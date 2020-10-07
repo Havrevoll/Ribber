@@ -24,27 +24,7 @@ Vm = np.nanmean(Vmx,0)
 up = Umx - Um
 vp = Vmx - Vm
 
-up_sq=(up*up)
-vp_sq=(vp*vp)
 
-up_sq_bar=np.nanmean(up_sq,0)
-vp_sq_bar=np.nanmean(vp_sq,0)
-
-u_bar=np.nanmean(Umx,0)
-v_bar=np.nanmean(Vmx,0)
-
-Re_stressp = -1*up*vp
-Re_stressm=np.nanmean(Re_stressp ,0);
-
-
-x_reshape1=(reshape(x,I,J))';       x_reshape=(x_reshape1(t+1:J-b,m+1:I-n));
-y_reshape1=(reshape(y,I,J))';       y_reshape=(y_reshape1(t+1:J-b,m+1:I-n));
-u_reshape1=(reshape(u_bar,I,J))';   u_reshape=(u_reshape1(t+1:J-b,m+1:I-n));
-v_reshape1=(reshape(v_bar,I,J))';    v_reshape=(v_reshape1(t+1:J-b,m+1:I-n));
-
-Re_str_reshape1=(reshape(Re_stress,I,J))';      Re_str_reshape=(Re_str_reshape1(t+1:J-b,m+1:I-n));
-up_sq_bar_reshape1=(reshape(up_sq_bar,I,J))';   up_sq_bar_reshape=(up_sq_bar_reshape1(t+1:J-b,m+1:I-n));
-vp_sq_bar_reshape1=(reshape(vp_sq_bar,I,J))';   vp_sq_bar_reshape=(vp_sq_bar_reshape1(t+1:J-b,m+1:I-n));
 
 
 # %%
