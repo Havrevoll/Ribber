@@ -100,3 +100,5 @@ def f(xn,yn):
     return interpolate.griddata(np.transpose(np.vstack((x[nonanindex], y[nonanindex]))), u_bar[nonanindex], np.array([xn,yn]),method='cubic')
 
 g = f(0,0)
+
+solve_ivp(fun, t_span, y0, method='RK45', t_eval=None, dense_output=False, events=None, vectorized=False, args=None, **options)
