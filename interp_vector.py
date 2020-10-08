@@ -1,23 +1,25 @@
 # -*- coding: utf-8 -*-
 
 import matplotlib.pyplot as plt
-import matplotlib as mpl
+import matplotlib.animation as animation
+# import matplotlib as mpl
+
 import numpy as np
 from scipy import interpolate
 from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#r179348322575-1
 import h5py
 # import os.path.join as pjoin
 
-f = h5py.File('F:/TONSTAD_TWO/Q40.mat', 'r') # https://docs.h5py.org/en/stable/quick.html#quick
+fil = h5py.File('F:/TONSTAD_TWO/Q40.mat', 'r') # https://docs.h5py.org/en/stable/quick.html#quick
  # list(f.keys())
  # ['#refs#', 'LEUC', 'LSUC', 'UEUC', 'USUC', 'Umx', 'Vmx', 'x', 'y']
  # x.shape
  
-x = f['x'][0]
-y = f['y'][0]
+x = fil['x'][0]
+y = fil['y'][0]
 
-Umx = f['Umx']
-Vmx = f['Vmx']
+Umx = np.array(fil['Umx'])*1000
+Vmx = np.array(fil['Vmx'])*1000
 
 u_bar = np.nanmean(Umx,0)
 v_bar = np.nanmean(Vmx,0)
@@ -52,39 +54,39 @@ vp_sq_bar_reshape1 = vp_sq_bar.reshape((J,I)) #   vp_sq_bar_reshape=(vp_sq_bar_r
 
 #%%
 
-fig, axes = plt.subplots(1,2, figsize=(23,10))
+fig, axes = plt.subplots(1,2, figsize=(18,8))
 # ax.plot(x, y1, color="blue", label="x")
 # ax.plot(x, y2, color="red", label="y'(x)")
 # ax.plot(x, y3, color="green", label="y”(x)")
 
 
 p= axes[0].pcolor(x_reshape1,y_reshape1, u_reshape1)
-axes[0].set_xlabel(r'$x$', fontsize=18)
-axes[0].set_ylabel(r'$y$', fontsize=18)
+axes[0].set_xlabel(r'$x$ [mm]', fontsize=18)
+axes[0].set_ylabel(r'$y$ [mm]', fontsize=18)
 cb = fig.colorbar(p, ax=axes[0])
-cb.set_label(r"$\overline{u}$", fontsize=18)
+cb.set_label(r"$\overline{u}$ [mm/s]", fontsize=18)
+
 
 k = 5
 # https://matplotlib.org/3.1.1/gallery/images_contours_and_fields/quiver_demo.html
-axes[0].quiver(x_reshape1[::k, ::k], y_reshape1[::k, ::k], u_reshape1[::k, ::k], v_reshape1[::k, ::k] ) # kunne lagt inn angles='xy', prøv det
+axes[0].quiver(x_reshape1[::k, ::k], y_reshape1[::k, ::k], u_reshape1[::k, ::k], v_reshape1[::k, ::k])
+# Kva med dette: Straumlinefelt: https://stackoverflow.com/questions/39619128/plotting-direction-field-in-python
  
 
 axes[0].axis('equal')
 
-q= axes[1].pcolor(x_reshape1,y_reshape1, v_reshape1)
-axes[1].set_xlabel(r'$x$', fontsize=18)
-axes[1].set_ylabel(r'$y$', fontsize=18)
+v_mag = np.sqrt(up_sq_bar_reshape1+ vp_sq_bar_reshape1)
+q= axes[1].pcolor(x_reshape1,y_reshape1, v_mag)
+axes[1].set_xlabel(r'$x$ [mm]', fontsize=18)
+axes[1].set_ylabel(r'$y$ [mm]', fontsize=18)
 cb2 = fig.colorbar(q, ax=axes[1])
-cb2.set_label(r"$\overline{v}$", fontsize=18)
+cb2.set_label(r"$\overline{v}$ [mm/s]", fontsize=18)
 axes[1].axis('equal')
+
+# https://matplotlib.org/gallery/images_contours_and_fields/plot_streamplot.html#sphx-glr-gallery-images-contours-and-fields-plot-streamplot-py
+q= axes[1].streamplot(x_reshape1,y_reshape1,u_reshape1, v_reshape1, arrowsize=1, linewidth=(.1*v_mag)) # tok vekk color=v_mag
 #plt.show()
 
-
-#%%
-
-#Ta vekk alle nan frå u_bar og v_bar
-
-nonanindex=np.invert(np.isnan(x))*np.invert(np.isnan(y))*np.invert(np.isnan(u_bar))
 
 #%%
 ''' Byrja på å berekna stien til ein partikkel '''
@@ -92,13 +94,30 @@ nonanindex=np.invert(np.isnan(x))*np.invert(np.isnan(y))*np.invert(np.isnan(u_ba
 # https://stackoverflow.com/questions/59071446/why-does-scipy-griddata-return-nans-with-cubic-interpolation-if-input-values
 
 
-f1 = interpolate.griddata(np.transpose(np.vstack((x, y))), u_bar, np.array([0,0]),method='linear')
+# f1 = interpolate.griddata(np.transpose(np.vstack((x, y))), u_bar, np.array([0,0]),method='linear')
 
 #Her tek me vekk alle nan frå x, y og uv.
 nonanindex=np.invert(np.isnan(x)) * np.invert(np.isnan(y)) * np.invert(np.isnan(u_bar)) * np.invert(np.isnan(v_bar))
-def f(xn,yn):
-    return interpolate.griddata(np.transpose(np.vstack((x[nonanindex], y[nonanindex]))), u_bar[nonanindex], np.array([xn,yn]),method='cubic')
 
-g = f(0,0)
+def f(t,yn): # yn er array-like, altså np.array(xn,yn)
+    return interpolate.griddata(np.transpose(np.vstack((x[nonanindex], y[nonanindex]))), u_bar[nonanindex], yn ,method='cubic')
 
-solve_ivp(fun, t_span, y0, method='RK45', t_eval=None, dense_output=False, events=None, vectorized=False, args=None, **options)
+g = f(0,[0,0])
+#%%
+#solve_ivp(fun, t_span, y0, method='RK45', t_eval=None, dense_output=False, events=None, vectorized=False, args=None, **options)
+p_x,p_y = np.meshgrid([-91],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
+
+sol = []
+
+for par in np.column_stack((p_x,p_y)):
+    sol.append(solve_ivp(f, [0,1], par))
+
+sol[0]
+
+#%%
+
+#animer ein partikkel
+
+#fig, ax = plt.subplots()
+
+#plot()
