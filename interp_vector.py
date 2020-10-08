@@ -10,7 +10,7 @@ from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/refere
 import h5py
 # import os.path.join as pjoin
 
-fil = h5py.File('F:/TONSTAD_TWO/Q40.mat', 'r') # https://docs.h5py.org/en/stable/quick.html#quick
+fil = h5py.File('D:/Q40.mat', 'r') # https://docs.h5py.org/en/stable/quick.html#quick
  # list(f.keys())
  # ['#refs#', 'LEUC', 'LSUC', 'UEUC', 'USUC', 'Umx', 'Vmx', 'x', 'y']
  # x.shape
@@ -99,10 +99,35 @@ q= axes[1].streamplot(x_reshape1,y_reshape1,u_reshape1, v_reshape1, arrowsize=1,
 #Her tek me vekk alle nan frå x, y og uv.
 nonanindex=np.invert(np.isnan(x)) * np.invert(np.isnan(y)) * np.invert(np.isnan(u_bar)) * np.invert(np.isnan(v_bar))
 
+nonancoords= np.transpose(np.vstack((x[nonanindex], y[nonanindex])))
+nonanu = u_bar[nonanindex]
+nonanv = v_bar[nonanindex]
+
 def f(t,yn): # yn er array-like, altså np.array(xn,yn)
-    return interpolate.griddata(np.transpose(np.vstack((x[nonanindex], y[nonanindex]))), u_bar[nonanindex], yn ,method='cubic')
+    return np.hstack([interpolate.griddata(nonancoords, nonanu, yn ,method='cubic'),
+            interpolate.griddata(nonancoords, nonanv, yn ,method='cubic')]) 
+    
 
 g = f(0,[0,0])
+
+#%%
+
+
+h=0.02
+t0 = 0
+y0 = [-91,85]
+
+t=t0
+y=y0
+
+
+for n in range(0,int(10/h)):
+    k1= f(t,y)
+    
+    t = t + h
+
+
+
 #%%
 #solve_ivp(fun, t_span, y0, method='RK45', t_eval=None, dense_output=False, events=None, vectorized=False, args=None, **options)
 p_x,p_y = np.meshgrid([-91],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
