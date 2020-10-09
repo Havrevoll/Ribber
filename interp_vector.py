@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
+from matplotlib import animation, rc
 # import matplotlib as mpl
 
 import numpy as np
@@ -33,22 +33,22 @@ vp_sq = (vp*vp)
 up_sq_bar = np.nanmean(up_sq,0)
 vp_sq_bar = np.nanmean(vp_sq,0)
 
-Re_stressp = -1*up*vp
-Re_stressm = np.nanmean(Re_stressp ,0)
+# Re_stressp = -1*up*vp
+# Re_stressm = np.nanmean(Re_stressp ,0)
 
 I = 126  # horisontal lengd
 J = 127  # vertikal lengd
-m = 3 #define number of columns to be cut at the lefthand side of the window
-n = 2 #define number of columns to be cut at the righthand side of the window
-b = 3 #define number of columns to be cut at the bottom of the window
-t = 3 #define number of columns to be cut at the top of the window
+# m = 3 #define number of columns to be cut at the lefthand side of the window
+# n = 2 #define number of columns to be cut at the righthand side of the window
+# b = 3 #define number of columns to be cut at the bottom of the window
+# t = 3 #define number of columns to be cut at the top of the window
 
 x_reshape1 = x.reshape((J,I))      # x_reshape=(x_reshape1(t+1:J-b,m+1:I-n))
 y_reshape1 = y.reshape((J,I))      # y_reshape=(y_reshape1(t+1:J-b,m+1:I-n));
 u_reshape1 = u_bar.reshape((J,I))  # u_reshape=(u_reshape1(t+1:J-b,m+1:I-n));
 v_reshape1 = v_bar.reshape((J,I))  # v_reshape=(v_reshape1(t+1:J-b,m+1:I-n));
 
-Re_str_reshape1 = Re_stressm.reshape((J,I))   #   Re_str_reshape=(Re_str_reshape1(t+1:J-b,m+1:I-n));
+# Re_str_reshape1 = Re_stressm.reshape((J,I))   #   Re_str_reshape=(Re_str_reshape1(t+1:J-b,m+1:I-n));
 up_sq_bar_reshape1 = up_sq_bar.reshape((J,I))  #   up_sq_bar_reshape=(up_sq_bar_reshape1(t+1:J-b,m+1:I-n));
 vp_sq_bar_reshape1 = vp_sq_bar.reshape((J,I)) #   vp_sq_bar_reshape=(vp_sq_bar_reshape1(t+1:J-b,m+1:I-n));
 
@@ -75,7 +75,8 @@ axes[0].quiver(x_reshape1[::k, ::k], y_reshape1[::k, ::k], u_reshape1[::k, ::k],
 
 axes[0].axis('equal')
 
-v_mag = np.sqrt(up_sq_bar_reshape1+ vp_sq_bar_reshape1)
+v_mag = np.sqrt(u_reshape1 * u_reshape1 + v_reshape1 * v_reshape1)
+
 q= axes[1].pcolor(x_reshape1,y_reshape1, v_mag)
 axes[1].set_xlabel(r'$x$ [mm]', fontsize=18)
 axes[1].set_ylabel(r'$y$ [mm]', fontsize=18)
@@ -84,8 +85,9 @@ cb2.set_label(r"$\overline{v}$ [mm/s]", fontsize=18)
 axes[1].axis('equal')
 
 # https://matplotlib.org/gallery/images_contours_and_fields/plot_streamplot.html#sphx-glr-gallery-images-contours-and-fields-plot-streamplot-py
-q= axes[1].streamplot(x_reshape1,y_reshape1,u_reshape1, v_reshape1, arrowsize=1, linewidth=(.1*v_mag)) # tok vekk color=v_mag
+q= axes[1].streamplot(x_reshape1,y_reshape1,u_reshape1, v_reshape1, arrowsize=1, linewidth=(.01*v_mag)) # tok vekk color=v_mag
 #plt.show()
+fig.savefig('straumfelt.png')
 
 
 #%%
@@ -104,45 +106,99 @@ nonanu = u_bar[nonanindex]
 nonanv = v_bar[nonanindex]
 
 def f(t,yn): # yn er array-like, altså np.array(xn,yn)
-    return np.hstack([interpolate.griddata(nonancoords, nonanu, yn ,method='cubic'),
-            interpolate.griddata(nonancoords, nonanv, yn ,method='cubic')]) 
+    return np.hstack([interpolate.griddata(nonancoords, nonanu, yn ,method='nearest'),
+            interpolate.griddata(nonancoords, nonanv, yn ,method='nearest')]) 
     
 
-g = f(0,[0,0])
+#g = f(0,[0,0])
 
 #%%
 
 
-h=0.02
-t0 = 0
-y0 = [-91,85]
+def rk(t0, y0, L, h=0.02):
+    N=int(L/h)
 
-t=t0
-y=y0
-
-
-for n in range(0,int(10/h)):
-    k1= f(t,y)
+    t=[0]*N # initialize lists
+    y=[0]*N # initialize lists
     
-    t = t + h
+    t[0] = t0
+    y[0] = y0
+    
+    for n in range(0, N-1):
+        print(n,t[n], y[n], f(t[n],y[n]))
+        k1 = h*f(t[n], y[n])
+        k2 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k1)
+        k3 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k2)
+        k4 = h*f(t[n] + h, y[n] + k3)
+        
+        if (np.isnan(k4+k3+k2+k1).any()):
+            print(k1,k2,k3,k4)
+            return t,y
+        
+        t[n+1] = t[n] + h
+        y[n+1] = y[n] + 1/6 * (k1 + 2*k2 + 2*k3 + k4)
+        
 
+    return t,y
 
+#%%
+
+p_x,p_y = np.meshgrid([-91],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
+
+sti = []
+
+for par in np.column_stack((p_x,p_y)):
+    sti_t, sti_y = rk(0, par, 1)
+    sti.append([sti_t,sti_y])
+    
+sti = np.array(sti)
 
 #%%
 #solve_ivp(fun, t_span, y0, method='RK45', t_eval=None, dense_output=False, events=None, vectorized=False, args=None, **options)
-p_x,p_y = np.meshgrid([-91],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
 
-sol = []
 
-for par in np.column_stack((p_x,p_y)):
-    sol.append(solve_ivp(f, [0,1], par))
-
-sol[0]
 
 #%%
 
-#animer ein partikkel
+# animer ein partikkel https://stackoverflow.com/questions/49119896/animating-particles-path-with-disappearing-tail-in-python
 
-#fig, ax = plt.subplots()
 
-#plot()
+
+punkt = np.vstack(sti[:,1,0])
+
+
+fig, ax = plt.subplots()
+
+ax.pcolor(x_reshape1,y_reshape1, v_mag)
+part, =ax.plot(punkt[:,0], punkt[:,1], 'ro')
+
+def nypkt(i):
+    part.set_data(np.vstack(sti[:,1,i])[:,0], np.vstack(sti[:,1,i])[:,1])
+    return part,
+
+ax.axis('equal')
+ani = animation.FuncAnimation(fig, nypkt, np.arange(1,50),interval=100)
+plt.show()
+ani.save("sti.mp4")
+    
+    
+# im = ax.pcolor(x_reshape1,y_reshape1, v_mag)
+
+# if i == 0:
+#     ax.pcolor(x_reshape1,y_reshape1, v_mag)
+# # axes[1].set_xlabel(r'$x$ [mm]', fontsize=18)
+# # axes[1].set_ylabel(r'$y$ [mm]', fontsize=18)
+# # cb2 = fig.colorbar(q, ax=axes[1])
+# # cb2.set_label(r"$\overline{v}$ [mm/s]", fontsize=18)
+# ax.axis('equal')
+
+
+
+   
+# ax.plot(punktx,punkty,'o')
+
+# ims.append([im])
+#fig.savefig('straumfelt{0}.png'.format(i))
+   
+#ani= animation.ArtistAnimation(fig, ims, interval=50, blit=False, repeat_delay=1000)
+#ani.save("sti.mp4")
