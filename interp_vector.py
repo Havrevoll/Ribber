@@ -107,31 +107,71 @@ nonanindex=np.invert(np.isnan(x)) * np.invert(np.isnan(y)) * np.invert(np.isnan(
 nonancoords= np.transpose(np.vstack((x[nonanindex], y[nonanindex])))
 nonanu = u_bar[nonanindex]
 nonanv = v_bar[nonanindex]
-
+nonanUmx = Umx[:,nonanindex]
+nonanVmx = Vmx[:,nonanindex]
 
 from math import floor, ceil
 
 def f(t,yn, method='nearest',t_av=True): # yn er array-like, altså np.array(xn,yn)
-    if not t_av:
-        #return np.hstack([interpolate.griddata((x,y), Umx[round(t),:], yn, method=method), interpolate.griddata((x,y), Vmx[round(t),:], yn, method=method)])
-        interpolate.interp1d(np.array([floor(t),ceil(t)]),np.hstack([interpolate.griddata((x,y), Umx[floor(t),:], yn, method='linear'), 
-                                                        interpolate.griddata((x,y), Umx[ceil(t),:], yn, method='linear')]))(t)
-        #t_low = np.hstack([interpolate.griddata((x,y), Umx[floor(t),:], yn, method=method), interpolate.griddata((x,y), Vmx[floor(t),:], yn, method=method)])
-        #t_hi = np.hstack([interpolate.griddata((x,y), Umx[ceil(t),:], yn, method=method), interpolate.griddata((x,y), Vmx[ceil(t),:], yn, method=method)])
-    else:
+    # if not t_av:
+    #     t_0 = floor(t)
+    #     t_1 = ceil(t)
+        
+    #     vel_0 = np.hstack([interpolate.griddata(nonancoords, nonanUmx[t_0,:], yn, method=method), 
+    #                       interpolate.griddata(nonancoords, nonanVmx[t_0,:], yn, method=method)])
+        
+    #     vel_1 = np.hstack([interpolate.griddata(nonancoords, nonanUmx[t_1,:], yn, method=method), 
+    #                        interpolate.griddata(nonancoords, nonanVmx[t_1,:], yn, method=method)])
+        
+    #     vel = np.hstack( [ interpolate.griddata([t_0, t_1], [vel_0[0], vel_1[0]], t, method=method), 
+    #                         interpolate.griddata([t_0, t_1], [vel_0[1], vel_1[1]], t, method=method)] )
+        
+    #     return vel
+        
+        
+        # return np.hstack([interpolate.griddata((x,y), Umx[round(t),:], yn, method=method), interpolate.griddata((x,y), Vmx[round(t),:], yn, method=method)])
+        # return interpolate.interp1d(np.array([floor(t),ceil(t)]),np.hstack([interpolate.griddata((x,y), Umx[floor(t),:], yn, method='linear'), interpolate.griddata((x,y), Umx[ceil(t),:], yn, method='linear')]))(t)
+        # t_low = np.hstack([interpolate.griddata((x,y), Umx[floor(t),:], yn, method=method), interpolate.griddata((x,y), Vmx[floor(t),:], yn, method=method)])
+        # t_hi = np.hstack([interpolate.griddata((x,y), Umx[ceil(t),:], yn, method=method), interpolate.griddata((x,y), Vmx[ceil(t),:], yn, method=method)])
+    # else:
         return np.hstack([interpolate.griddata((x,y), u_bar, yn, method=method), interpolate.griddata((x,y), v_bar, yn, method=method)]) 
 
     # return np.hstack([interpolate.griddata(nonancoords, nonanu, yn ,method=method),
             # interpolate.griddata(nonancoords, nonanv, yn ,method=method)]) 
     
 def f_t(t,yn):
-    return f(t,yn,t_av=False)
+    t_0 = floor(t)
+    t_1 = ceil(t)
+    
+    if t_0 == t_1:
+        u_0 = interpolate.griddata(nonancoords, nonanUmx[t_0,:], yn)
+        v_0 = interpolate.griddata(nonancoords, nonanVmx[t_0,:], yn)
+        
+        return np.hstack([u_0,v_0])
+    
+    
+    u_0 = interpolate.griddata(nonancoords, nonanUmx[t_0,:], yn)
+    v_0 = interpolate.griddata(nonancoords, nonanVmx[t_0,:], yn)
+    
+    u_1 = interpolate.griddata(nonancoords, nonanUmx[t_1,:], yn)
+    v_1 = interpolate.griddata(nonancoords, nonanVmx[t_1,:], yn)
+    
+    #vel_x = interpolate.griddata([t_0, t_1], np.array([vel_0[0], vel_1[0]]), t)
+    #vel_y = interpolate.griddata([t_0, t_1], np.array([vel_0[1], vel_1[1]]), t)
+    
+    u_x = u_0 + (t- t_0) * (u_1 - u_0) / (t_1 - t_0) 
+    v_y = v_0 + (t- t_0) * (v_1 - v_0) / (t_1 - t_0) 
+    vel = np.hstack([u_x,v_y])
+    
+    return vel
+    
+    #return f(t,yn,t_av=False,method='linear')
 
 #g = f(0,[0,0])
 
+
+
 #%%
-
-
 def rk(t0, y0, L, h=0.02):
     N=int(L/h)
 
