@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import matplotlib.pyplot as plt
-from matplotlib import animation, rc
+from matplotlib import animation
 # import matplotlib as mpl
 
 import numpy as np
@@ -47,6 +47,9 @@ x_reshape1 = x.reshape((J,I))      # x_reshape=(x_reshape1(t+1:J-b,m+1:I-n))
 y_reshape1 = y.reshape((J,I))      # y_reshape=(y_reshape1(t+1:J-b,m+1:I-n));
 u_reshape1 = u_bar.reshape((J,I))  # u_reshape=(u_reshape1(t+1:J-b,m+1:I-n));
 v_reshape1 = v_bar.reshape((J,I))  # v_reshape=(v_reshape1(t+1:J-b,m+1:I-n));
+Umx_reshape = Umx.reshape((len(Umx),J,I))
+Vmx_reshape = Vmx.reshape((len(Vmx),J,I))
+t_3d,y_3d,x_3d = np.meshgrid(np.arange(3600.0),y_reshape1[:,0],x_reshape1[0,:],indexing='ij')
 
 # Re_str_reshape1 = Re_stressm.reshape((J,I))   #   Re_str_reshape=(Re_str_reshape1(t+1:J-b,m+1:I-n));
 up_sq_bar_reshape1 = up_sq_bar.reshape((J,I))  #   up_sq_bar_reshape=(up_sq_bar_reshape1(t+1:J-b,m+1:I-n));
@@ -105,10 +108,24 @@ nonancoords= np.transpose(np.vstack((x[nonanindex], y[nonanindex])))
 nonanu = u_bar[nonanindex]
 nonanv = v_bar[nonanindex]
 
-def f(t,yn): # yn er array-like, altså np.array(xn,yn)
-    return np.hstack([interpolate.griddata(nonancoords, nonanu, yn ,method='nearest'),
-            interpolate.griddata(nonancoords, nonanv, yn ,method='nearest')]) 
+
+from math import floor, ceil
+
+def f(t,yn, method='nearest',t_av=True): # yn er array-like, altså np.array(xn,yn)
+    if not t_av:
+        #return np.hstack([interpolate.griddata((x,y), Umx[round(t),:], yn, method=method), interpolate.griddata((x,y), Vmx[round(t),:], yn, method=method)])
+        interpolate.interp1d(np.array([floor(t),ceil(t)]),np.hstack([interpolate.griddata((x,y), Umx[floor(t),:], yn, method='linear'), 
+                                                        interpolate.griddata((x,y), Umx[ceil(t),:], yn, method='linear')]))(t)
+        #t_low = np.hstack([interpolate.griddata((x,y), Umx[floor(t),:], yn, method=method), interpolate.griddata((x,y), Vmx[floor(t),:], yn, method=method)])
+        #t_hi = np.hstack([interpolate.griddata((x,y), Umx[ceil(t),:], yn, method=method), interpolate.griddata((x,y), Vmx[ceil(t),:], yn, method=method)])
+    else:
+        return np.hstack([interpolate.griddata((x,y), u_bar, yn, method=method), interpolate.griddata((x,y), v_bar, yn, method=method)]) 
+
+    # return np.hstack([interpolate.griddata(nonancoords, nonanu, yn ,method=method),
+            # interpolate.griddata(nonancoords, nonanv, yn ,method=method)]) 
     
+def f_t(t,yn):
+    return f(t,yn,t_av=False)
 
 #g = f(0,[0,0])
 
@@ -125,14 +142,14 @@ def rk(t0, y0, L, h=0.02):
     y[0] = y0
     
     for n in range(0, N-1):
-        print(n,t[n], y[n], f(t[n],y[n]))
+        #print(n,t[n], y[n], f(t[n],y[n]))
         k1 = h*f(t[n], y[n])
         k2 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k1)
         k3 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k2)
         k4 = h*f(t[n] + h, y[n] + k3)
         
         if (np.isnan(k4+k3+k2+k1).any()):
-            print(k1,k2,k3,k4)
+            #print(k1,k2,k3,k4)
             return t,y
         
         t[n+1] = t[n] + h
@@ -177,7 +194,7 @@ def nypkt(i):
     return part,
 
 ax.axis('equal')
-ani = animation.FuncAnimation(fig, nypkt, np.arange(1,50),interval=100)
+ani = animation.FuncAnimation(fig, nypkt, np.arange(1,100),interval=100)
 plt.show()
 ani.save("sti.mp4")
     
@@ -202,3 +219,31 @@ ani.save("sti.mp4")
    
 #ani= animation.ArtistAnimation(fig, ims, interval=50, blit=False, repeat_delay=1000)
 #ani.save("sti.mp4")
+
+#%%
+
+p_x,p_y = np.meshgrid([-91],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
+
+sti = []
+
+for par in np.column_stack((p_x,p_y)):
+    sti.append(solve_ivp(f, , y0, options))
+    
+sti = np.array(sti)
+
+punkt = np.vstack(sti[:,1,0])
+
+
+fig, ax = plt.subplots()
+
+ax.pcolor(x_reshape1,y_reshape1, Umx_reshape[0,:,:])
+part, =ax.plot(punkt[:,0], punkt[:,1], 'ro')
+
+def nypkt(i):
+    part.set_data(np.vstack(sti[:,1,i])[:,0], np.vstack(sti[:,1,i])[:,1])
+    return part,
+
+ax.axis('equal')
+ani = animation.FuncAnimation(fig, nypkt, np.arange(1,100),interval=100)
+plt.show()
+ani.save("sti.mp4")
