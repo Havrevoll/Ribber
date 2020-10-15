@@ -94,84 +94,63 @@ fig.savefig('straumfelt.png')
 
 
 #%%
-''' Byrja på å berekna stien til ein partikkel '''
+''' Funksjon for å laga eit kontinuerleg vektorfelt '''
 
 # https://stackoverflow.com/questions/59071446/why-does-scipy-griddata-return-nans-with-cubic-interpolation-if-input-values
 
-
-# f1 = interpolate.griddata(np.transpose(np.vstack((x, y))), u_bar, np.array([0,0]),method='linear')
-
 #Her tek me vekk alle nan frå x, y og uv.
 nonanindex=np.invert(np.isnan(x)) * np.invert(np.isnan(y)) * np.invert(np.isnan(u_bar)) * np.invert(np.isnan(v_bar))
-
 nonancoords= np.transpose(np.vstack((x[nonanindex], y[nonanindex])))
 nonanu = u_bar[nonanindex]
 nonanv = v_bar[nonanindex]
-nonanUmx = Umx[:,nonanindex]
-nonanVmx = Vmx[:,nonanindex]
+
+nonanxindex = np.invert(np.isnan(Umx))
+nonanyindex = np.invert(np.isnan(Vmx))
+
 
 from math import floor, ceil
 
-def f(t,yn, method='nearest',t_av=True): # yn er array-like, altså np.array(xn,yn)
-    # if not t_av:
-    #     t_0 = floor(t)
-    #     t_1 = ceil(t)
-        
-    #     vel_0 = np.hstack([interpolate.griddata(nonancoords, nonanUmx[t_0,:], yn, method=method), 
-    #                       interpolate.griddata(nonancoords, nonanVmx[t_0,:], yn, method=method)])
-        
-    #     vel_1 = np.hstack([interpolate.griddata(nonancoords, nonanUmx[t_1,:], yn, method=method), 
-    #                        interpolate.griddata(nonancoords, nonanVmx[t_1,:], yn, method=method)])
-        
-    #     vel = np.hstack( [ interpolate.griddata([t_0, t_1], [vel_0[0], vel_1[0]], t, method=method), 
-    #                         interpolate.griddata([t_0, t_1], [vel_0[1], vel_1[1]], t, method=method)] )
-        
-    #     return vel
-        
-        
-        # return np.hstack([interpolate.griddata((x,y), Umx[round(t),:], yn, method=method), interpolate.griddata((x,y), Vmx[round(t),:], yn, method=method)])
-        # return interpolate.interp1d(np.array([floor(t),ceil(t)]),np.hstack([interpolate.griddata((x,y), Umx[floor(t),:], yn, method='linear'), interpolate.griddata((x,y), Umx[ceil(t),:], yn, method='linear')]))(t)
-        # t_low = np.hstack([interpolate.griddata((x,y), Umx[floor(t),:], yn, method=method), interpolate.griddata((x,y), Vmx[floor(t),:], yn, method=method)])
-        # t_hi = np.hstack([interpolate.griddata((x,y), Umx[ceil(t),:], yn, method=method), interpolate.griddata((x,y), Vmx[ceil(t),:], yn, method=method)])
-    # else:
-        return np.hstack([interpolate.griddata((x,y), u_bar, yn, method=method), interpolate.griddata((x,y), v_bar, yn, method=method)]) 
+def f(t,yn, method='nearest'): # yn er array-like, altså np.array(xn,yn)
+    return np.hstack([interpolate.griddata((x,y), u_bar, yn, method=method), interpolate.griddata((x,y), v_bar, yn, method=method)]) 
 
-    # return np.hstack([interpolate.griddata(nonancoords, nonanu, yn ,method=method),
-            # interpolate.griddata(nonancoords, nonanv, yn ,method=method)]) 
-    
+def interp_lin_near(coords,values, yn):
+    new = interpolate.griddata(coords, values, yn, method='linear')
+    if np.isnan(new):
+        return interpolate.griddata(coords, values, yn, method='nearest')
+    else:
+        return new
+
 def f_t(t,yn):
     t_0 = floor(t)
     t_1 = ceil(t)
     
     if t_0 == t_1:
-        u_0 = interpolate.griddata(nonancoords, nonanUmx[t_0,:], yn)
-        v_0 = interpolate.griddata(nonancoords, nonanVmx[t_0,:], yn)
+        u_0 = interp_lin_near((x[nonanxindex[t_0]], y[nonanxindex[t_0]]), Umx[t_0,nonanxindex[t_0,:]], yn) #interpolate.griddata((x[nonanxindex[t_0]], y[nonanxindex[t_0]]), Umx[t_0,nonanxindex[t_0,:]], yn)
+        v_0 = interp_lin_near((x[nonanyindex[t_0]], y[nonanyindex[t_0]]), Vmx[t_0,nonanyindex[t_0,:]], yn)
         
         return np.hstack([u_0,v_0])
     
+    u_0 = interp_lin_near((x[nonanxindex[t_0]], y[nonanxindex[t_0]]), Umx[t_0,nonanxindex[t_0,:]], yn)
+    v_0 = interp_lin_near((x[nonanyindex[t_0]], y[nonanyindex[t_0]]), Vmx[t_0,nonanyindex[t_0,:]], yn)
     
-    u_0 = interpolate.griddata(nonancoords, nonanUmx[t_0,:], yn)
-    v_0 = interpolate.griddata(nonancoords, nonanVmx[t_0,:], yn)
-    
-    u_1 = interpolate.griddata(nonancoords, nonanUmx[t_1,:], yn)
-    v_1 = interpolate.griddata(nonancoords, nonanVmx[t_1,:], yn)
-    
-    #vel_x = interpolate.griddata([t_0, t_1], np.array([vel_0[0], vel_1[0]]), t)
-    #vel_y = interpolate.griddata([t_0, t_1], np.array([vel_0[1], vel_1[1]]), t)
+    u_1 = interp_lin_near((x[nonanxindex[t_1]], y[nonanxindex[t_1]]), Umx[t_1,nonanxindex[t_1,:]], yn)
+    v_1 = interp_lin_near((x[nonanyindex[t_1]], y[nonanyindex[t_1]]), Vmx[t_1,nonanyindex[t_1,:]], yn)
     
     u_x = u_0 + (t- t_0) * (u_1 - u_0) / (t_1 - t_0) 
     v_y = v_0 + (t- t_0) * (v_1 - v_0) / (t_1 - t_0) 
-    vel = np.hstack([u_x,v_y])
     
-    return vel
+    print("ferdig med interpolering")
+    print(t,yn,np.hstack([u_x,v_y]))
+    return np.hstack([u_x,v_y])
     
-    #return f(t,yn,t_av=False,method='linear')
-
 #g = f(0,[0,0])
 
-
+#%%
+f_t(0.5,[-90,85])
 
 #%%
+''' Heimelaga Runge-Kutta-metode '''
+
 def rk(t0, y0, L, h=0.02):
     N=int(L/h)
 
@@ -195,7 +174,6 @@ def rk(t0, y0, L, h=0.02):
         t[n+1] = t[n] + h
         y[n+1] = y[n] + 1/6 * (k1 + 2*k2 + 2*k3 + k4)
         
-
     return t,y
 
 #%%
@@ -219,10 +197,7 @@ sti = np.array(sti)
 
 # animer ein partikkel https://stackoverflow.com/questions/49119896/animating-particles-path-with-disappearing-tail-in-python
 
-
-
 punkt = np.vstack(sti[:,1,0])
-
 
 fig, ax = plt.subplots()
 
@@ -262,28 +237,39 @@ ani.save("sti.mp4")
 
 #%%
 
-p_x,p_y = np.meshgrid([-91],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
+p_x,p_y = np.meshgrid([-90],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
 
 sti = []
 
+timespan = [0,2]
+
 for par in np.column_stack((p_x,p_y)):
-    sti.append(solve_ivp(f, , y0, options))
+    print("No skal han gjera")
+    print(par)
+    sti.append(solve_ivp(f_t, timespan, par, t_eval=np.array([0,.1,.2,.3,.4,.5,.6,.7,.8,.9,1.,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9])))
     
-sti = np.array(sti)
+print("ferdig med likningsløysing")
 
-punkt = np.vstack(sti[:,1,0])
+#sti = np.array(sti)
 
+#punkt = np.vstack(sti[:,1,0])
+
+
+#%%
 
 fig, ax = plt.subplots()
 
-ax.pcolor(x_reshape1,y_reshape1, Umx_reshape[0,:,:])
-part, =ax.plot(punkt[:,0], punkt[:,1], 'ro')
+field, = axes.imshow(Umx_reshape[0,:,:], extent=[x_reshape1[0,0],x_reshape1[0,-1], y_reshape1[-1,0], y_reshape1[0,0]])
+particle, =ax.plot(punkt[:,0], punkt[:,1], 'ro')
 
 def nypkt(i):
-    part.set_data(np.vstack(sti[:,1,i])[:,0], np.vstack(sti[:,1,i])[:,1])
-    return part,
+    field.set_data(Umx_reshape[i,:,:])
+    particle.set_data(np.vstack(sti[:,1,i])[:,0], np.vstack(sti[:,1,i])[:,1])
+    return field,particle
 
+print("Skal byrja på filmen")
 ax.axis('equal')
 ani = animation.FuncAnimation(fig, nypkt, np.arange(1,100),interval=100)
 plt.show()
-ani.save("sti.mp4")
+print("ferdig med animasjon, skal lagra")
+ani.save("sti2.mp4")
