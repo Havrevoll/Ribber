@@ -8,6 +8,8 @@ import numpy as np
 from scipy import interpolate
 from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#r179348322575-1
 import h5py
+
+from math import floor, ceil
 # import os.path.join as pjoin
 
 fil = h5py.File('D:/Q40.mat', 'r') # https://docs.h5py.org/en/stable/quick.html#quick
@@ -108,7 +110,6 @@ nonanxindex = np.invert(np.isnan(Umx))
 nonanyindex = np.invert(np.isnan(Vmx))
 
 
-from math import floor, ceil
 
 def f(t,yn, method='nearest'): # yn er array-like, altså np.array(xn,yn)
     return np.hstack([interpolate.griddata((x,y), u_bar, yn, method=method), interpolate.griddata((x,y), v_bar, yn, method=method)]) 
@@ -246,7 +247,7 @@ timespan = [0,2]
 for par in np.column_stack((p_x,p_y)):
     print("No skal han gjera")
     print(par)
-    sti.append(solve_ivp(f_t, timespan, par, t_eval=np.array([0,.1,.2,.3,.4,.5,.6,.7,.8,.9,1.,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9])))
+    sti.append(solve_ivp(f_t, timespan, par, t_eval=np.arange(0, 2, .1)))
     
 print("ferdig med likningsløysing")
 
