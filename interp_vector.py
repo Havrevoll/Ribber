@@ -179,98 +179,44 @@ def rk(t0, y0, L, h=0.02):
 
 #%%
 
-p_x,p_y = np.meshgrid([-91],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
+p_x,p_y = np.meshgrid([-90,-200],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
+
+p_x = p_x.T.reshape(-1)
+p_y= p_y.T.reshape(-1)
 
 sti = []
 
-for par in np.column_stack((p_x,p_y)):
-    sti_t, sti_y = rk(0, par, 1)
-    sti.append([sti_t,sti_y])
-    
-sti = np.array(sti)
-
-#%%
-#solve_ivp(fun, t_span, y0, method='RK45', t_eval=None, dense_output=False, events=None, vectorized=False, args=None, **options)
-
-
-
-#%%
-
-# animer ein partikkel https://stackoverflow.com/questions/49119896/animating-particles-path-with-disappearing-tail-in-python
-
-punkt = np.vstack(sti[:,1,0])
-
-fig, ax = plt.subplots()
-
-ax.pcolor(x_reshape1,y_reshape1, v_mag)
-part, =ax.plot(punkt[:,0], punkt[:,1], 'ro')
-
-def nypkt(i):
-    part.set_data(np.vstack(sti[:,1,i])[:,0], np.vstack(sti[:,1,i])[:,1])
-    return part,
-
-ax.axis('equal')
-ani = animation.FuncAnimation(fig, nypkt, np.arange(1,100),interval=100)
-plt.show()
-ani.save("sti.mp4")
-    
-    
-# im = ax.pcolor(x_reshape1,y_reshape1, v_mag)
-
-# if i == 0:
-#     ax.pcolor(x_reshape1,y_reshape1, v_mag)
-# # axes[1].set_xlabel(r'$x$ [mm]', fontsize=18)
-# # axes[1].set_ylabel(r'$y$ [mm]', fontsize=18)
-# # cb2 = fig.colorbar(q, ax=axes[1])
-# # cb2.set_label(r"$\overline{v}$ [mm/s]", fontsize=18)
-# ax.axis('equal')
-
-
-
-   
-# ax.plot(punktx,punkty,'o')
-
-# ims.append([im])
-#fig.savefig('straumfelt{0}.png'.format(i))
-   
-#ani= animation.ArtistAnimation(fig, ims, interval=50, blit=False, repeat_delay=1000)
-#ani.save("sti.mp4")
-
-#%%
-
-p_x,p_y = np.meshgrid([-90],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
-
-sti = []
-
-timespan = [0,2]
+t_start= 0
+t_end = 10
+fps= 60
 
 for par in np.column_stack((p_x,p_y)):
-    print("No skal han gjera")
-    print(par)
-    sti.append(solve_ivp(f_t, timespan, par, t_eval=np.arange(0, 2, .1)))
+    sti.append(solve_ivp(f_t, [t_start,t_end], par, t_eval=np.arange(t_start, t_end, 1/fps)))
     
-print("ferdig med likningsløysing")
+sti_ny=[]
 
-#sti = np.array(sti)
+for el in sti:
+    sti_ny.append(el.y.T)
 
-#punkt = np.vstack(sti[:,1,0])
+sti_ny = np.array(sti_ny)
 
 
 #%%
 
 fig, ax = plt.subplots()
 
-field, = axes.imshow(Umx_reshape[0,:,:], extent=[x_reshape1[0,0],x_reshape1[0,-1], y_reshape1[-1,0], y_reshape1[0,0]])
-particle, =ax.plot(punkt[:,0], punkt[:,1], 'ro')
+field = ax.imshow(Umx_reshape[0,:,:], extent=[x_reshape1[0,0],x_reshape1[0,-1], y_reshape1[-1,0], y_reshape1[0,0]])
+particle, =ax.plot(sti_ny[:,0,0], sti_ny[:,0,1], 'ro')
+ax.set_xlim([x_reshape1[0,0],x_reshape1[0,-1]])
 
 def nypkt(i):
     field.set_data(Umx_reshape[i,:,:])
-    particle.set_data(np.vstack(sti[:,1,i])[:,0], np.vstack(sti[:,1,i])[:,1])
+    particle.set_data(sti_ny[:,i,0], sti_ny[:,i,1])
     return field,particle
 
 print("Skal byrja på filmen")
-ax.axis('equal')
-ani = animation.FuncAnimation(fig, nypkt, np.arange(1,100),interval=100)
+#ax.axis('equal')
+ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,600),interval=20)
 plt.show()
 print("ferdig med animasjon, skal lagra")
 ani.save("sti2.mp4")
