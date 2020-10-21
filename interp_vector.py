@@ -94,6 +94,24 @@ q= axes[1].streamplot(x_reshape1,y_reshape1,u_reshape1, v_reshape1, arrowsize=1,
 #plt.show()
 fig.savefig('straumfelt.png')
 
+#%%
+myDPI = 300
+fig, axes = plt.subplots(figsize=(2050/myDPI,2050/myDPI),dpi=myDPI)
+
+v_mag = np.sqrt(u_reshape1 * u_reshape1 + v_reshape1 * v_reshape1)
+
+p= axes.pcolor(x_reshape1,y_reshape1, v_mag)
+axes.set_xlabel(r'$x$ [mm]', fontsize=18)
+axes.set_ylabel(r'$y$ [mm]', fontsize=18)
+cb = fig.colorbar(p, ax=axes[0])
+cb.set_label(r"$\overline{u}$ [mm/s]", fontsize=18)
+
+k = 5
+axes.quiver(x_reshape1[::k, ::k], y_reshape1[::k, ::k], u_reshape1[::k, ::k], v_reshape1[::k, ::k])
+
+axes.axis('equal')
+
+fig.savefig('straumfelt_hires.png')
 
 #%%
 ''' Funksjon for å laga eit kontinuerleg vektorfelt '''
@@ -220,3 +238,4 @@ ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,600),interval=20)
 plt.show()
 print("ferdig med animasjon, skal lagra")
 ani.save("sti2.mp4")
+
