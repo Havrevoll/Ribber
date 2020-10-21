@@ -26,6 +26,7 @@ Vmx = np.array(fil['Vmx'])*1000
 u_bar = np.nanmean(Umx,0)
 v_bar = np.nanmean(Vmx,0)
 
+
 up = Umx - u_bar
 vp = Vmx - v_bar
 
@@ -49,6 +50,7 @@ x_reshape1 = x.reshape((J,I))      # x_reshape=(x_reshape1(t+1:J-b,m+1:I-n))
 y_reshape1 = y.reshape((J,I))      # y_reshape=(y_reshape1(t+1:J-b,m+1:I-n));
 u_reshape1 = u_bar.reshape((J,I))  # u_reshape=(u_reshape1(t+1:J-b,m+1:I-n));
 v_reshape1 = v_bar.reshape((J,I))  # v_reshape=(v_reshape1(t+1:J-b,m+1:I-n));
+v_mag = np.sqrt(u_reshape1 * u_reshape1 + v_reshape1 * v_reshape1)
 Umx_reshape = Umx.reshape((len(Umx),J,I))
 Vmx_reshape = Vmx.reshape((len(Vmx),J,I))
 t_3d,y_3d,x_3d = np.meshgrid(np.arange(3600.0),y_reshape1[:,0],x_reshape1[0,:],indexing='ij')
@@ -80,8 +82,6 @@ axes[0].quiver(x_reshape1[::k, ::k], y_reshape1[::k, ::k], u_reshape1[::k, ::k],
 
 axes[0].axis('equal')
 
-v_mag = np.sqrt(u_reshape1 * u_reshape1 + v_reshape1 * v_reshape1)
-
 q= axes[1].pcolor(x_reshape1,y_reshape1, v_mag)
 axes[1].set_xlabel(r'$x$ [mm]', fontsize=18)
 axes[1].set_ylabel(r'$y$ [mm]', fontsize=18)
@@ -96,22 +96,62 @@ fig.savefig('straumfelt.png')
 
 #%%
 myDPI = 300
-fig, axes = plt.subplots(figsize=(2050/myDPI,2050/myDPI),dpi=myDPI)
+fig, axes = plt.subplots(figsize=(2050/myDPI,1450/myDPI),dpi=myDPI)
 
-v_mag = np.sqrt(u_reshape1 * u_reshape1 + v_reshape1 * v_reshape1)
 
 p= axes.pcolor(x_reshape1,y_reshape1, v_mag)
 axes.set_xlabel(r'$x$ [mm]', fontsize=18)
 axes.set_ylabel(r'$y$ [mm]', fontsize=18)
-cb = fig.colorbar(p, ax=axes[0])
+cb = fig.colorbar(p, ax=axes)
 cb.set_label(r"$\overline{u}$ [mm/s]", fontsize=18)
 
-k = 5
+k = 3
 axes.quiver(x_reshape1[::k, ::k], y_reshape1[::k, ::k], u_reshape1[::k, ::k], v_reshape1[::k, ::k])
+axes.set_xlim()
 
 axes.axis('equal')
+axes.axis([-91, 91, -75, 90])
 
 fig.savefig('straumfelt_hires.png')
+
+#%%
+'''Nærbilete av kvervelen ved ribba '''
+myDPI = 300
+fig, axes = plt.subplots(figsize=(2050/myDPI,1050/myDPI),dpi=myDPI)
+
+p= axes.pcolor(x_reshape1,y_reshape1, v_mag)
+axes.set_xlabel(r'$x$ [mm]', fontsize=18)
+axes.set_ylabel(r'$y$ [mm]', fontsize=18)
+cb = fig.colorbar(p, ax=axes)
+cb.set_label(r"$\overline{u}$ [mm/s]", fontsize=18)
+
+k = 1
+axes.quiver(x_reshape1[::k, ::k], y_reshape1[::k, ::k], u_reshape1[::k, ::k], v_reshape1[::k, ::k],scale=100)
+axes.set_xlim()
+
+axes.axis('equal')
+axes.axis([-25, 15, -20, 5])
+
+fig.savefig('vortex.png')
+
+#%%
+
+fig = plt.figure(figsize=(2050/myDPI,1050/myDPI),dpi=myDPI)
+ax = fig.gca(projection='3d')
+
+# Plot the surface.
+surf = ax.plot_surface(x_reshape1, y_reshape1, v_mag)
+
+# Customize the z axis.
+# ax.set_zlim(-1.01, 1.01)
+# ax.zaxis.set_major_locator(LinearLocator(10))
+# ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
+
+# Add a color bar which maps values to colors.
+fig.colorbar(surf)
+
+# plt.show()
+
 
 #%%
 ''' Funksjon for å laga eit kontinuerleg vektorfelt '''
