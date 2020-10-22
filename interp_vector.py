@@ -22,6 +22,7 @@ y = fil['y'][0]
 
 Umx = np.array(fil['Umx'])*1000
 Vmx = np.array(fil['Vmx'])*1000
+V_mag = np.sqrt(Umx * Umx + Vmx * Vmx)
 
 u_bar = np.nanmean(Umx,0)
 v_bar = np.nanmean(Vmx,0)
@@ -50,14 +51,35 @@ x_reshape1 = x.reshape((J,I))      # x_reshape=(x_reshape1(t+1:J-b,m+1:I-n))
 y_reshape1 = y.reshape((J,I))      # y_reshape=(y_reshape1(t+1:J-b,m+1:I-n));
 u_reshape1 = u_bar.reshape((J,I))  # u_reshape=(u_reshape1(t+1:J-b,m+1:I-n));
 v_reshape1 = v_bar.reshape((J,I))  # v_reshape=(v_reshape1(t+1:J-b,m+1:I-n));
-v_mag = np.sqrt(u_reshape1 * u_reshape1 + v_reshape1 * v_reshape1)
+v_bar_mag = np.sqrt(u_reshape1 * u_reshape1 + v_reshape1 * v_reshape1)
+
 Umx_reshape = Umx.reshape((len(Umx),J,I))
 Vmx_reshape = Vmx.reshape((len(Vmx),J,I))
+V_mag_reshape = V_mag.reshape((len(V_mag),J,I))
 t_3d,y_3d,x_3d = np.meshgrid(np.arange(3600.0),y_reshape1[:,0],x_reshape1[0,:],indexing='ij')
 
 # Re_str_reshape1 = Re_stressm.reshape((J,I))   #   Re_str_reshape=(Re_str_reshape1(t+1:J-b,m+1:I-n));
 up_sq_bar_reshape1 = up_sq_bar.reshape((J,I))  #   up_sq_bar_reshape=(up_sq_bar_reshape1(t+1:J-b,m+1:I-n));
 vp_sq_bar_reshape1 = vp_sq_bar.reshape((J,I)) #   vp_sq_bar_reshape=(vp_sq_bar_reshape1(t+1:J-b,m+1:I-n));
+
+#%%
+
+vort = np.zeros((3600,J,I))
+
+d_l = 186/I
+
+for t in np.arange(3600):
+    print(t, end = '')
+    print(' ', end = '')
+    for j in np.arange(1,J-1):
+        for i in np.arange(1,I-1):
+            vort[t,j,i] = (Umx_reshape[t,j-1,i]-Umx_reshape[t,j+1,i]) / 2 + (Vmx_reshape[t,j,i+1]-Vmx_reshape[t,j,i-1]) / 2
+            
+
+print("ferdig")
+vort = vort/d_l
+
+vort_bar = np.nanmean(vort,0)
 
 #%%
 
@@ -82,7 +104,7 @@ axes[0].quiver(x_reshape1[::k, ::k], y_reshape1[::k, ::k], u_reshape1[::k, ::k],
 
 axes[0].axis('equal')
 
-q= axes[1].pcolor(x_reshape1,y_reshape1, v_mag)
+q= axes[1].pcolor(x_reshape1,y_reshape1, v_bar_mag)
 axes[1].set_xlabel(r'$x$ [mm]', fontsize=18)
 axes[1].set_ylabel(r'$y$ [mm]', fontsize=18)
 cb2 = fig.colorbar(q, ax=axes[1])
@@ -90,16 +112,18 @@ cb2.set_label(r"$\overline{v}$ [mm/s]", fontsize=18)
 axes[1].axis('equal')
 
 # https://matplotlib.org/gallery/images_contours_and_fields/plot_streamplot.html#sphx-glr-gallery-images-contours-and-fields-plot-streamplot-py
-q= axes[1].streamplot(x_reshape1,y_reshape1,u_reshape1, v_reshape1, arrowsize=1, linewidth=(.01*v_mag)) # tok vekk color=v_mag
+q= axes[1].streamplot(x_reshape1,y_reshape1,u_reshape1, v_reshape1, arrowsize=1, linewidth=(.01*v_bar_mag)) # tok vekk color=v_bar_mag
 #plt.show()
 fig.savefig('straumfelt.png')
 
 #%%
+''' Straumfeltet og piler '''
+
 myDPI = 300
 fig, axes = plt.subplots(figsize=(2050/myDPI,1450/myDPI),dpi=myDPI)
 
 
-p= axes.pcolor(x_reshape1,y_reshape1, v_mag)
+p= axes.pcolor(x_reshape1,y_reshape1, v_bar_mag)
 axes.set_xlabel(r'$x$ [mm]', fontsize=18)
 axes.set_ylabel(r'$y$ [mm]', fontsize=18)
 cb = fig.colorbar(p, ax=axes)
@@ -115,11 +139,29 @@ axes.axis([-91, 91, -75, 90])
 fig.savefig('straumfelt_hires.png')
 
 #%%
+''' Vortisiteten i heile feltet '''
+
+myDPI = 300
+fig, axes = plt.subplots(figsize=(2050/myDPI,1450/myDPI),dpi=myDPI)
+
+
+p= axes.pcolor(x_reshape1,y_reshape1, vort_bar)
+axes.set_xlabel(r'$x$ [mm]', fontsize=18)
+axes.set_ylabel(r'$y$ [mm]', fontsize=18)
+cb = fig.colorbar(p, ax=axes)
+cb.set_label(r"Vorticity", fontsize=18)
+
+axes.axis('equal')
+axes.axis([-91, 91, -75, 90])
+
+fig.savefig('vorticity.png')
+
+#%%
 '''Nærbilete av kvervelen ved ribba '''
 myDPI = 300
 fig, axes = plt.subplots(figsize=(2050/myDPI,1050/myDPI),dpi=myDPI)
 
-p= axes.pcolor(x_reshape1,y_reshape1, v_mag)
+p= axes.pcolor(x_reshape1,y_reshape1, v_bar_mag)
 axes.set_xlabel(r'$x$ [mm]', fontsize=18)
 axes.set_ylabel(r'$y$ [mm]', fontsize=18)
 cb = fig.colorbar(p, ax=axes)
@@ -136,11 +178,32 @@ fig.savefig('vortex.png')
 
 #%%
 
+fig, ax = plt.subplots()
+
+field = ax.imshow(V_mag_reshape[0,55:80,45:67], extent=[x_reshape1[0,45],x_reshape1[0,67], y_reshape1[80,0], y_reshape1[55,0]])
+pil = ax.quiver(x_reshape1[55:80,45:67], y_reshape1[55:80,45:67], Umx_reshape[0,55:80,45:67], Vmx_reshape[0,55:80,45:67], scale=1000)
+
+def nypkt(i):
+    field.set_data(V_mag_reshape[i,55:80,45:67])
+    pil.set_UVC(Umx_reshape[i,55:80,45:67], Vmx_reshape[i,55:80,45:67])
+    return field,pil
+
+print("Skal byrja på filmen")
+#ax.axis('equal')
+ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,600),interval=50)
+plt.show()
+print("ferdig med animasjon, skal lagra")
+ani.save("kvervel.mp4")
+
+
+
+#%%
+
 fig = plt.figure(figsize=(2050/myDPI,1050/myDPI),dpi=myDPI)
 ax = fig.gca(projection='3d')
 
 # Plot the surface.
-surf = ax.plot_surface(x_reshape1, y_reshape1, v_mag)
+surf = ax.plot_surface(x_reshape1, y_reshape1, v_bar_mag)
 
 # Customize the z axis.
 # ax.set_zlim(-1.01, 1.01)
@@ -274,7 +337,7 @@ def nypkt(i):
 
 print("Skal byrja på filmen")
 #ax.axis('equal')
-ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,600),interval=20)
+ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,600),interval=50)
 plt.show()
 print("ferdig med animasjon, skal lagra")
 ani.save("sti2.mp4")
