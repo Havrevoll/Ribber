@@ -12,6 +12,15 @@ import h5py
 from math import floor, ceil
 # import os.path.join as pjoin
 
+
+#discharges = [20,40,60,80,100,120,140]
+
+
+
+
+#def hentdata(flow_case):
+    
+    
 fil = h5py.File('D:/Q40.mat', 'r') # https://docs.h5py.org/en/stable/quick.html#quick
  # list(f.keys())
  # ['#refs#', 'LEUC', 'LSUC', 'UEUC', 'USUC', 'Umx', 'Vmx', 'x', 'y']
@@ -62,6 +71,8 @@ t_3d,y_3d,x_3d = np.meshgrid(np.arange(3600.0),y_reshape1[:,0],x_reshape1[0,:],i
 up_sq_bar_reshape1 = up_sq_bar.reshape((J,I))  #   up_sq_bar_reshape=(up_sq_bar_reshape1(t+1:J-b,m+1:I-n));
 vp_sq_bar_reshape1 = vp_sq_bar.reshape((J,I)) #   vp_sq_bar_reshape=(vp_sq_bar_reshape1(t+1:J-b,m+1:I-n));
 
+    
+
 #%%
 
 vort = np.zeros((3600,J,I))
@@ -69,14 +80,13 @@ vort = np.zeros((3600,J,I))
 d_l = 186/I
 
 for t in np.arange(3600):
-    print(t, end = '')
-    print(' ', end = '')
+    # print(t, end = '')
+    # print(' ', end = '')
     for j in np.arange(1,J-1):
         for i in np.arange(1,I-1):
             vort[t,j,i] = (Umx_reshape[t,j-1,i]-Umx_reshape[t,j+1,i]) / 2 + (Vmx_reshape[t,j,i+1]-Vmx_reshape[t,j,i-1]) / 2
             
 
-print("ferdig")
 vort = vort/d_l
 
 vort_bar = np.nanmean(vort,0)
@@ -177,8 +187,9 @@ axes.axis([-25, 15, -20, 5])
 fig.savefig('vortex.png')
 
 #%%
-
-fig, ax = plt.subplots()
+''' Lagar ein film av området nedstraums for ribba, med absoluttverdien av farten i bakgrunnen, og piler for farten oppå.'''
+myDPI = 200
+fig, ax = plt.subplots(figsize=(1000/myDPI,1000/myDPI),dpi=myDPI)
 
 field = ax.imshow(V_mag_reshape[0,55:80,45:67], extent=[x_reshape1[0,45],x_reshape1[0,67], y_reshape1[80,0], y_reshape1[55,0]])
 pil = ax.quiver(x_reshape1[55:80,45:67], y_reshape1[55:80,45:67], Umx_reshape[0,55:80,45:67], Vmx_reshape[0,55:80,45:67], scale=1000)
@@ -194,6 +205,26 @@ ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,600),interval=50)
 plt.show()
 print("ferdig med animasjon, skal lagra")
 ani.save("kvervel.mp4")
+
+#%%
+''' Lagar ein film av området nedstraums for ribba, med vortisiteten i bakgrunnen, og piler for farten oppå.'''
+myDPI = 200
+fig, ax = plt.subplots(figsize=(1000/myDPI,1000/myDPI),dpi=myDPI)
+
+field = ax.imshow(vort[0,55:80,45:67], extent=[x_reshape1[0,45],x_reshape1[0,67], y_reshape1[80,0], y_reshape1[55,0]])
+pil = ax.quiver(x_reshape1[55:80,45:67], y_reshape1[55:80,45:67], Umx_reshape[0,55:80,45:67], Vmx_reshape[0,55:80,45:67], scale=1000)
+
+def nypkt(i):
+    field.set_data(vort[i,55:80,45:67])
+    pil.set_UVC(Umx_reshape[i,55:80,45:67], Vmx_reshape[i,55:80,45:67])
+    return field,pil
+
+print("Skal byrja på filmen")
+#ax.axis('equal')
+ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,600),interval=50)
+plt.show()
+print("ferdig med animasjon, skal lagra")
+ani.save("kvervel2.mp4")
 
 
 
