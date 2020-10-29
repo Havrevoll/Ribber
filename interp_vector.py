@@ -17,9 +17,11 @@ from math import ceil, floor, log
 
 
 
-fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
+fil = h5py.File("D:/alle.hdf5", 'a')
 
 discharges = [20,40,60,80,100,120,140]
+
+h= -75
 
 class MidpointNormalize(mpl.colors.Normalize):
     '''https://stackoverflow.com/questions/7404116/defining-the-midpoint-of-a-colormap-in-matplotlib 
@@ -40,7 +42,7 @@ class MidpointNormalize(mpl.colors.Normalize):
 
 def vegglov(u_star, y, v):
     nu = 1 # 1 mm²/s
-    y = y + 75
+    y = y - h
     return 1/0.4 * log(u_star * y / nu) + 5.5 - v/u_star
 
 
@@ -49,8 +51,7 @@ def finn_u(y,v):
     
     for i in np.arange(95,113):
         u[i]= fsolve(vegglov, 2, args=(y[i],v[i]))
- 
-    
+     
     return u
 
 def hentdata(flow_case):
@@ -168,7 +169,7 @@ def straumfelt(case):
     # ax.plot(x, y3, color="green", label="y”(x)")
     
     
-    p= axes[0].pcolor(x_reshape1,y_reshape1, u_reshape1)
+    p= axes[0].pcolor(x_reshape1,y_reshape1, u_reshape1, shading='nearest' )
     axes[0].set_xlabel(r'$x$ [mm]', fontsize=18)
     axes[0].set_ylabel(r'$y$ [mm]', fontsize=18)
     
@@ -212,7 +213,7 @@ def straumfelt_normalisert(case):
     # ax.plot(x, y3, color="green", label="y”(x)")
     
     
-    p= axes[0].pcolor(x_reshape1,y_reshape1, u_reshape1,vmin=0, vmax=500)
+    p= axes[0].pcolor(x_reshape1,y_reshape1, u_reshape1,vmin=0, vmax=500, shading='nearest' )
     axes[0].set_xlabel(r'$x$ [mm]', fontsize=18)
     axes[0].set_ylabel(r'$y$ [mm]', fontsize=18)
     
@@ -286,7 +287,7 @@ def straumfelt_og_piler(case):
     fig, axes = plt.subplots(figsize=(2050/myDPI,1450/myDPI),dpi=myDPI)
     
     
-    p= axes.pcolor(x_reshape1,y_reshape1, v_bar_mag)
+    p= axes.pcolor(x_reshape1,y_reshape1, v_bar_mag, shading='nearest' )
     axes.set_xlabel(r'$x$ [mm]', fontsize=18)
     axes.set_ylabel(r'$y$ [mm]', fontsize=18)
     cb = fig.colorbar(p, ax=axes)
@@ -316,7 +317,7 @@ def vortisiteten(case):
     fig, axes = plt.subplots(figsize=(2050/myDPI,1450/myDPI),dpi=myDPI)
     
     
-    p= axes.pcolor(x_reshape1,y_reshape1, vort_bar)
+    p= axes.pcolor(x_reshape1,y_reshape1, vort_bar, shading='nearest' )
     axes.set_xlabel(r'$x$ [mm]', fontsize=18)
     axes.set_ylabel(r'$y$ [mm]', fontsize=18)
     cb = fig.colorbar(p, ax=axes)
@@ -344,7 +345,7 @@ def kvervel_naerbilete(case):
     myDPI = 300
     fig, axes = plt.subplots(figsize=(2050/myDPI,1050/myDPI),dpi=myDPI)
     
-    p= axes.pcolor(x_reshape1,y_reshape1, v_bar_mag)
+    p= axes.pcolor(x_reshape1,y_reshape1, v_bar_mag, shading='nearest' )
     axes.set_xlabel(r'$x$ [mm]', fontsize=18)
     axes.set_ylabel(r'$y$ [mm]', fontsize=18)
     cb = fig.colorbar(p, ax=axes)
@@ -598,16 +599,15 @@ def lagra(dataset):
 def plottingar(cases):
     '''kall med plottingar(fil['vassføringar'])'''
     for q in discharges:
-        # straumfelt_normalisert(cases[str(q)])
-        # straumfelt(cases[str(q)])
-        reynolds_plot(cases[str(q)])
-        # straumfelt_og_piler(cases[str(q)])
-        # vortisiteten(cases[str(q)])
-        # kvervel_naerbilete(cases[str(q)])
-        # film_fartogpiler(cases[str(q)])
-        # film_vortisitetogpiler(cases[str(q)])
+        straumfelt_normalisert(cases[str(q)])
+        straumfelt(cases[str(q)])
+        # reynolds_plot(cases[str(q)])
+        straumfelt_og_piler(cases[str(q)])
+        vortisiteten(cases[str(q)])
+        kvervel_naerbilete(cases[str(q)])
+        film_fartogpiler(cases[str(q)])
+        film_vortisitetogpiler(cases[str(q)])
         
-# re.split(r'/',fil['vassføringar']['20'].name)[-1]
 
 
 vass = fil['vassføringar']
