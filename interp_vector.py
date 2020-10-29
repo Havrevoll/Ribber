@@ -3,24 +3,55 @@
 
 import matplotlib.pyplot as plt
 from matplotlib import animation
-# import matplotlib as mpl
+import matplotlib as mpl
 
 import numpy as np
 from scipy import interpolate
 from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#r179348322575-1
+from scipy.optimize import fsolve
 import h5py
 import re
 
-from math import floor, ceil
+from math import ceil, floor, log
 # import os.path.join as pjoin
 
 
 
-fil = h5py.File("alle.hdf5", 'r') # 
+fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
 
 discharges = [20,40,60,80,100,120,140]
 
+class MidpointNormalize(mpl.colors.Normalize):
+    '''https://stackoverflow.com/questions/7404116/defining-the-midpoint-of-a-colormap-in-matplotlib 
+    http://chris35wills.github.io/matplotlib_diverging_colorbar/
+    https://matplotlib.org/tutorials/colors/colormapnorms.html'''
+    
+    def __init__(self, vmin, vmax, midpoint=0, clip=False):
+        self.midpoint = midpoint
+        mpl.colors.Normalize.__init__(self, vmin, vmax, clip)
 
+    def __call__(self, value, clip=None):
+        normalized_min = max(0, 1 / 2 * (1 - abs((self.midpoint - self.vmin) / (self.midpoint - self.vmax))))
+        normalized_max = min(1, 1 / 2 * (1 + abs((self.vmax - self.midpoint) / (self.midpoint - self.vmin))))
+        normalized_mid = 0.5
+        x, y = [self.vmin, self.midpoint, self.vmax], [normalized_min, normalized_mid, normalized_max]
+        return np.ma.masked_array(np.interp(value, x, y))
+
+
+def vegglov(u_star, y, v):
+    nu = 1 # 1 mm²/s
+    y = y + 75
+    return 1/0.4 * log(u_star * y / nu) + 5.5 - v/u_star
+
+
+def finn_u(y,v):
+    u = np.zeros(127)
+    
+    for i in np.arange(95,113):
+        u[i]= fsolve(vegglov, 2, args=(y[i],v[i]))
+ 
+    
+    return u
 
 def hentdata(flow_case):
     
@@ -51,8 +82,8 @@ def hentdata(flow_case):
     up_sq_bar = np.nanmean(up_sq,0)
     vp_sq_bar = np.nanmean(vp_sq,0)
     
-    # Re_stressp = -1*up*vp
-    # Re_stressm = np.nanmean(Re_stressp ,0)
+    Re_stressp = -1*up*vp
+    Re_stressm = np.nanmean(Re_stressp ,0)
     
     I = 126  # horisontal lengd
     J = 127  # vertikal lengd
@@ -72,9 +103,12 @@ def hentdata(flow_case):
     V_mag_reshape = V_mag.reshape((len(V_mag),J,I))
     t_3d,y_3d,x_3d = np.meshgrid(np.arange(3600.0),y_reshape1[:,0],x_reshape1[0,:],indexing='ij')
     
-    # Re_str_reshape1 = Re_stressm.reshape((J,I))   #   Re_str_reshape=(Re_str_reshape1(t+1:J-b,m+1:I-n));
+    Re_str_reshape1 = Re_stressm.reshape((J,I))   #   Re_str_reshape=(Re_str_reshape1(t+1:J-b,m+1:I-n));
     up_sq_bar_reshape1 = up_sq_bar.reshape((J,I))  #   up_sq_bar_reshape=(up_sq_bar_reshape1(t+1:J-b,m+1:I-n));
     vp_sq_bar_reshape1 = vp_sq_bar.reshape((J,I)) #   vp_sq_bar_reshape=(vp_sq_bar_reshape1(t+1:J-b,m+1:I-n));
+
+    u_profile = np.nanmean(u_reshape1,1)
+
 
     vort = np.zeros((3600,J,I))
 
@@ -126,7 +160,7 @@ def straumfelt(case):
     y_reshape1 = np.array(case['y_reshape1'])
     u_reshape1 = np.array(case['u_reshape1'])
     v_reshape1 = np.array(case['v_reshape1'])
-    v_bar_mag = np.array(case['v_bar_mag'])
+    u_profile = np.array(case['u_profile'])
     
     fig, axes = plt.subplots(1,2, figsize=(18,8))
     # ax.plot(x, y1, color="blue", label="x")
@@ -137,33 +171,105 @@ def straumfelt(case):
     p= axes[0].pcolor(x_reshape1,y_reshape1, u_reshape1)
     axes[0].set_xlabel(r'$x$ [mm]', fontsize=18)
     axes[0].set_ylabel(r'$y$ [mm]', fontsize=18)
+    
     cb = fig.colorbar(p, ax=axes[0])
     cb.set_label(r"$\overline{u}$ [mm/s]", fontsize=18)
-    
-    
+       
     k = 5
     # https://matplotlib.org/3.1.1/gallery/images_contours_and_fields/quiver_demo.html
     axes[0].quiver(x_reshape1[::k, ::k], y_reshape1[::k, ::k], u_reshape1[::k, ::k], v_reshape1[::k, ::k])
     # Kva med dette: Straumlinefelt: https://stackoverflow.com/questions/39619128/plotting-direction-field-in-python
      
-    
+
     axes[0].axis('equal')
+    fig.canvas.draw()
+   
     
-    q= axes[1].pcolor(x_reshape1,y_reshape1, v_bar_mag)
-    axes[1].set_xlabel(r'$x$ [mm]', fontsize=18)
+    axes[1].plot(u_profile,y_reshape1[:,0])
+    axes[1].set_xlabel(r'$x$ [mm/s]', fontsize=18)
     axes[1].set_ylabel(r'$y$ [mm]', fontsize=18)
-    cb2 = fig.colorbar(q, ax=axes[1])
-    cb2.set_label(r"$\overline{v}$ [mm/s]", fontsize=18)
-    axes[1].axis('equal')
-    
+    axes[1].set_ylim(axes[0].get_ylim())
+    #axes[1].set_xlim(0,500)
     # https://matplotlib.org/gallery/images_contours_and_fields/plot_streamplot.html#sphx-glr-gallery-images-contours-and-fields-plot-streamplot-py
-    q= axes[1].streamplot(x_reshape1,y_reshape1,u_reshape1, v_reshape1, arrowsize=1, linewidth=(.01*v_bar_mag)) # tok vekk color=v_bar_mag
-    #plt.show()
     
     filnamn = "straumfeltQ{}.png".format(re.split(r'/',case.name)[-1])
     
     fig.savefig(filnamn)
     plt.close()
+    
+    
+def straumfelt_normalisert(case):
+    
+    x_reshape1 = np.array(case['x_reshape1'])
+    y_reshape1 = np.array(case['y_reshape1'])
+    u_reshape1 = np.array(case['u_reshape1'])
+    v_reshape1 = np.array(case['v_reshape1'])
+    u_profile = np.array(case['u_profile'])
+    
+    fig, axes = plt.subplots(1,2, figsize=(18,8))
+    # ax.plot(x, y1, color="blue", label="x")
+    # ax.plot(x, y2, color="red", label="y'(x)")
+    # ax.plot(x, y3, color="green", label="y”(x)")
+    
+    
+    p= axes[0].pcolor(x_reshape1,y_reshape1, u_reshape1,vmin=0, vmax=500)
+    axes[0].set_xlabel(r'$x$ [mm]', fontsize=18)
+    axes[0].set_ylabel(r'$y$ [mm]', fontsize=18)
+    
+    cb = fig.colorbar(p, ax=axes[0])
+    cb.set_label(r"$\overline{u}$ [mm/s]", fontsize=18)
+       
+    k = 5
+    # https://matplotlib.org/3.1.1/gallery/images_contours_and_fields/quiver_demo.html
+    axes[0].quiver(x_reshape1[::k, ::k], y_reshape1[::k, ::k], u_reshape1[::k, ::k], v_reshape1[::k, ::k])
+    # Kva med dette: Straumlinefelt: https://stackoverflow.com/questions/39619128/plotting-direction-field-in-python
+     
+
+    axes[0].axis('equal')
+    fig.canvas.draw()
+   
+    
+    axes[1].plot(u_profile,y_reshape1[:,0])
+    axes[1].set_xlabel(r'$x$ [mm/s]', fontsize=18)
+    axes[1].set_ylabel(r'$y$ [mm]', fontsize=18)
+    axes[1].set_ylim(axes[0].get_ylim())
+    axes[1].set_xlim(0,500)
+    # https://matplotlib.org/gallery/images_contours_and_fields/plot_streamplot.html#sphx-glr-gallery-images-contours-and-fields-plot-streamplot-py
+    
+    filnamn = "straumfelt_normQ{}.png".format(re.split(r'/',case.name)[-1])
+    
+    fig.savefig(filnamn)
+    plt.close()
+
+#%% 
+
+# Burde laga eit plott av Reynolds skjerspenning
+# 
+
+def reynolds_plot(case):
+    x_reshape1 = np.array(case['x_reshape1'])
+    y_reshape1 = np.array(case['y_reshape1'])
+    Re_str_reshape1 = np.array(case['Re_str_reshape1'])
+
+    vmin =  np.nanmin(Re_str_reshape1)
+    vmax = np.nanmax(Re_str_reshape1)
+    
+    norm = MidpointNormalize(vmin=vmin, vmax=vmax, midpoint=0)
+    # cmap = 'RdBu_r' 
+
+    # plt.imshow(vals, cmap=cmap, norm=norm)
+    # plt.colorbar()
+    
+    fig,axes = plt.subplots()
+    p = axes.imshow(Re_str_reshape1, extent=[x_reshape1[0,0],x_reshape1[0,-1], y_reshape1[-1,0], y_reshape1[0,0]], cmap='RdGy', norm=norm)
+    
+    fig.colorbar(p, ax=axes)
+    
+    filnamn = "reynolds_stress_Q{}.png".format(re.split(r'/',case.name)[-1])
+    
+    fig.savefig(filnamn)
+    plt.close()
+    
 
 #%%
 
@@ -477,26 +583,34 @@ def sti_animasjon(case):
 
 #%%
 def lagra(dataset):
-    f = h5py.File('alle.hdf5','w')
+    f = h5py.File('alle2.hdf5','w')
     
     vassf = f.create_group("vassføringar")
     
     for q in dataset:
         gr = vassf.create_group(str(q))
         for k in dataset[q]:
-            gr.create_dataset(k, data=dataset[q][k])
+            gr.create_dataset(k, data=dataset[q][k], compression="gzip", compression_opts=9)
     f.close()
 
 #%%
 # lag straumfelt-bilete
 def plottingar(cases):
+    '''kall med plottingar(fil['vassføringar'])'''
     for q in discharges:
-        straumfelt(cases[str(q)])
-        straumfelt_og_piler(cases[str(q)])
-        vortisiteten(cases[str(q)])
-        kvervel_naerbilete(cases[str(q)])
-        film_fartogpiler(cases[str(q)])
-        film_vortisitetogpiler(cases[str(q)])
+        # straumfelt_normalisert(cases[str(q)])
+        # straumfelt(cases[str(q)])
+        reynolds_plot(cases[str(q)])
+        # straumfelt_og_piler(cases[str(q)])
+        # vortisiteten(cases[str(q)])
+        # kvervel_naerbilete(cases[str(q)])
+        # film_fartogpiler(cases[str(q)])
+        # film_vortisitetogpiler(cases[str(q)])
         
 # re.split(r'/',fil['vassføringar']['20'].name)[-1]
 
+
+vass = fil['vassføringar']
+v_mean = {}
+for q in vass:
+    v_mean[q] = np.mean(vass[q]['u_profile'][67:114])
