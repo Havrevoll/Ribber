@@ -17,11 +17,11 @@ from math import ceil, floor, log
 
 
 
-fil = h5py.File("D:/alle.hdf5", 'a')
+fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
 
 discharges = [20,40,60,80,100,120,140]
 
-h= -75
+h= -5.9
 
 class MidpointNormalize(mpl.colors.Normalize):
     '''https://stackoverflow.com/questions/7404116/defining-the-midpoint-of-a-colormap-in-matplotlib 
@@ -43,13 +43,14 @@ class MidpointNormalize(mpl.colors.Normalize):
 def vegglov(u_star, y, v):
     nu = 1 # 1 mm²/s
     y = y - h
-    return 1/0.4 * log(u_star * y / nu) + 5.5 - v/u_star
+    ks = 
+    return 1/0.4 * log(30 * y / ks) + 5.5 - v/u_star
 
 
 def finn_u(y,v):
     u = np.zeros(127)
     
-    for i in np.arange(95,113):
+    for i in np.arange(0,67):
         u[i]= fsolve(vegglov, 2, args=(y[i],v[i]))
      
     return u
@@ -169,7 +170,7 @@ def straumfelt(case):
     # ax.plot(x, y3, color="green", label="y”(x)")
     
     
-    p= axes[0].pcolor(x_reshape1,y_reshape1, u_reshape1, shading='nearest' )
+    p= axes[0].pcolor(x_reshape1,y_reshape1, u_reshape1 )
     axes[0].set_xlabel(r'$x$ [mm]', fontsize=18)
     axes[0].set_ylabel(r'$y$ [mm]', fontsize=18)
     
@@ -213,7 +214,7 @@ def straumfelt_normalisert(case):
     # ax.plot(x, y3, color="green", label="y”(x)")
     
     
-    p= axes[0].pcolor(x_reshape1,y_reshape1, u_reshape1,vmin=0, vmax=500, shading='nearest' )
+    p= axes[0].pcolor(x_reshape1,y_reshape1, u_reshape1,vmin=0, vmax=500 )
     axes[0].set_xlabel(r'$x$ [mm]', fontsize=18)
     axes[0].set_ylabel(r'$y$ [mm]', fontsize=18)
     
@@ -287,7 +288,7 @@ def straumfelt_og_piler(case):
     fig, axes = plt.subplots(figsize=(2050/myDPI,1450/myDPI),dpi=myDPI)
     
     
-    p= axes.pcolor(x_reshape1,y_reshape1, v_bar_mag, shading='nearest' )
+    p= axes.pcolor(x_reshape1,y_reshape1, v_bar_mag )
     axes.set_xlabel(r'$x$ [mm]', fontsize=18)
     axes.set_ylabel(r'$y$ [mm]', fontsize=18)
     cb = fig.colorbar(p, ax=axes)
@@ -317,7 +318,7 @@ def vortisiteten(case):
     fig, axes = plt.subplots(figsize=(2050/myDPI,1450/myDPI),dpi=myDPI)
     
     
-    p= axes.pcolor(x_reshape1,y_reshape1, vort_bar, shading='nearest' )
+    p= axes.pcolor(x_reshape1,y_reshape1, vort_bar )
     axes.set_xlabel(r'$x$ [mm]', fontsize=18)
     axes.set_ylabel(r'$y$ [mm]', fontsize=18)
     cb = fig.colorbar(p, ax=axes)
@@ -345,7 +346,7 @@ def kvervel_naerbilete(case):
     myDPI = 300
     fig, axes = plt.subplots(figsize=(2050/myDPI,1050/myDPI),dpi=myDPI)
     
-    p= axes.pcolor(x_reshape1,y_reshape1, v_bar_mag, shading='nearest' )
+    p= axes.pcolor(x_reshape1,y_reshape1, v_bar_mag )
     axes.set_xlabel(r'$x$ [mm]', fontsize=18)
     axes.set_ylabel(r'$y$ [mm]', fontsize=18)
     cb = fig.colorbar(p, ax=axes)
