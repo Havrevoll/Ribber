@@ -2,8 +2,11 @@
 '''køyr funksjonar som plottingar(fil['vassføringar'])'''
 
 import matplotlib.pyplot as plt
+plt.rcParams["font.family"] = "STIXGeneral"
+plt.rcParams['mathtext.fontset'] = 'stix'
 from matplotlib import animation
 import matplotlib as mpl
+from matplotlib.patches import Rectangle
 
 import numpy as np
 from scipy import interpolate
@@ -11,11 +14,11 @@ from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/refere
 from scipy.optimize import fsolve
 import h5py
 import re
+import scipy.stats as stats
+
 
 from math import ceil, floor, log
 # import os.path.join as pjoin
-
-
 
 fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
 
@@ -39,13 +42,11 @@ class MidpointNormalize(mpl.colors.Normalize):
         x, y = [self.vmin, self.midpoint, self.vmax], [normalized_min, normalized_mid, normalized_max]
         return np.ma.masked_array(np.interp(value, x, y))
 
-
 def vegglov(u_star, y, v):
-    nu = 1 # 1 mm²/s
+    # nu = 1 # 1 mm²/s
     y = y - h
-    ks = 
-    return 1/0.4 * log(30 * y / ks) + 5.5 - v/u_star
-
+    ks = .0025
+    return 1/0.4 * log(30 * y / ks) - v/u_star
 
 def finn_u(y,v):
     u = np.zeros(127)
@@ -54,6 +55,12 @@ def finn_u(y,v):
         u[i]= fsolve(vegglov, 2, args=(y[i],v[i]))
      
     return u
+
+def draw_rect(axes):
+    axes.add_patch(Rectangle((-60.9,-9.36),50,8,linewidth=1,edgecolor='r',facecolor='none'))
+    axes.add_patch(Rectangle((37.0,-7.5),50,8,linewidth=1,edgecolor='r',facecolor='none'))
+
+
 
 def hentdata(flow_case):
     
@@ -152,10 +159,6 @@ def fyllopp(discharges):
         cases[q]=hentdata(q)
     return cases
 
-
-
-#%%
-
 def straumfelt(case):
     
     x_reshape1 = np.array(case['x_reshape1'])
@@ -194,11 +197,13 @@ def straumfelt(case):
     #axes[1].set_xlim(0,500)
     # https://matplotlib.org/gallery/images_contours_and_fields/plot_streamplot.html#sphx-glr-gallery-images-contours-and-fields-plot-streamplot-py
     
+    draw_rect(axes[0])
+    draw_rect(axes[1])
+    
     filnamn = "straumfeltQ{}.png".format(re.split(r'/',case.name)[-1])
     
     fig.savefig(filnamn)
     plt.close()
-    
     
 def straumfelt_normalisert(case):
     
@@ -238,20 +243,34 @@ def straumfelt_normalisert(case):
     axes[1].set_xlim(0,500)
     # https://matplotlib.org/gallery/images_contours_and_fields/plot_streamplot.html#sphx-glr-gallery-images-contours-and-fields-plot-streamplot-py
     
+
+    draw_rect(axes[0])
+    draw_rect(axes[1])
+    
     filnamn = "straumfelt_normQ{}.png".format(re.split(r'/',case.name)[-1])
     
     fig.savefig(filnamn)
     plt.close()
 
-#%% 
-
-# Burde laga eit plott av Reynolds skjerspenning
-# 
-
 def reynolds_plot(case):
     x_reshape1 = np.array(case['x_reshape1'])
     y_reshape1 = np.array(case['y_reshape1'])
-    Re_str_reshape1 = np.array(case['Re_str_reshape1'])
+       
+    up = case['up']
+    vp = case['vp']
+    
+    rep=-1*np.array(up)*np.array(vp)
+    
+    rem = np.nanmean(rep,0)
+    
+    Re_str_reshape1 = rem.reshape((127,126))
+    
+    z = stats.zscore(Re_str_reshape1.flatten(),nan_policy='omit').reshape((127,126))
+    
+    outliers = z > 10
+    Re_str_reshape1[outliers] = np.nan
+        
+    # Re_str_reshape1 = np.array(case['Re_str_reshape1'])
 
     vmin =  np.nanmin(Re_str_reshape1)
     vmax = np.nanmax(Re_str_reshape1)
@@ -262,8 +281,12 @@ def reynolds_plot(case):
     # plt.imshow(vals, cmap=cmap, norm=norm)
     # plt.colorbar()
     
-    fig,axes = plt.subplots()
+    myDPI = 300
+    fig, axes = plt.subplots(figsize=(2050/myDPI,1450/myDPI),dpi=myDPI)
+    
     p = axes.imshow(Re_str_reshape1, extent=[x_reshape1[0,0],x_reshape1[0,-1], y_reshape1[-1,0], y_reshape1[0,0]], cmap='RdGy', norm=norm)
+    draw_rect(axes)
+    
     
     fig.colorbar(p, ax=axes)
     
@@ -272,9 +295,9 @@ def reynolds_plot(case):
     fig.savefig(filnamn)
     plt.close()
     
-
-#%%
-
+    
+    
+    
 def straumfelt_og_piler(case):
     ''' Straumfeltet og piler '''
 
@@ -301,12 +324,13 @@ def straumfelt_og_piler(case):
     axes.axis('equal')
     axes.axis([-91, 91, -75, 90])
     
+    draw_rect(axes)
+    
     filnamn = "straumfelt_hires_Q{}.png".format(re.split(r'/',case.name)[-1])
     
     fig.savefig(filnamn)
     plt.close()
 
-#%%
 def vortisiteten(case):
     ''' Vortisiteten i heile feltet '''
     
@@ -326,13 +350,13 @@ def vortisiteten(case):
     
     axes.axis('equal')
     axes.axis([-91, 91, -75, 90])
-    
+
+    draw_rect(axes)    
     filnamn = "vorticityQ{}.png".format(re.split(r'/',case.name)[-1])
     
     fig.savefig(filnamn)
     plt.close()
 
-#%%
 
 def kvervel_naerbilete(case):
     '''Nærbilete av kvervelen ved ribba '''
@@ -358,12 +382,11 @@ def kvervel_naerbilete(case):
     
     axes.axis('equal')
     axes.axis([-25, 15, -20, 5])
+    draw_rect(axes)
     
     filnamn = "vortexQ{}.png".format(re.split(r'/',case.name)[-1])
     fig.savefig(filnamn)
     plt.close()
-
-#%%
 
 def film_fartogpiler(case):
     ''' Lagar ein film av området nedstraums for ribba, med absoluttverdien av farten i bakgrunnen, og piler for farten oppå.'''
@@ -379,7 +402,8 @@ def film_fartogpiler(case):
     
     field = ax.imshow(V_mag_reshape[0,55:80,45:67], extent=[x_reshape1[0,45],x_reshape1[0,67], y_reshape1[80,0], y_reshape1[55,0]])
     pil = ax.quiver(x_reshape1[55:80,45:67], y_reshape1[55:80,45:67], Umx_reshape[0,55:80,45:67], Vmx_reshape[0,55:80,45:67], scale=1000)
-    
+    draw_rect(ax)
+        
     def nypkt(i):
         field.set_data(V_mag_reshape[i,55:80,45:67])
         pil.set_UVC(Umx_reshape[i,55:80,45:67], Vmx_reshape[i,55:80,45:67])
@@ -395,8 +419,6 @@ def film_fartogpiler(case):
     ani.save(filnamn)
     plt.close()
 
-#%%
-
 def film_vortisitetogpiler(case):
     ''' Lagar ein film av området nedstraums for ribba, med vortisiteten i bakgrunnen, og piler for farten oppå.'''
     
@@ -411,6 +433,7 @@ def film_vortisitetogpiler(case):
     
     field = ax.imshow(vort[0,55:80,45:67], extent=[x_reshape1[0,45],x_reshape1[0,67], y_reshape1[80,0], y_reshape1[55,0]])
     pil = ax.quiver(x_reshape1[55:80,45:67], y_reshape1[55:80,45:67], Umx_reshape[0,55:80,45:67], Vmx_reshape[0,55:80,45:67], scale=1000)
+    draw_rect(ax)
     
     def nypkt(i):
         field.set_data(vort[i,55:80,45:67])
@@ -426,9 +449,6 @@ def film_vortisitetogpiler(case):
     filnamn = "kvervel2Q{}.mp4".format(re.split(r'/',case.name)[-1])
     ani.save(filnamn)
     plt.close()
-
-
-#%%
 
 def tredimensjonalt_felt(case):
     '''lag eit tredimensjonalt diagram av fartsfeltet'''
@@ -566,6 +586,7 @@ def sti_animasjon(case):
     field = ax.imshow(V_mag_reshape[0,:,:], extent=[x_reshape1[0,0],x_reshape1[0,-1], y_reshape1[-1,0], y_reshape1[0,0]])
     particle, =ax.plot(sti_ny[:,0,0], sti_ny[:,0,1], 'ro')
     ax.set_xlim([x_reshape1[0,0],x_reshape1[0,-1]])
+    draw_rect(ax)
     
     def nypkt(i):
         field.set_data(V_mag_reshape[i,:,:])
@@ -599,19 +620,64 @@ def lagra(dataset):
 # lag straumfelt-bilete
 def plottingar(cases):
     '''kall med plottingar(fil['vassføringar'])'''
-    for q in discharges:
+    
+    maxmin(cases)
+    for q in cases:
         straumfelt_normalisert(cases[str(q)])
         straumfelt(cases[str(q)])
-        # reynolds_plot(cases[str(q)])
+        reynolds_plot(cases[str(q)])
         straumfelt_og_piler(cases[str(q)])
         vortisiteten(cases[str(q)])
         kvervel_naerbilete(cases[str(q)])
-        film_fartogpiler(cases[str(q)])
-        film_vortisitetogpiler(cases[str(q)])
+        #film_fartogpiler(cases[str(q)])
+        #film_vortisitetogpiler(cases[str(q)])
         
-
+        
+        
+def maxmin(case):
+    '''Skal finna maks og min for over, midt på og under ribbene'''
+    maxmin = {}
+    for q in case:
+        maxmin[q] = dict(over=np.max(case[q]['u_profile'][0:62]), 
+                         under= np.max(case[q]['u_profile'][66:113]),
+                         midt=np.min(case[q]['u_profile'][60:100])
+                         )
+        
+    over, under, midt = (np.zeros(7),np.zeros(7),np.zeros(7))
+ 
+    for i,q in enumerate(discharges):  
+        over[i] = maxmin[str(q)]['over']
+        under[i] = maxmin[str(q)]['under']
+        midt[i] = maxmin[str(q)]['midt']
+        
+    maxmin = dict(over=over, under=under, midt=midt)
+   
+    myDPI = 300
+    fig, axes = plt.subplots(figsize=(2050/myDPI,1450/myDPI),dpi=myDPI)
+    
+    
+    axes.plot(discharges,over,'r-', label=r'$u_{max,over}$')
+    axes.plot(discharges, under,'b-', label=r'$u_{max,under}$')
+    axes.plot(discharges,midt,'g-', label=r'$u_{min}$')
+    axes.set_yscale('log')
+    axes.set_title('Maximum and minimum velocities for discharges')
+    axes.set_xlabel(r'$Q$ [l/s]', fontsize=14)
+    axes.set_ylabel(r'$u$ [mm/s]', fontsize=14)
+    axes.grid(b=True, which='both')
+    axes.legend()
+    draw_rect(axes)
+    
+    filnamn = "max_and_min_velocities.png"
+    
+    fig.savefig(filnamn)
+    plt.close()
+    
+    #return maxmin
+        
 
 vass = fil['vassføringar']
 v_mean = {}
 for q in vass:
     v_mean[q] = np.mean(vass[q]['u_profile'][67:114])
+    
+
