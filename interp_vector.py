@@ -17,7 +17,7 @@ import re
 import scipy.stats as stats
 
 
-from math import ceil, floor, log
+from math import ceil, floor, log, sqrt
 # import os.path.join as pjoin
 
 fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
@@ -57,8 +57,8 @@ def finn_u(y,v):
     return u
 
 def draw_rect(axes):
-    axes.add_patch(Rectangle((-60.9,-9.36),50,8,linewidth=1,edgecolor='r',facecolor='none'))
-    axes.add_patch(Rectangle((37.0,-7.5),50,8,linewidth=1,edgecolor='r',facecolor='none'))
+    axes.add_patch(Rectangle((-61.7,-8.8),50,8,linewidth=2,edgecolor='r',facecolor='none'))
+    axes.add_patch(Rectangle((37.0,-7.7),50,8,linewidth=2,edgecolor='r',facecolor='none'))
 
 
 
@@ -80,7 +80,6 @@ def hentdata(flow_case):
     
     u_bar = np.nanmean(Umx,0)
     v_bar = np.nanmean(Vmx,0)
-    
     
     up = Umx - u_bar
     vp = Vmx - v_bar
@@ -147,6 +146,7 @@ def hentdata(flow_case):
     
     nonanxindex = np.invert(np.isnan(Umx))
     nonanyindex = np.invert(np.isnan(Vmx))
+    
     
 
     loc = locals()
@@ -255,15 +255,18 @@ def straumfelt_normalisert(case):
 def reynolds_plot(case):
     x_reshape1 = np.array(case['x_reshape1'])
     y_reshape1 = np.array(case['y_reshape1'])
-       
-    up = case['up']
-    vp = case['vp']
     
-    rep=-1*np.array(up)*np.array(vp)
-    
-    rem = np.nanmean(rep,0)
-    
-    Re_str_reshape1 = rem.reshape((127,126))
+    try:
+        Re_str_reshape1 = np.array(case['Re_str_reshape1'])
+    except RuntimeError:
+        up = case['up']
+        vp = case['vp']
+        
+        rep=-1*np.array(up)*np.array(vp)
+        
+        rem = np.nanmean(rep,0)
+        
+        Re_str_reshape1 = rem.reshape((127,126))
     
     z = stats.zscore(Re_str_reshape1.flatten(),nan_policy='omit').reshape((127,126))
     
@@ -295,8 +298,92 @@ def reynolds_plot(case):
     fig.savefig(filnamn)
     plt.close()
     
+def quadrant(case):
+    '''Lag plott av kvadrantanalysen'''
+    x_reshape1= np.array(case['x_reshape1'])
+    y_reshape1 = np.array(case['y_reshape1'])
+    up = np.array(case['up'])
+    vp = np.array(case['vp'])
+    
+    qua1 = np.logical_and(up < 0, vp > 0)
+    qua2 = np.logical_and(up > 0, vp > 0)
+    qua3 = np.logical_and(up < 0, vp < 0)
+    qua4 = np.logical_and(up > 0, vp < 0)
+    
+    qua1num = qua1 * 1
+    qua2num = qua2 * 2
+    qua3num = qua3 * 3
+    qua4num = qua4 * 4
+    
+    quanum = qua1num + qua2num + qua3num + qua4num
+    
+    quanum_reshape = quanum.reshape((3600,127,126))
+    
+    myDPI = 200
     
     
+    colors = ['yellow', 'red', 'green', 'blue', 'purple']
+    bounds = [0,1,2,3,4]
+
+    fargekart = mpl.colors.Colormap(colors)
+    
+    
+    # fig, ax = plt.subplots(figsize=(1000/myDPI,1000/myDPI),dpi=myDPI)
+    
+    
+    
+
+    # norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+    
+    # field = ax.imshow(quanum_reshape[0,:,:], extent=[x_reshape1[0,0],x_reshape1[0,-1], y_reshape1[-1,0], y_reshape1[0,0]], cmap=fargar)
+    
+    # draw_rect(ax)
+    
+    # def nypkt(i):
+    #     field.set_data(quanum_reshape[i,:,:])
+        
+    #     return field,
+    
+    # print("Skal byrja på filmen")
+    # #ax.axis('equal')
+    # ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,300),interval=50)
+    # plt.show()
+    # print("ferdig med animasjon, skal lagra")
+    
+    # filnamn = "quadrant{}.mp4".format(re.split(r'/',case.name)[-1])
+    # ani.save(filnamn)
+    # plt.close()
+    
+    up_mean = np.nanmean(up,0)
+    vp_mean = np.nanmean(vp,0)
+    qua1_mean = np.logical_and(up_mean < 0, vp_mean > 0)
+    qua2_mean = np.logical_and(up_mean > 0, vp_mean > 0)
+    qua3_mean = np.logical_and(up_mean < 0, vp_mean < 0)
+    qua4_mean = np.logical_and(up_mean > 0, vp_mean < 0)
+    
+    qua1num_mean = qua1_mean * 1
+    qua2num_mean = qua2_mean * 2
+    qua3num_mean = qua3_mean * 3
+    qua4num_mean = qua4_mean * 4
+    
+    quanum_mean = qua1num_mean + qua2num_mean + qua3num_mean + qua4num_mean
+    quanum_mean_reshape = quanum_mean.reshape((127,126))
+    
+    fig, axes = plt.subplots(figsize=(2000/myDPI,1400/myDPI),dpi=myDPI)
+    
+    p = axes.imshow(quanum_mean_reshape, extent=[x_reshape1[0,0],x_reshape1[0,-1], y_reshape1[-1,0], y_reshape1[0,0]], interpolation='none', cmap='viridis')
+    
+    axes.set_xlabel(r'$x$ [mm]', fontsize=18)
+    axes.set_ylabel(r'$y$ [mm]', fontsize=18)
+    cb = fig.colorbar(p, ax=axes)
+    cb.set_label(r"$\overline{u'}$ [mm/s]", fontsize=18)
+    
+    draw_rect(axes)
+    
+    filnamn = "quadrant{}.png".format(re.split(r'/',case.name)[-1])
+    
+    fig.savefig(filnamn)
+    plt.close()
     
 def straumfelt_og_piler(case):
     ''' Straumfeltet og piler '''
@@ -470,9 +557,6 @@ def tredimensjonalt_felt(case):
     
     # plt.show()
 
-
-#%%
-
 # def f(t,yn, method='nearest'): # yn er array-like, altså np.array(xn,yn)
 #     return np.hstack([interpolate.griddata((x,y), u_bar, yn, method=method), interpolate.griddata((x,y), v_bar, yn, method=method)]) 
 
@@ -493,6 +577,10 @@ def lag_ft(case):
     y = np.array(case['y'])
         
     def f_t(t, yn):
+        
+        if yn[0] > 100:
+            return np.hstack([0,0])
+        
         t_0 = floor(t)
         t_1 = ceil(t)
         
@@ -516,36 +604,33 @@ def lag_ft(case):
         return np.hstack([u_x,v_y])
     return f_t
     
+def rk(t0, y0, L, f, h=0.02):
+    ''' Heimelaga Runge-Kutta-metode '''
+    N=int(L/h)
 
-#%%
-''' Heimelaga Runge-Kutta-metode '''
-
-# def rk(t0, y0, L, h=0.02):
-#     N=int(L/h)
-
-#     t=[0]*N # initialize lists
-#     y=[0]*N # initialize lists
+    t=[0]*N # initialize lists
+    y=[0]*N # initialize lists
     
-#     t[0] = t0
-#     y[0] = y0
+    t[0] = t0
+    y[0] = y0
     
-#     for n in range(0, N-1):
-#         #print(n,t[n], y[n], f(t[n],y[n]))
-#         k1 = h*f(t[n], y[n])
-#         k2 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k1)
-#         k3 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k2)
-#         k4 = h*f(t[n] + h, y[n] + k3)
+    for n in range(0, N-1):
+        #print(n,t[n], y[n], f(t[n],y[n]))
+        k1 = h*f(t[n], y[n])
+        k2 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k1)
+        k3 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k2)
+        k4 = h*f(t[n] + h, y[n] + k3)
         
-#         if (np.isnan(k4+k3+k2+k1).any()):
-#             #print(k1,k2,k3,k4)
-#             return t,y
+        if (np.isnan(k4+k3+k2+k1).any()):
+            #print(k1,k2,k3,k4)
+            return t,y
         
-#         t[n+1] = t[n] + h
-#         y[n+1] = y[n] + 1/6 * (k1 + 2*k2 + 2*k3 + k4)
+        t[n+1] = t[n] + h
+        y[n+1] = y[n] + 1/6 * (k1 + 2*k2 + 2*k3 + k4)
         
-#     return t,y
+    return t,y
 
-#%%
+
 def lag_sti(case):
     f_t = lag_ft(case)
     
@@ -571,26 +656,23 @@ def lag_sti(case):
     return np.array(sti_ny)
     
 
-
-
-#%%
 def sti_animasjon(case):
     
     x_reshape1= np.array(case['x_reshape1'])
     y_reshape1 = np.array(case['y_reshape1'])
     V_mag_reshape = np.array(case['V_mag_reshape'])
-    sti_ny = np.array(case['sti_ny'])
+    sti = np.array(case['sti'])
     
     fig, ax = plt.subplots()
     
     field = ax.imshow(V_mag_reshape[0,:,:], extent=[x_reshape1[0,0],x_reshape1[0,-1], y_reshape1[-1,0], y_reshape1[0,0]])
-    particle, =ax.plot(sti_ny[:,0,0], sti_ny[:,0,1], 'ro')
+    particle, =ax.plot(sti[:,0,0], sti[:,0,1], 'ro')
     ax.set_xlim([x_reshape1[0,0],x_reshape1[0,-1]])
     draw_rect(ax)
     
     def nypkt(i):
         field.set_data(V_mag_reshape[i,:,:])
-        particle.set_data(sti_ny[:,i,0], sti_ny[:,i,1])
+        particle.set_data(sti[:,i,0], sti[:,i,1])
         return field,particle
     
     print("Skal byrja på filmen")
@@ -604,7 +686,6 @@ def sti_animasjon(case):
     plt.close()
 
 
-#%%
 def lagra(dataset):
     f = h5py.File('alle2.hdf5','w')
     
@@ -616,7 +697,7 @@ def lagra(dataset):
             gr.create_dataset(k, data=dataset[q][k], compression="gzip", compression_opts=9)
     f.close()
 
-#%%
+
 # lag straumfelt-bilete
 def plottingar(cases):
     '''kall med plottingar(fil['vassføringar'])'''
@@ -631,8 +712,6 @@ def plottingar(cases):
         kvervel_naerbilete(cases[str(q)])
         #film_fartogpiler(cases[str(q)])
         #film_vortisitetogpiler(cases[str(q)])
-        
-        
         
 def maxmin(case):
     '''Skal finna maks og min for over, midt på og under ribbene'''
@@ -680,4 +759,34 @@ v_mean = {}
 for q in vass:
     v_mean[q] = np.mean(vass[q]['u_profile'][67:114])
     
+
+
+  
+  
+def runsTest(l, l_median): 
+  
+    runs, n1, n2 = 0, 0, 0
+      
+    # Checking for start of new run 
+    for i in range(len(l)): 
+          
+        # no. of runs 
+        if (l[i] >= l_median and l[i-1] < l_median) or (l[i] < l_median and l[i-1] >= l_median): 
+            runs += 1  
+          
+        # no. of positive values 
+        if(l[i]) >= l_median: 
+            n1 += 1   
+          
+        # no. of negative values 
+        else: 
+            n2 += 1   
+  
+    runs_exp = ((2*n1*n2)/(n1+n2))+1
+    stan_dev = sqrt((2*n1*n2*(2*n1*n2-n1-n2))/(((n1+n2)**2)*(n1+n2-1))) 
+  
+    z = (runs-runs_exp)/stan_dev 
+  
+    return z 
+
 
