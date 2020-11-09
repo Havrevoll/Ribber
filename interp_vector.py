@@ -642,11 +642,11 @@ def lag_sti(case):
     sti = []
     
     t_start= 0
-    t_end = 10
-    fps= 60
+    t_end = 30
+    fps= 20
     
     for par in np.column_stack((p_x,p_y)):
-        sti.append(solve_ivp(f_t, [t_start,t_end], par, t_eval=np.arange(t_start, t_end, 1/fps)))
+        sti.append(solve_ivp(f_t, [t_start,t_end*fps], par, t_eval=np.arange(t_start, t_end*fps, 1)))
         
     sti_ny=[]
     
