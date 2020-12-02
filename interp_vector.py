@@ -16,6 +16,8 @@ import h5py
 import re
 import scipy.stats as stats
 
+from IPython.display import clear_output
+
 
 from math import ceil, floor, log, sqrt
 # import os.path.join as pjoin
@@ -696,6 +698,39 @@ def tredimensjonalt_felt(case):
 # def f(t,yn, method='nearest'): # yn er array-like, altså np.array(xn,yn)
 #     return np.hstack([interpolate.griddata((x,y), u_bar, yn, method=method), interpolate.griddata((x,y), v_bar, yn, method=method)]) 
 
+def lag_nonan(case):
+    print(case.name)
+   
+        
+    # case.create_dataset('nonanx', data=nonanx, compression="gzip", compression_opts=9)
+    # case.create_dataset('nonany', data=nonany, compression="gzip", compression_opts=9)
+    # case.create_dataset('nonanu', data=nonanu, compression="gzip", compression_opts=9)
+    # case.create_dataset('nonanv', data=nonanv, compression="gzip", compression_opts=9)
+    # case.create_dataset('trix', data=trix, compression="gzip", compression_opts=9)
+    # case.create_dataset('triy', data=triy, compression="gzip", compression_opts=9)
+    
+       
+import scipy.spatial.qhull as qhull
+
+# https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids
+
+def interp_weights(tri, uv):
+   
+    simplex = tri.find_simplex(uv)
+    vertices = np.take(tri.simplices, simplex, axis=0)
+    temp = np.take(tri.transform, simplex, axis=0)
+    delta = uv - temp[:, 2]
+    bary = np.einsum('njk,nk->nj', temp[:2, :], delta)
+    wts = np.hstack((bary, 1 - bary.sum(axis=1, keepdims=True)))
+    ret = np.einsum('nj,nj->n', np.take(uv, vertices), wts)
+
+def interpol(coords, values, yn):
+    
+    #ret[np.any(wts < 0, axis=1)] = fill_value
+    return ret
+
+
+
 def interp_lin_near(coords,values, yn):
     new = interpolate.griddata(coords, values, yn, method='linear')
     if np.isnan(new):
@@ -703,14 +738,33 @@ def interp_lin_near(coords,values, yn):
     else:
         return new
 
-def lag_ft(case):
+def lag_ft(case, t_start, t_end, fps=20):
     ''' Funksjon for å laga eit kontinuerleg vektorfelt '''
+    
     nonanxindex = np.array(case['nonanxindex'])
     nonanyindex = np.array(case['nonanyindex'])
     Umx = np.array(case['Umx'])
     Vmx = np.array(case['Vmx'])
     x = np.array(case['x'])
     y = np.array(case['y'])
+    
+    nonanx={}
+    nonany={}
+    nonanu={}
+    nonanv={}
+    trix={}
+    triy={}
+    
+    for t in np.arange(t_start*fps, t_end*fps):
+        
+        nonanx[t]=np.vstack((x[nonanxindex[t]],y[nonanxindex[t]])).T
+        nonany[t]=np.vstack((x[nonanyindex[t]],y[nonanyindex[t]])).T
+        nonanu[t]=Umx[t,nonanxindex[t]]
+        nonanv[t]=Vmx[t,nonanyindex[t]]
+        trix[t] = qhull.Delaunay(nonanx[t])
+        triy[t] = qhull.Delaunay(nonany[t])
+        print(t, end = '')
+        print(' ', end = '')
         
     def f_t(t, yn):
         
@@ -721,7 +775,7 @@ def lag_ft(case):
         t_1 = ceil(t)
         
         if t_0 == t_1:
-            u_0 = interp_lin_near((x[nonanxindex[t_0]], y[nonanxindex[t_0]]), Umx[t_0,nonanxindex[t_0,:]], yn) #interpolate.griddata((x[nonanxindex[t_0]], y[nonanxindex[t_0]]), Umx[t_0,nonanxindex[t_0,:]], yn)
+            u_0 = interp_lin_near((nonanx[t_0], nonany[t_0]), nonanu[t_0], yn, tri) #interpolate.griddata((x[nonanxindex[t_0]], y[nonanxindex[t_0]]), Umx[t_0,nonanxindex[t_0,:]], yn)
             v_0 = interp_lin_near((x[nonanyindex[t_0]], y[nonanyindex[t_0]]), Vmx[t_0,nonanyindex[t_0,:]], yn)
             
             return np.hstack([u_0,v_0])
@@ -767,8 +821,11 @@ def rk(t0, y0, L, f, h=0.02):
     return t,y
 
 
-def lag_sti(case):
-    f_t = lag_ft(case)
+def lag_sti(case, t_start,t_end,fps=20):
+    
+
+    
+    f_t = lag_ft(case, t_start,t_end,fps=20)
     
     p_x,p_y = np.meshgrid([-90,-200],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
     
@@ -777,10 +834,7 @@ def lag_sti(case):
     
     sti = []
     
-    t_start= 0
-    t_end = 30
-    fps= 20
-    
+ 
     for par in np.column_stack((p_x,p_y)):
         sti.append(solve_ivp(f_t, [t_start,t_end*fps], par, t_eval=np.arange(t_start, t_end*fps, 1)))
         
@@ -930,3 +984,12 @@ def runsTest(l, l_median):
     return z 
 
 
+def reduce():
+    fs = h5py.File('"D:/Tonstad/alle.hdf5"', 'r')
+    fd = h5py.File("D:/Tonstad/alle_red.hdf5", 'w')
+    for a in fs['vassføringar'].attrs:
+        fd.attrs[a] = fs.attrs[a]
+    for d in fs:
+        if not '' in d: fs.copy(d, fd)
+        
+ 
