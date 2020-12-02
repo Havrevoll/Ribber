@@ -4,7 +4,7 @@
 import matplotlib.pyplot as plt
 plt.rcParams["font.family"] = "STIXGeneral"
 plt.rcParams['mathtext.fontset'] = 'stix'
-from matplotlib import animation
+from matplotlib import animation, colors
 import matplotlib as mpl
 from matplotlib.patches import Rectangle
 
@@ -58,9 +58,9 @@ def finn_u(y,v):
      
     return u
 
-def draw_rect(axes):
-    axes.add_patch(Rectangle((-61.7,-8.8),50,8,linewidth=2,edgecolor='r',facecolor='none'))
-    axes.add_patch(Rectangle((37.0,-7.7),50,8,linewidth=2,edgecolor='r',facecolor='none'))
+def draw_rect(axes,color='red'):
+    axes.add_patch(Rectangle((-61.7,-9.8),50,8,linewidth=2,edgecolor=color,facecolor='none'))
+    axes.add_patch(Rectangle((37.0,-7.7),50,8,linewidth=2,edgecolor=color,facecolor='none'))
 
 
 
@@ -275,40 +275,176 @@ def reynolds_plot(case):
     outliers = z > 10
     Re_str_reshape1[outliers] = np.nan
         
-    # Re_str_reshape1 = np.array(case['Re_str_reshape1'])
-
     vmin =  np.nanmin(Re_str_reshape1)
     vmax = np.nanmax(Re_str_reshape1)
     
     norm = MidpointNormalize(vmin=vmin, vmax=vmax, midpoint=0)
-    # cmap = 'RdBu_r' 
-
-    # plt.imshow(vals, cmap=cmap, norm=norm)
-    # plt.colorbar()
     
     myDPI = 300
-    fig, axes = plt.subplots(figsize=(2050/myDPI,1450/myDPI),dpi=myDPI)
+    fig, axes = plt.subplots(1,2, figsize=(1800/myDPI,900/myDPI),dpi=myDPI)
     
-    p = axes.imshow(Re_str_reshape1, extent=[x_reshape1[0,0],x_reshape1[0,-1], y_reshape1[-1,0], y_reshape1[0,0]], cmap='RdGy', norm=norm)
-    draw_rect(axes)
+    p = axes[0].imshow(Re_str_reshape1, extent=[x_reshape1[0,0],x_reshape1[0,-1], y_reshape1[-1,0], y_reshape1[0,0]], cmap='RdGy', norm=norm)
+    # draw_rect(axes[0])
+    
+    cb = fig.colorbar(p, ax=axes[0])
+    cb.set_label(r"$Re$ [mm²/s²]", fontsize=18)
+    fig.colorbar(p, ax=axes[0])
     
     
-    fig.colorbar(p, ax=axes)
+    Re_profile = np.nanmean(Re_str_reshape1,1)
+    axes[1].plot(Re_profile,y_reshape1[:,0])
+    axes[1].set_xlabel(r'$Re$ [mm²/s²]', fontsize=18)
+    axes[1].set_ylabel(r'$y$ [mm]', fontsize=18)
+    axes[1].set_ylim(axes[0].get_ylim())
+    # axes[1].set_xlim(0,500)
+    
     
     filnamn = "reynolds_stress_Q{}.png".format(re.split(r'/',case.name)[-1])
     
     fig.savefig(filnamn)
     plt.close()
     
-def quadrant(case):
+def dbl_average(case):
+    x_reshape1 = np.array(case['x_reshape1'])
+    x=x_reshape1
+    y_reshape1 = np.array(case['y_reshape1'])
+    y=y_reshape1
+    u_profile = np.array(case['u_profile'])
+    u_reshape1 = np.array(case['u_reshape1'])
+    v_reshape1 = np.array(case['v_reshape1'])
+    
+    up_sq_bar_reshape1 = np.array(case['up_sq_bar_reshape1'])
+    vp_sq_bar_reshape1 = np.array(case['vp_sq_bar_reshape1'])
+        
+    v_profile = np.nanmean(v_reshape1,1)
+    
+    u_tilde = (u_reshape1.T - u_profile).T
+    
+    v_tilde = (v_reshape1.T - v_profile).T
+    
+    
+
+    u_tilde_sq=u_tilde*u_tilde
+    v_tilde_sq=v_tilde*v_tilde
+    
+    u_tilde_DA = np.nanmean(u_tilde,1)
+    v_tilde_DA = np.nanmean(v_tilde,1)
+
+    u_tilde_sq_DA = np.nanmean(u_tilde_sq,1)
+    v_tilde_sq_DA = np.nanmean(v_tilde_sq,1)
+    
+    form_stress = u_tilde*v_tilde
+    form_stress_DA = np.nanmean(form_stress,1)
+    
+    z = stats.zscore(u_tilde.flatten(),nan_policy='omit').reshape((127,126))
+    
+    outliers = z > 10
+    u_tilde[outliers] = np.nan
+        
+    vmin =  np.nanmin(u_tilde)
+    vmax = np.nanmax(u_tilde)
+    norm = MidpointNormalize(vmin=vmin, vmax=vmax, midpoint=0)
+    myDPI = 300
+    
+    fig, axes = plt.subplots(1,2, figsize=(1800/myDPI,1000/myDPI),dpi=myDPI)
+    
+    p = axes[0].imshow(form_stress, extent=[x_reshape1[0,0],x_reshape1[0,-1], y_reshape1[-1,0], y_reshape1[0,0]], cmap='RdGy', norm=norm)
+    draw_rect(axes[0])
+
+    cb = fig.colorbar(p, ax=axes[0])
+    cb.set_label(r"$\langle\tilde{u}\tilde{w}\rangle$ [mm²/s²]")
+    
+    
+    axes[1].plot(form_stress_DA,y_reshape1[:,0])
+    axes[1].set_xlabel(r'$\langle\tilde{u}\tilde{w}\rangle$ [mm²/s²]')
+    axes[1].set_ylabel(r'$y$ [mm]')
+    axes[1].set_ylim(axes[0].get_ylim())
+    plt.tight_layout()
+    
+    filnamn = "spatial_averaged_vel_Q{}.png".format(re.split(r'/',case.name)[-1])
+    
+    fig.savefig(filnamn)
+    plt.close()
+    
+    fig, ax = plt.subplots(figsize=(2000/myDPI,700/myDPI),dpi=myDPI)
+    
+    ax.imshow(form_stress[45:85,:], extent=[x_reshape1[0,0],x_reshape1[0,-1], y_reshape1[85,0], y_reshape1[45,0]],cmap='RdGy', norm=norm)
+    draw_rect(ax)
+    
+    cb = fig.colorbar(p, ax=ax)
+    cb.set_label(r"$\langle\tilde{u}\tilde{w}\rangle$ [mm²/s²]")
+    
+    ax.set_xlabel(r'$x$ [mm]')
+    ax.set_ylabel(r'$y$ [mm]')
+    
+    filnamn = "spatial_av_vel_near_Q{}.png".format(re.split(r'/',case.name)[-1])
+    
+    fig.savefig(filnamn)
+    plt.close()
+        
+    fig, ax  = plt.subplots(figsize=(1000/myDPI,1000/myDPI),dpi=myDPI)
+    
+    ax.plot(u_tilde[61,38:107],v_tilde[61,38:107],"bo")
+    ax.plot(u_tilde[60,38:107],v_tilde[60,38:107],"ro")
+    ax.plot(u_tilde[64,55:87],v_tilde[64,55:87],"bx")
+    ax.plot(u_tilde[66,55:87],v_tilde[66,55:87],"gx")
+    ax.set_xlabel(r'$\tilde{u}$')
+    ax.set_ylabel(r'$\tilde{w}$')
+    
+    filnamn = "spatial_quadrant_Q{}.png".format(re.split(r'/',case.name)[-1])
+    fig.savefig(filnamn)
+    plt.close()
+    
+    # k_bar= 0.5 * (up_sq_bar_reshape1 + vp_sq_bar_reshape1)
+    
+    # k_profile = 0.5 * np.nanmean((up_sq_bar_reshape1 + vp_sq_bar_reshape1),1)
+    
+    qua1 = np.logical_and(u_tilde > 0, v_tilde > 0)
+    qua2 = np.logical_and(u_tilde < 0, v_tilde > 0)
+    qua3 = np.logical_and(u_tilde < 0, v_tilde < 0)
+    qua4 = np.logical_and(u_tilde > 0, v_tilde < 0)
+    
+    qua1 = np.ma.masked_where(qua1 == False, qua1)
+    qua2 = np.ma.masked_where(qua2 == False, qua2)
+    qua3 = np.ma.masked_where(qua3 == False, qua3)
+    qua4 = np.ma.masked_where(qua4 == False, qua4)
+    
+    cmap1 = colors.ListedColormap(['green'])
+    cmap2 = colors.ListedColormap(['red'])
+    cmap3 = colors.ListedColormap(['yellow'])
+    cmap4 = colors.ListedColormap(['blue'])
+    
+    # z = qua1[:-1, :-1]
+    # levels = mpl.ticker.MaxNLocator(nbins=1).tick_values( z.max())
+    # norm = colors.BoundaryNorm(levels, ncolors=cmap1.N, clip=True)
+    
+    
+    fig, ax  = plt.subplots(figsize=(1000/myDPI,1000/myDPI),dpi=myDPI)
+    
+    ax.pcolormesh(x, y, qua1, shading='nearest', cmap=cmap1)
+    ax.pcolormesh(x, y, qua2, shading='nearest', cmap=cmap2)
+    ax.pcolormesh(x, y, qua3, shading='nearest', cmap=cmap3)
+    ax.pcolormesh(x, y, qua4, shading='nearest', cmap=cmap4)
+    draw_rect(ax,'black')
+    
+    ax.set_xlabel(r'$x$ [mm]')
+    ax.set_ylabel(r'$y$ [mm]')
+    plt.tight_layout()
+
+    
+    filnamn = "spatial_quadrant_map_Q{}.png".format(re.split(r'/',case.name)[-1])
+    fig.savefig(filnamn)
+    plt.close()
+    
+def t_quadrant(case):
     '''Lag plott av kvadrantanalysen'''
     x_reshape1= np.array(case['x_reshape1'])
     y_reshape1 = np.array(case['y_reshape1'])
     up = np.array(case['up'])
     vp = np.array(case['vp'])
     
-    qua1 = np.logical_and(up < 0, vp > 0)
-    qua2 = np.logical_and(up > 0, vp > 0)
+    qua1 = np.logical_and(up > 0, vp > 0)
+    qua2 = np.logical_and(up < 0, vp > 0)
     qua3 = np.logical_and(up < 0, vp < 0)
     qua4 = np.logical_and(up > 0, vp < 0)
     
@@ -324,10 +460,10 @@ def quadrant(case):
     myDPI = 200
     
     
-    colors = ['yellow', 'red', 'green', 'blue', 'purple']
+    fargar = ['green', 'red', 'yellow', 'blue', 'purple']
     bounds = [0,1,2,3,4]
 
-    fargekart = mpl.colors.Colormap(colors)
+    fargekart = colors.Colormap(colors)
     
     
     # fig, ax = plt.subplots(figsize=(1000/myDPI,1000/myDPI),dpi=myDPI)
@@ -792,17 +928,21 @@ def maxmin(case):
     axes.plot(discharges,over,'r-', label=r'$u_{max,over}$')
     axes.plot(discharges, under,'b-', label=r'$u_{max,under}$')
     axes.plot(discharges,midt,'g-', label=r'$u_{min}$')
-    axes.set_yscale('log')
+    # axes.set_yscale('log')
     axes.set_title('Maximum and minimum velocities for discharges')
     axes.set_xlabel(r'$Q$ [l/s]', fontsize=14)
     axes.set_ylabel(r'$u$ [mm/s]', fontsize=14)
     axes.grid(b=True, which='both')
     axes.legend()
-    draw_rect(axes)
+
     
     filnamn = "max_and_min_velocities.png"
     
     fig.savefig(filnamn)
+    
+    axes.set_yscale('log')
+    fig.savefig("max_and_min_velocities_log.png")
+    
     plt.close()
     
     #return maxmin
