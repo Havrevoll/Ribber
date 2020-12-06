@@ -287,19 +287,72 @@ def reynolds_plot(case):
     # draw_rect(axes[0])
     
     cb = fig.colorbar(p, ax=axes[0])
-    cb.set_label(r"$Re$ [mm²/s²]", fontsize=18)
+    cb.set_label(r"$Re$ [mm²/s²]")
     fig.colorbar(p, ax=axes[0])
     
     
     Re_profile = np.nanmean(Re_str_reshape1,1)
     axes[1].plot(Re_profile,y_reshape1[:,0])
-    axes[1].set_xlabel(r'$Re$ [mm²/s²]', fontsize=18)
-    axes[1].set_ylabel(r'$y$ [mm]', fontsize=18)
+    axes[1].set_xlabel(r'$Re$ [mm²/s²]')
+    axes[1].set_ylabel(r'$y$ [mm]')
     axes[1].set_ylim(axes[0].get_ylim())
     # axes[1].set_xlim(0,500)
-    
+    plt.tight_layout()
     
     filnamn = "reynolds_stress_Q{}.png".format(re.split(r'/',case.name)[-1])
+    
+    fig.savefig(filnamn)
+    plt.close()
+    
+def re_plot_all(cases):
+    # x_reshape1 = np.array(cases['40']['x_reshape1'])
+    y_reshape1 = np.array(cases['40']['y_reshape1'])
+    
+    Re_profiles = {}
+    
+    vmin = np.inf
+    vmax = np.NINF
+    
+    for q in cases:
+        
+        try:
+            Re_str_reshape1 = np.array(cases[q]['Re_str_reshape1'])
+        except RuntimeError:
+            up = cases[q]['up']
+            vp = cases[q]['vp']
+            
+            rep=-1*np.array(up)*np.array(vp)
+            
+            rem = np.nanmean(rep,0)
+            
+            Re_str_reshape1 = rem.reshape((127,126))
+        
+        z = stats.zscore(Re_str_reshape1.flatten(),nan_policy='omit').reshape((127,126))
+        
+        outliers = z > 10
+        Re_str_reshape1[outliers] = np.nan
+            
+        vmin = np.min([np.nanmin(Re_str_reshape1), vmin])
+        vmax = np.max([np.nanmax(Re_str_reshape1), vmax])
+         
+        
+        Re_profiles[q] = np.nanmean(Re_str_reshape1,1)
+    
+
+    myDPI = 300
+    fig, axes = plt.subplots(figsize=(900/myDPI,900/myDPI),dpi=myDPI)
+    
+    for case in Re_profiles:
+        axes.plot(Re_profiles[case],y_reshape1[:,0], linewidth=.8, label="{} l/s".format(case))
+        
+    axes.add_patch(Rectangle((-150,-9.8),1200,8,linewidth=2,edgecolor='none',facecolor='lightgray'))
+    axes.set_xlabel(r'$Re$ [mm$^2$/s$^2$]')
+    axes.set_ylabel(r'$y$ [mm]')
+    axes.legend(frameon=False, loc='lower right', ncol=2, fontsize=9)
+    # axes[1].set_xlim(0,500)
+    plt.tight_layout()
+    
+    filnamn = "reynolds_profiles.png"
     
     fig.savefig(filnamn)
     plt.close()
