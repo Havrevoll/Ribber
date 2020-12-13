@@ -60,7 +60,7 @@ def finn_u(y,v):
 
 def draw_rect(axes,color='red'):
     axes.add_patch(Rectangle((-62.4,-9.56),50,8,linewidth=2,edgecolor=color,facecolor='none'))
-    axes.add_patch(Rectangle((37.6,-7.7),50,8,linewidth=2,edgecolor=color,facecolor='none'))
+    axes.add_patch(Rectangle((37.6,-8.5),50,8,linewidth=2,edgecolor=color,facecolor='none'))
 
 
 
@@ -378,8 +378,8 @@ def re_plot_all(cases):
     plt.close()
     
 def dbl_average(case):
-    y_range = np.s_[0:113]
-    x_range = np.s_[40:107]
+    y_range = np.s_[0:114]
+    x_range = np.s_[40:108]
     
     piv_range = np.index_exp[y_range,x_range]
     
@@ -434,8 +434,7 @@ def dbl_average(case):
     axes[0].set_ylabel(r'$y$ [mm]')
 
     cb = fig.colorbar(p, ax=axes[0])
-    cb.set_label(r"$-\rho\langle\tilde{u}\tilde{w}\rangle$ [Pa]")
-    
+    cb.set_label(r"$-\rho\tilde{u}\tilde{w}$ [Pa]")    
     
     axes[1].plot(form_stress_DA,y[:,0])
     axes[1].set_xlabel(r'$-\rho\langle\tilde{u}\tilde{w}\rangle$ [Pa]')
@@ -448,30 +447,39 @@ def dbl_average(case):
     fig.savefig(filnamn)
     plt.close()
     
-    fig, ax = plt.subplots(figsize=(2000/myDPI,700/myDPI),dpi=myDPI)
     
-    ax.imshow(form_stress[45:85,:], extent=[x[0,0],x[0,-1], y[85,0], y[45,0]],cmap='RdGy', norm=norm)
+    
+    fig, ax = plt.subplots(figsize=(2000/myDPI,830/myDPI),dpi=myDPI)
+    
+    ax.imshow(form_stress[50:80,:], extent=[x[0,0],x[0,-1], y[80,0], y[50,0]],cmap='RdGy', norm=norm)
     draw_rect(ax)
     
     cb = fig.colorbar(p, ax=ax)
-    cb.set_label(r"$-\rho\langle\tilde{u}\tilde{w}\rangle$ [mm²/s²]")
+    cb.set_label(r"$-\rho\langle\tilde{u}\tilde{w}\rangle$ [Pa]")
     
     ax.set_xlabel(r'$x$ [mm]')
     ax.set_ylabel(r'$y$ [mm]')
+    plt.tight_layout()
     
     filnamn = "spatial_av_vel_near_Q{}.png".format(re.split(r'/',case.name)[-1])
     
     fig.savefig(filnamn)
     plt.close()
         
+    
     fig, ax  = plt.subplots(figsize=(1000/myDPI,1000/myDPI),dpi=myDPI)
     
-    ax.plot(u_tilde[61,38:107],v_tilde[61,38:107],"bo")
-    ax.plot(u_tilde[60,38:107],v_tilde[60,38:107],"ro")
-    ax.plot(u_tilde[64,55:87],v_tilde[64,55:87],"bx")
-    ax.plot(u_tilde[66,55:87],v_tilde[66,55:87],"gx")
+    ax.plot(u_tilde[61,:],v_tilde[61,:],"bo")
+    ax.plot(u_tilde[58,:],v_tilde[58,:],"ro")
+    ax.plot(u_tilde[55,:],v_tilde[55,:],"go")
+    ax.plot(u_tilde[52,:],v_tilde[52,:],"co")
+    # btw_rib = np.s_[15:48]
+    # ax.plot(u_tilde[64,btw_rib],v_tilde[64,btw_rib],"bx")
+    # ax.plot(u_tilde[66,btw_rib],v_tilde[66,btw_rib],"gx")
     ax.set_xlabel(r'$\tilde{u}$')
     ax.set_ylabel(r'$\tilde{w}$')
+    ax.axis('equal')
+    plt.tight_layout()
     
     filnamn = "spatial_quadrant_Q{}.png".format(re.split(r'/',case.name)[-1])
     fig.savefig(filnamn)
@@ -507,6 +515,12 @@ def dbl_average(case):
     ax.pcolormesh(x, y, qua2, shading='nearest', cmap=cmap2)
     ax.pcolormesh(x, y, qua3, shading='nearest', cmap=cmap3)
     ax.pcolormesh(x, y, qua4, shading='nearest', cmap=cmap4)
+    
+    ax.plot(np.array([-50]), np.array([7.25]),"ro")
+    ax.plot(np.array([-50]), np.array([2.85]),"bo")
+    ax.plot(np.array([-50]), np.array([11.66]),"go")
+    ax.plot(np.array([-50]), np.array([16.07]),"co")
+    
     draw_rect(ax,'black')
     
     ax.set_xlabel(r'$x$ [mm]')
@@ -517,6 +531,8 @@ def dbl_average(case):
     filnamn = "spatial_quadrant_map_Q{}.png".format(re.split(r'/',case.name)[-1])
     fig.savefig(filnamn)
     plt.close()
+    
+    print(x[0,0],x[0,-1],y[0,0],y[-1,0],x.shape)
     
 def t_quadrant(case):
     '''Lag plott av kvadrantanalysen'''
