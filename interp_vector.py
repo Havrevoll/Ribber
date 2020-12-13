@@ -59,8 +59,8 @@ def finn_u(y,v):
     return u
 
 def draw_rect(axes,color='red'):
-    axes.add_patch(Rectangle((-61.7,-9.8),50,8,linewidth=2,edgecolor=color,facecolor='none'))
-    axes.add_patch(Rectangle((37.0,-7.7),50,8,linewidth=2,edgecolor=color,facecolor='none'))
+    axes.add_patch(Rectangle((-62.4,-9.56),50,8,linewidth=2,edgecolor=color,facecolor='none'))
+    axes.add_patch(Rectangle((37.6,-7.7),50,8,linewidth=2,edgecolor=color,facecolor='none'))
 
 
 
@@ -92,7 +92,7 @@ def hentdata(flow_case):
     up_sq_bar = np.nanmean(up_sq,0)
     vp_sq_bar = np.nanmean(vp_sq,0)
     
-    Re_stressp = -1*up*vp
+    Re_stressp = -1*up*vp*1e-3
     Re_stressm = np.nanmean(Re_stressp ,0)
     
     I = 126  # horisontal lengd
@@ -153,6 +153,26 @@ def hentdata(flow_case):
 
     loc = locals()
     return dict([(i,loc[i]) for i in loc])
+
+def calc_Re_stress(case):
+    up = case['up']
+    vp = case['vp']
+    
+    Re_stressp=-1*np.array(up)*np.array(vp)*1e-3
+    
+    Re_stressm = np.nanmean(Re_stressp,0)
+    
+    Re_str_reshape1 = Re_stressm.reshape((127,126))
+    
+    data = case['Re_str_reshape1']       # load the data
+    data[...] = Re_str_reshape1          # assign new values to data
+    rep = case['Re_stressp']
+    rep[...] = Re_stressp
+    rem = case['Re_stressm']
+    rem[...] = Re_stressm
+    fil.flush() 
+    
+    
 
 def fyllopp(discharges):
     cases = {}
@@ -345,8 +365,8 @@ def re_plot_all(cases):
     for case in Re_profiles:
         axes.plot(Re_profiles[case],y_reshape1[:,0], linewidth=.8, label="{} l/s".format(case))
         
-    axes.add_patch(Rectangle((-150,-9.8),1200,8,linewidth=2,edgecolor='none',facecolor='lightgray'))
-    axes.set_xlabel(r'$Re$ [mm$^2$/s$^2$]')
+    axes.add_patch(Rectangle((-.150,-9.8),1.2,10.8,linewidth=2,edgecolor='none',facecolor='lightcoral'))
+    axes.set_xlabel(r'$Re$ [Pa]')
     axes.set_ylabel(r'$y$ [mm]')
     axes.legend(frameon=False, loc='lower right', ncol=2, fontsize=9)
     # axes[1].set_xlim(0,500)
@@ -358,16 +378,23 @@ def re_plot_all(cases):
     plt.close()
     
 def dbl_average(case):
-    x_reshape1 = np.array(case['x_reshape1'])
-    x=x_reshape1
-    y_reshape1 = np.array(case['y_reshape1'])
-    y=y_reshape1
-    u_profile = np.array(case['u_profile'])
-    u_reshape1 = np.array(case['u_reshape1'])
-    v_reshape1 = np.array(case['v_reshape1'])
+    y_range = np.s_[0:113]
+    x_range = np.s_[40:107]
     
-    up_sq_bar_reshape1 = np.array(case['up_sq_bar_reshape1'])
-    vp_sq_bar_reshape1 = np.array(case['vp_sq_bar_reshape1'])
+    piv_range = np.index_exp[y_range,x_range]
+    
+    x_reshape1 = np.array(case['x_reshape1'])
+    x=x_reshape1[piv_range]
+    y_reshape1 = np.array(case['y_reshape1'])
+    y=y_reshape1[piv_range]
+
+
+    u_profile = np.array(case['u_profile'][y_range])
+    u_reshape1 = np.array(case['u_reshape1'][piv_range])
+    v_reshape1 = np.array(case['v_reshape1'][piv_range])
+    
+    up_sq_bar_reshape1 = np.array(case['up_sq_bar_reshape1'][piv_range])
+    vp_sq_bar_reshape1 = np.array(case['vp_sq_bar_reshape1'][piv_range])
         
     v_profile = np.nanmean(v_reshape1,1)
     
@@ -386,30 +413,32 @@ def dbl_average(case):
     u_tilde_sq_DA = np.nanmean(u_tilde_sq,1)
     v_tilde_sq_DA = np.nanmean(v_tilde_sq,1)
     
-    form_stress = u_tilde*v_tilde
+    form_stress = u_tilde*v_tilde*1e-3
     form_stress_DA = np.nanmean(form_stress,1)
     
-    z = stats.zscore(u_tilde.flatten(),nan_policy='omit').reshape((127,126))
+    z = stats.zscore(u_tilde.flatten(),nan_policy='omit').reshape(u_tilde.shape)
     
     outliers = z > 10
     u_tilde[outliers] = np.nan
         
-    vmin =  np.nanmin(u_tilde)
-    vmax = np.nanmax(u_tilde)
+    vmin =  np.nanmin(form_stress)
+    vmax = np.nanmax(form_stress)
     norm = MidpointNormalize(vmin=vmin, vmax=vmax, midpoint=0)
     myDPI = 300
     
     fig, axes = plt.subplots(1,2, figsize=(1800/myDPI,1000/myDPI),dpi=myDPI)
     
-    p = axes[0].imshow(form_stress, extent=[x_reshape1[0,0],x_reshape1[0,-1], y_reshape1[-1,0], y_reshape1[0,0]], cmap='RdGy', norm=norm)
+    p = axes[0].imshow(form_stress, extent=[x[0,0],x[0,-1], y[-1,0], y[0,0]], cmap='RdGy', norm=norm)
     draw_rect(axes[0])
+    axes[0].set_xlabel(r'$x$ [mm]')
+    axes[0].set_ylabel(r'$y$ [mm]')
 
     cb = fig.colorbar(p, ax=axes[0])
-    cb.set_label(r"$\langle\tilde{u}\tilde{w}\rangle$ [mm²/s²]")
+    cb.set_label(r"$-\rho\langle\tilde{u}\tilde{w}\rangle$ [Pa]")
     
     
-    axes[1].plot(form_stress_DA,y_reshape1[:,0])
-    axes[1].set_xlabel(r'$\langle\tilde{u}\tilde{w}\rangle$ [mm²/s²]')
+    axes[1].plot(form_stress_DA,y[:,0])
+    axes[1].set_xlabel(r'$-\rho\langle\tilde{u}\tilde{w}\rangle$ [Pa]')
     axes[1].set_ylabel(r'$y$ [mm]')
     axes[1].set_ylim(axes[0].get_ylim())
     plt.tight_layout()
@@ -421,11 +450,11 @@ def dbl_average(case):
     
     fig, ax = plt.subplots(figsize=(2000/myDPI,700/myDPI),dpi=myDPI)
     
-    ax.imshow(form_stress[45:85,:], extent=[x_reshape1[0,0],x_reshape1[0,-1], y_reshape1[85,0], y_reshape1[45,0]],cmap='RdGy', norm=norm)
+    ax.imshow(form_stress[45:85,:], extent=[x[0,0],x[0,-1], y[85,0], y[45,0]],cmap='RdGy', norm=norm)
     draw_rect(ax)
     
     cb = fig.colorbar(p, ax=ax)
-    cb.set_label(r"$\langle\tilde{u}\tilde{w}\rangle$ [mm²/s²]")
+    cb.set_label(r"$-\rho\langle\tilde{u}\tilde{w}\rangle$ [mm²/s²]")
     
     ax.set_xlabel(r'$x$ [mm]')
     ax.set_ylabel(r'$y$ [mm]')
