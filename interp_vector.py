@@ -16,7 +16,7 @@ import h5py
 import re
 import scipy.stats as stats
 
-from IPython.display import clear_output
+# from IPython.display import clear_output
 
 
 from math import ceil, floor, log, sqrt
@@ -377,6 +377,33 @@ def re_plot_all(cases):
     fig.savefig(filnamn)
     plt.close()
     
+    
+def u_plot_all(cases):
+    y_reshape1 = np.array(cases['40']['y_reshape1'])
+    
+    u_profiles = {}
+    
+    for q in cases:
+        u_profiles[q] = np.array(cases[q]['u_profile'])
+    
+    myDPI = 200
+    fig, axes = plt.subplots(figsize=(900/myDPI,900/myDPI),dpi=myDPI)
+    
+    for case in u_profiles:
+        axes.plot(u_profiles[case],y_reshape1[:,0], linewidth=.8, label="{} l/s".format(case))
+    
+    axes.add_patch(Rectangle((0,-9.8),430,10.8,linewidth=2,edgecolor='none',facecolor='lightcoral'))
+    axes.set_xlabel(r'$u$ [mm/s]')
+    axes.set_ylabel(r'$y$ [mm]')
+    axes.legend(frameon=False, loc='lower right', ncol=2, fontsize=9)
+    # axes[1].set_xlim(0,500)
+    plt.tight_layout()
+    
+    filnamn = "u_profiles.png"
+    
+    fig.savefig(filnamn)
+    plt.close()
+    
 def dbl_average(case):
     y_range = np.s_[0:114]
     x_range = np.s_[40:108]
@@ -533,6 +560,60 @@ def dbl_average(case):
     plt.close()
     
     print(x[0,0],x[0,-1],y[0,0],y[-1,0],x.shape)
+    
+def dbl_av_all(cases):
+    u_tildes = {}
+    v_tildes = {}
+    
+
+        
+    y_range = np.s_[0:114]
+    x_range = np.s_[40:108]
+    
+    piv_range = np.index_exp[y_range,x_range]
+
+    for q in cases:
+        case = cases[q]
+        x_reshape1 = np.array(case['x_reshape1'])
+        x=x_reshape1[piv_range]
+        y_reshape1 = np.array(case['y_reshape1'])
+        y=y_reshape1[piv_range]
+    
+        u_profile = np.array(case['u_profile'][y_range])
+        u_reshape1 = np.array(case['u_reshape1'][piv_range])
+        v_reshape1 = np.array(case['v_reshape1'][piv_range])
+        v_profile = np.nanmean(v_reshape1,1)
+        
+        u_tilde = (u_reshape1.T - u_profile).T
+        
+        v_tilde = (v_reshape1.T - v_profile).T
+        
+        u_tildes[case] = u_tilde
+        v_tildes[case] = v_tilde
+    
+    myDPI = 200
+    fig, ax  = plt.subplots(figsize=(1000/myDPI,1000/myDPI),dpi=myDPI)
+    
+    for q in cases:
+        case = cases[q]
+        u_tilde = u_tildes[case]
+        v_tilde = v_tildes[case]
+        
+        ax.plot(u_tilde[61,:],v_tilde[61,:],'-', label="{} l/s".format(q))
+             
+    ax.set_xlabel(r'$\tilde{u}$')
+    ax.set_ylabel(r'$\tilde{w}$')
+    ax.legend(bbox_to_anchor=(1.05, 1.0), loc='lower right', ncol=3, fontsize=9)
+    ax.axhline(y=0, color='k')
+    ax.axvline(x=0, color='k')
+
+    ax.axis('equal')
+    plt.tight_layout()
+    
+    filnamn = "quadrant_diagrams.png"
+    
+    fig.savefig(filnamn)
+    plt.close()
     
 def t_quadrant(case):
     '''Lag plott av kvadrantanalysen'''
@@ -1001,6 +1082,8 @@ def plottingar(cases):
         #film_fartogpiler(cases[str(q)])
         #film_vortisitetogpiler(cases[str(q)])
         
+
+
 def maxmin(case):
     '''Skal finna maks og min for over, midt på og under ribbene'''
     maxmin = {}
