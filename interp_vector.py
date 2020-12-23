@@ -62,7 +62,16 @@ def draw_rect(axes,color='red'):
     axes.add_patch(Rectangle((-62.4,-9.56),50,8,linewidth=2,edgecolor=color,facecolor='none'))
     axes.add_patch(Rectangle((37.6,-8.5),50,8,linewidth=2,edgecolor=color,facecolor='none'))
 
+def draw_shade(axes, x0=0, x=430, color='red'):
+    axes.add_patch(Rectangle((x0,-9.8),x,10.8,linewidth=2,edgecolor='none',facecolor='lightcoral'))
 
+def ranges():
+    y_range = np.s_[0:114]
+    x_range = np.s_[40:108]
+    
+    piv_range = np.index_exp[y_range,x_range]
+    
+    return piv_range
 
 def hentdata(flow_case):
     
@@ -170,10 +179,48 @@ def calc_Re_stress(case):
     rep[...] = Re_stressp
     rem = case['Re_stressm']
     rem[...] = Re_stressm
-    fil.flush() 
+    fil.flush()
     
     
+def calc_u_profile(case):
 
+    
+    piv_range = ranges()
+    y_range = piv_range[0]
+    
+    x_reshape1 = np.array(case['x_reshape1'])
+    x=x_reshape1[piv_range]
+    y_reshape1 = np.array(case['y_reshape1'])
+    y=y_reshape1[piv_range]
+
+
+    u_reshape1 = np.array(case['u_reshape1'][piv_range])
+    v_reshape1 = np.array(case['v_reshape1'][piv_range])
+    
+    u_profile = np.nanmean(u_reshape1,1)
+    
+    gml_u_profile = np.array(case['u_profile'][y_range])
+    
+    myDPI = 300
+    fig, axes = plt.subplots(figsize=(900/myDPI,900/myDPI),dpi=myDPI)
+    
+    axes.plot(u_profile, y[:,0], linewidth=.8, label="ny")
+    axes.plot(gml_u_profile, y[:,0], linewidth=.8, label="gml")
+    
+    draw_shade(axes)
+    # axes.set_title("Reynolds' turbulent shear stress")
+    axes.set_xlabel(r'$u$ [mm/s]')
+    axes.set_ylabel(r'$y$ [mm]')
+    axes.legend()
+    # axes[1].set_xlim(0,500)
+    plt.tight_layout()
+    
+    filnamn = "u_nyoggamal.png"
+    
+    fig.savefig(filnamn)
+    plt.close()
+    
+    
 def fyllopp(discharges):
     cases = {}
     for q in discharges:
@@ -267,7 +314,7 @@ def straumfelt_normalisert(case):
     
 
     draw_rect(axes[0])
-    draw_rect(axes[1])
+    draw_shade(axes[1],x=500)
     
     filnamn = "straumfelt_normQ{}.png".format(re.split(r'/',case.name)[-1])
     
@@ -275,6 +322,7 @@ def straumfelt_normalisert(case):
     plt.close()
 
 def reynolds_plot(case):
+
     x_reshape1 = np.array(case['x_reshape1'])
     y_reshape1 = np.array(case['y_reshape1'])
     
@@ -284,38 +332,39 @@ def reynolds_plot(case):
         up = case['up']
         vp = case['vp']
         
-        rep=-1*np.array(up)*np.array(vp)
+        rep=-1*np.array(up)*np.array(vp)*1e-3
         
         rem = np.nanmean(rep,0)
         
         Re_str_reshape1 = rem.reshape((127,126))
     
-    z = stats.zscore(Re_str_reshape1.flatten(),nan_policy='omit').reshape((127,126))
+    z = stats.zscore(Re_str_reshape1.flatten(),nan_policy='omit').reshape(Re_str_reshape1.shape)
     
     outliers = z > 10
     Re_str_reshape1[outliers] = np.nan
         
-    vmin =  np.nanmin(Re_str_reshape1)
+    vmin = np.nanmin(Re_str_reshape1)
     vmax = np.nanmax(Re_str_reshape1)
     
     norm = MidpointNormalize(vmin=vmin, vmax=vmax, midpoint=0)
     
-    myDPI = 300
-    fig, axes = plt.subplots(1,2, figsize=(1800/myDPI,900/myDPI),dpi=myDPI)
+    myDPI = 200
+    fig, axes = plt.subplots(figsize=(1100/myDPI,900/myDPI),dpi=myDPI)
     
-    p = axes[0].imshow(Re_str_reshape1, extent=[x_reshape1[0,0],x_reshape1[0,-1], y_reshape1[-1,0], y_reshape1[0,0]], cmap='RdGy', norm=norm)
-    # draw_rect(axes[0])
+    p = axes.imshow(Re_str_reshape1, extent=[x_reshape1[0,0],x_reshape1[0,-1], y_reshape1[-1,0], y_reshape1[0,0]], cmap='RdGy', norm=norm)
+    draw_rect(axes)
     
-    cb = fig.colorbar(p, ax=axes[0])
-    cb.set_label(r"$Re$ [mm²/s²]")
-    fig.colorbar(p, ax=axes[0])
+    cb = fig.colorbar(p, ax=axes)
+    cb.set_label(r"$\tau_t$ [Pa]")
     
+    axes.set_xlabel(r'$x$ [mm]')
+    axes.set_ylabel(r'$y$ [mm]')
     
-    Re_profile = np.nanmean(Re_str_reshape1,1)
-    axes[1].plot(Re_profile,y_reshape1[:,0])
-    axes[1].set_xlabel(r'$Re$ [mm²/s²]')
-    axes[1].set_ylabel(r'$y$ [mm]')
-    axes[1].set_ylim(axes[0].get_ylim())
+    # Re_profile = np.nanmean(Re_str_reshape1,1)
+    # axes[1].plot(Re_profile,y_reshape1[:,0])
+    # axes[1].set_xlabel(r'$Re$ [mm²/s²]')
+    # axes[1].set_ylabel(r'$y$ [mm]')
+    # axes[1].set_ylim(axes[0].get_ylim())
     # axes[1].set_xlim(0,500)
     plt.tight_layout()
     
@@ -325,8 +374,11 @@ def reynolds_plot(case):
     plt.close()
     
 def re_plot_all(cases):
+    
+    piv_range = ranges()
+    
     # x_reshape1 = np.array(cases['40']['x_reshape1'])
-    y_reshape1 = np.array(cases['40']['y_reshape1'])
+    y_reshape1 = np.array(cases['40']['y_reshape1'])[piv_range]
     
     Re_profiles = {}
     
@@ -336,18 +388,18 @@ def re_plot_all(cases):
     for q in cases:
         
         try:
-            Re_str_reshape1 = np.array(cases[q]['Re_str_reshape1'])
+            Re_str_reshape1 = np.array(cases[q]['Re_str_reshape1'])[piv_range]
         except RuntimeError:
             up = cases[q]['up']
             vp = cases[q]['vp']
             
-            rep=-1*np.array(up)*np.array(vp)
+            rep=-1*np.array(up)*np.array(vp)*1e-3
             
             rem = np.nanmean(rep,0)
             
-            Re_str_reshape1 = rem.reshape((127,126))
+            Re_str_reshape1 = rem.reshape((127,126))[piv_range]
         
-        z = stats.zscore(Re_str_reshape1.flatten(),nan_policy='omit').reshape((127,126))
+        z = stats.zscore(Re_str_reshape1.flatten(),nan_policy='omit').reshape(Re_str_reshape1.shape)
         
         outliers = z > 10
         Re_str_reshape1[outliers] = np.nan
@@ -359,14 +411,15 @@ def re_plot_all(cases):
         Re_profiles[q] = np.nanmean(Re_str_reshape1,1)
     
 
-    myDPI = 300
+    myDPI = 200
     fig, axes = plt.subplots(figsize=(900/myDPI,900/myDPI),dpi=myDPI)
     
     for case in Re_profiles:
         axes.plot(Re_profiles[case],y_reshape1[:,0], linewidth=.8, label="{} l/s".format(case))
         
-    axes.add_patch(Rectangle((-.150,-9.8),1.2,10.8,linewidth=2,edgecolor='none',facecolor='lightcoral'))
-    axes.set_xlabel(r'$Re$ [Pa]')
+    draw_shade(axes,x0=-.15,x=1.15)
+    # axes.set_title("Reynolds' turbulent shear stress")
+    axes.set_xlabel(r'$\langle\tau_t\rangle$ [Pa]')
     axes.set_ylabel(r'$y$ [mm]')
     axes.legend(frameon=False, loc='lower right', ncol=2, fontsize=9)
     # axes[1].set_xlim(0,500)
@@ -379,12 +432,13 @@ def re_plot_all(cases):
     
     
 def u_plot_all(cases):
-    y_reshape1 = np.array(cases['40']['y_reshape1'])
+    piv_range = ranges()
+    y_reshape1 = np.array(cases['40']['y_reshape1'])[piv_range]
     
     u_profiles = {}
     
     for q in cases:
-        u_profiles[q] = np.array(cases[q]['u_profile'])
+        u_profiles[q] = np.array(cases[q]['u_profile'])[piv_range[0]]
     
     myDPI = 200
     fig, axes = plt.subplots(figsize=(900/myDPI,900/myDPI),dpi=myDPI)
@@ -392,8 +446,8 @@ def u_plot_all(cases):
     for case in u_profiles:
         axes.plot(u_profiles[case],y_reshape1[:,0], linewidth=.8, label="{} l/s".format(case))
     
-    axes.add_patch(Rectangle((0,-9.8),430,10.8,linewidth=2,edgecolor='none',facecolor='lightcoral'))
-    axes.set_xlabel(r'$u$ [mm/s]')
+    draw_shade(axes)
+    axes.set_xlabel(r'$\langle \bar{u}\rangle$ [mm/s]')
     axes.set_ylabel(r'$y$ [mm]')
     axes.legend(frameon=False, loc='lower right', ncol=2, fontsize=9)
     # axes[1].set_xlim(0,500)
@@ -405,10 +459,8 @@ def u_plot_all(cases):
     plt.close()
     
 def dbl_average(case):
-    y_range = np.s_[0:114]
-    x_range = np.s_[40:108]
-    
-    piv_range = np.index_exp[y_range,x_range]
+    piv_range = ranges()
+    # y_range = piv_range[0]
     
     x_reshape1 = np.array(case['x_reshape1'])
     x=x_reshape1[piv_range]
@@ -416,12 +468,12 @@ def dbl_average(case):
     y=y_reshape1[piv_range]
 
 
-    u_profile = np.array(case['u_profile'][y_range])
+    u_profile = np.array(case['u_profile'][piv_range[0]])
     u_reshape1 = np.array(case['u_reshape1'][piv_range])
     v_reshape1 = np.array(case['v_reshape1'][piv_range])
     
-    up_sq_bar_reshape1 = np.array(case['up_sq_bar_reshape1'][piv_range])
-    vp_sq_bar_reshape1 = np.array(case['vp_sq_bar_reshape1'][piv_range])
+    # up_sq_bar_reshape1 = np.array(case['up_sq_bar_reshape1'][piv_range])
+    # vp_sq_bar_reshape1 = np.array(case['vp_sq_bar_reshape1'][piv_range])
         
     v_profile = np.nanmean(v_reshape1,1)
     
@@ -431,14 +483,14 @@ def dbl_average(case):
     
     
 
-    u_tilde_sq=u_tilde*u_tilde
-    v_tilde_sq=v_tilde*v_tilde
+    # u_tilde_sq=u_tilde*u_tilde
+    # v_tilde_sq=v_tilde*v_tilde
     
-    u_tilde_DA = np.nanmean(u_tilde,1)
-    v_tilde_DA = np.nanmean(v_tilde,1)
+    # u_tilde_DA = np.nanmean(u_tilde,1)
+    # v_tilde_DA = np.nanmean(v_tilde,1)
 
-    u_tilde_sq_DA = np.nanmean(u_tilde_sq,1)
-    v_tilde_sq_DA = np.nanmean(v_tilde_sq,1)
+    # u_tilde_sq_DA = np.nanmean(u_tilde_sq,1)
+    # v_tilde_sq_DA = np.nanmean(v_tilde_sq,1)
     
     form_stress = u_tilde*v_tilde*1e-3
     form_stress_DA = np.nanmean(form_stress,1)
@@ -503,9 +555,11 @@ def dbl_average(case):
     # btw_rib = np.s_[15:48]
     # ax.plot(u_tilde[64,btw_rib],v_tilde[64,btw_rib],"bx")
     # ax.plot(u_tilde[66,btw_rib],v_tilde[66,btw_rib],"gx")
-    ax.set_xlabel(r'$\tilde{u}$')
-    ax.set_ylabel(r'$\tilde{w}$')
+    ax.set_xlabel(r'$\tilde{u}$ [mm/s]')
+    ax.set_ylabel(r'$\tilde{v}$ [mm/s]')
     ax.axis('equal')
+    ax.axhline(y=0, color='k')
+    ax.axvline(x=0, color='k')
     plt.tight_layout()
     
     filnamn = "spatial_quadrant_Q{}.png".format(re.split(r'/',case.name)[-1])
@@ -552,6 +606,7 @@ def dbl_average(case):
     
     ax.set_xlabel(r'$x$ [mm]')
     ax.set_ylabel(r'$y$ [mm]')
+
     plt.tight_layout()
 
     
@@ -566,18 +621,15 @@ def dbl_av_all(cases):
     v_tildes = {}
     
 
-        
-    y_range = np.s_[0:114]
-    x_range = np.s_[40:108]
-    
-    piv_range = np.index_exp[y_range,x_range]
+    piv_range = ranges()
+    y_range = piv_range[0]
 
     for q in cases:
         case = cases[q]
-        x_reshape1 = np.array(case['x_reshape1'])
-        x=x_reshape1[piv_range]
-        y_reshape1 = np.array(case['y_reshape1'])
-        y=y_reshape1[piv_range]
+        # x_reshape1 = np.array(case['x_reshape1'])
+        # x=x_reshape1[piv_range]
+        # y_reshape1 = np.array(case['y_reshape1'])
+        # y=y_reshape1[piv_range]
     
         u_profile = np.array(case['u_profile'][y_range])
         u_reshape1 = np.array(case['u_reshape1'][piv_range])
@@ -591,7 +643,7 @@ def dbl_av_all(cases):
         u_tildes[case] = u_tilde
         v_tildes[case] = v_tilde
     
-    myDPI = 200
+    myDPI = 300
     fig, ax  = plt.subplots(figsize=(1000/myDPI,1000/myDPI),dpi=myDPI)
     
     for q in cases:
@@ -601,8 +653,8 @@ def dbl_av_all(cases):
         
         ax.plot(u_tilde[61,:],v_tilde[61,:],'-', label="{} l/s".format(q))
              
-    ax.set_xlabel(r'$\tilde{u}$')
-    ax.set_ylabel(r'$\tilde{w}$')
+    ax.set_xlabel(r'$\tilde{u}$ [mm/s]')
+    ax.set_ylabel(r'$\tilde{v}$ [mm/s]')
     ax.legend(bbox_to_anchor=(1.05, 1.0), loc='lower right', ncol=3, fontsize=9)
     ax.axhline(y=0, color='k')
     ax.axvline(x=0, color='k')
@@ -615,6 +667,29 @@ def dbl_av_all(cases):
     fig.savefig(filnamn)
     plt.close()
     
+def kontur(case):
+    piv_range = ranges()
+    # y_range = piv_range[0]
+    
+    x_reshape1 = np.array(case['x_reshape1'])
+    x=x_reshape1[piv_range]
+    y_reshape1 = np.array(case['y_reshape1'])
+    y=y_reshape1[piv_range]
+
+
+    u_profile = np.array(case['u_profile'][piv_range[0]])
+    u_reshape1 = np.array(case['u_reshape1'])
+    v_reshape1 = np.array(case['v_reshape1'])
+    Re_str_reshape1 = np.array(case['Re_str_reshape1'])
+    
+  
+    
+    
+    myDPI = 200
+    fig, ax  = plt.subplots(figsize=(1000/myDPI,1000/myDPI),dpi=myDPI)
+    
+    ax.contour(x_reshape1, y_reshape1, u_reshape1, colors='black')
+    draw_rect(ax)
 def t_quadrant(case):
     '''Lag plott av kvadrantanalysen'''
     x_reshape1= np.array(case['x_reshape1'])
@@ -747,10 +822,10 @@ def vortisiteten(case):
     
     
     p= axes.pcolor(x_reshape1,y_reshape1, vort_bar )
-    axes.set_xlabel(r'$x$ [mm]', fontsize=18)
-    axes.set_ylabel(r'$y$ [mm]', fontsize=18)
+    axes.set_xlabel(r'$x$ [mm]')
+    axes.set_ylabel(r'$y$ [mm]')
     cb = fig.colorbar(p, ax=axes)
-    cb.set_label(r"Vorticity", fontsize=18)
+    cb.set_label(r"Vorticity")
     
     axes.axis('equal')
     axes.axis([-91, 91, -75, 90])
@@ -775,10 +850,10 @@ def kvervel_naerbilete(case):
     fig, axes = plt.subplots(figsize=(2050/myDPI,1050/myDPI),dpi=myDPI)
     
     p= axes.pcolor(x_reshape1,y_reshape1, v_bar_mag )
-    axes.set_xlabel(r'$x$ [mm]', fontsize=18)
-    axes.set_ylabel(r'$y$ [mm]', fontsize=18)
+    axes.set_xlabel(r'$x$ [mm]')
+    axes.set_ylabel(r'$y$ [mm]')
     cb = fig.colorbar(p, ax=axes)
-    cb.set_label(r"$\overline{u}$ [mm/s]", fontsize=18)
+    cb.set_label(r"$\overline{u}$ [mm/s]")
     
     k = 1
     axes.quiver(x_reshape1[::k, ::k], y_reshape1[::k, ::k], u_reshape1[::k, ::k], v_reshape1[::k, ::k],scale=100)
@@ -787,6 +862,7 @@ def kvervel_naerbilete(case):
     axes.axis('equal')
     axes.axis([-25, 15, -20, 5])
     draw_rect(axes)
+    plt.tight_layout()
     
     filnamn = "vortexQ{}.png".format(re.split(r'/',case.name)[-1])
     fig.savefig(filnamn)
@@ -1102,19 +1178,19 @@ def maxmin(case):
         
     maxmin = dict(over=over, under=under, midt=midt)
    
-    myDPI = 300
-    fig, axes = plt.subplots(figsize=(2050/myDPI,1450/myDPI),dpi=myDPI)
+    myDPI = 200
+    fig, axes = plt.subplots(figsize=(900/myDPI,900/myDPI),dpi=myDPI)
     
     
     axes.plot(discharges,over,'r-', label=r'$u_{max,over}$')
     axes.plot(discharges, under,'b-', label=r'$u_{max,under}$')
     axes.plot(discharges,midt,'g-', label=r'$u_{min}$')
     # axes.set_yscale('log')
-    axes.set_title('Maximum and minimum velocities for discharges')
-    axes.set_xlabel(r'$Q$ [l/s]', fontsize=14)
-    axes.set_ylabel(r'$u$ [mm/s]', fontsize=14)
-    axes.grid(b=True, which='both')
-    axes.legend()
+    # axes.set_title('Maximum and minimum velocities for discharges')
+    axes.set_xlabel(r'$Q$ [l/s]')
+    axes.set_ylabel(r'$u$ [mm/s]')
+    # axes.grid(b=True, which='both')
+    axes.legend(frameon=False)
 
     
     filnamn = "max_and_min_velocities.png"
