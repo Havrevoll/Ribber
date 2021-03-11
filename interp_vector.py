@@ -22,7 +22,9 @@ import scipy.stats as stats
 from math import ceil, floor, log, sqrt
 # import os.path.join as pjoin
 
-fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
+# fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
+# vass = fil['vassføringar']
+
 
 discharges = [20,40,60,80,100,120,140]
 
@@ -43,6 +45,39 @@ class MidpointNormalize(mpl.colors.Normalize):
         normalized_mid = 0.5
         x, y = [self.vmin, self.midpoint, self.vmax], [normalized_min, normalized_mid, normalized_max]
         return np.ma.masked_array(np.interp(value, x, y))
+
+def reshape(dataset):
+    '''
+    Ein metode som tek inn eit datasett og gjer alle reshapings-tinga for x og y, u og v og Re.
+
+    '''
+    return
+
+def lag_mindredatasett(case):
+    '''
+    Ein metode som tek inn eit case frå den store alle.hdf5-fila og tek ut berre dei viktige delane og lagrar i ei ny fil med maks kompresjon. Må laga ein tilsvarande metode for å henta fram data og laga alle dei bearbeida versjonane, på eit per case-basis.
+    '''
+    utfilnamn = "D:/Tonstad/utvalde/Q{}.hdf5".format(case)
+    print(utfilnamn)
+    
+    utfil = h5py.File(utfilnamn, 'a')
+    
+    liste = ['nonanindex', 'x', 'y', 'nonanu', 'nonanv', 'nonancoords', 'vort', 'Umx', 'Vmx']
+    
+    
+    
+    for sett in liste:
+        utfil.create_dataset(sett, data=vass[case][sett], compression="gzip", compression_opts=9)
+        
+    for sett in ['I', 'J', 'd_l', 'filnamn', 'flow_case', 'i', 'j']:
+        utfil.create_dataset(sett, data=vass[case][sett])
+    
+    
+
+
+
+    utfil.close()
+    
 
 def vegglov(u_star, y, v):
     # nu = 1 # 1 mm²/s
@@ -1205,12 +1240,6 @@ def maxmin(case):
     #return maxmin
         
 
-vass = fil['vassføringar']
-v_mean = {}
-for q in vass:
-    v_mean[q] = np.mean(vass[q]['u_profile'][67:114])
-    
-
 
   
   
@@ -1241,12 +1270,5 @@ def runsTest(l, l_median):
     return z 
 
 
-def reduce():
-    fs = h5py.File('"D:/Tonstad/alle.hdf5"', 'r')
-    fd = h5py.File("D:/Tonstad/alle_red.hdf5", 'w')
-    for a in fs['vassføringar'].attrs:
-        fd.attrs[a] = fs.attrs[a]
-    for d in fs:
-        if not '' in d: fs.copy(d, fd)
-        
+
  
