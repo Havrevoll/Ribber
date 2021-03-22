@@ -35,7 +35,7 @@ def reshape(dataset):
     Ein metode som tek inn eit datasett og gjer alle reshapings-tinga for x og y, u og v og Re.
 
     '''
-    (I,J)=(dataset['I'],dataset['J'])
+    (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
     
     Umx = np.array(dataset['Umx'])
     Umx_reshape = Umx.reshape((len(Umx),J,I))[:,1:114,1:125]
@@ -43,7 +43,16 @@ def reshape(dataset):
     Vmx = np.array(dataset['Vmx'])
     Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,1:114,1:125]
     
+    x = np.array(dataset['x'])
+    y = np.array(dataset['y'])
     
+    x_reshape = x.reshape(J,I)[1:114,1:125]
+    y_reshape = y.reshape(J,I)[1:114,1:125]
+    
+    nonanUmx = np.invert(np.isnan(Umx))
+    nonanUmx_reshape = np.invert(np.isnan(Umx_reshape))
+    nonanVmx = np.invert(np.isnan(Vmx))
+    nonanVmx_reshape = np.invert(np.isnan(Vmx_reshape))
     
     return
 
