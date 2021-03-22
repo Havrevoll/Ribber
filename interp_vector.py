@@ -53,31 +53,21 @@ def reshape(dataset):
     '''
     return
 
-def lag_mindredatasett(case):
-    '''
-    Ein metode som tek inn eit case frå den store alle.hdf5-fila og tek ut berre dei viktige delane og lagrar i ei ny fil med maks kompresjon. Må laga ein tilsvarande metode for å henta fram data og laga alle dei bearbeida versjonane, på eit per case-basis.
-    '''
-    utfilnamn = "D:/Tonstad/utvalde/Q{}.hdf5".format(case)
-    print(utfilnamn)
-    
-    utfil = h5py.File(utfilnamn, 'a')
-    
-    liste = ['nonanindex', 'x', 'y', 'nonanu', 'nonanv', 'nonancoords', 'vort', 'Umx', 'Vmx']
-    
-    
-    
-    for sett in liste:
-        utfil.create_dataset(sett, data=vass[case][sett], compression="gzip", compression_opts=9)
+# def lag_mindredatasett(case):
+#     '''
+#     Ein metode som tek inn eit case frå den store alle.hdf5-fila og tek ut berre dei viktige delane og lagrar i ei ny fil med maks kompresjon. Må laga ein tilsvarande metode for å henta fram data og laga alle dei bearbeida versjonane, på eit per case-basis.
+#     '''
+#     utfilnamn = "D:/Tonstad/utvalde/Q{}.hdf5".format(case)
+#     print(utfilnamn)
         
-    for sett in ['I', 'J', 'd_l', 'filnamn', 'flow_case', 'i', 'j']:
-        utfil.create_dataset(sett, data=vass[case][sett])
     
-    
-
-
-
-    utfil.close()
-    
+#     with h5py.File(utfilnamn, 'a') as utfil:
+#         for sett in ['nonanindex', 'x', 'y', 'nonanu', 'nonanv', 'nonancoords', 'vort', 'Umx', 'Vmx']:
+#             utfil.create_dataset(sett, data=vass[case][sett], compression="gzip", compression_opts=9)
+            
+#         for sett in ['I', 'J', 'd_l', 'filnamn', 'flow_case', 'i', 'j']:
+#             utfil.create_dataset(sett, data=vass[case][sett])
+#     print("hei")
 
 def vegglov(u_star, y, v):
     # nu = 1 # 1 mm²/s
@@ -198,23 +188,23 @@ def hentdata(flow_case):
     loc = locals()
     return dict([(i,loc[i]) for i in loc])
 
-def calc_Re_stress(case):
-    up = case['up']
-    vp = case['vp']
+# def calc_Re_stress(case):
+#     up = case['up']
+#     vp = case['vp']
     
-    Re_stressp=-1*np.array(up)*np.array(vp)*1e-3
+#     Re_stressp=-1*np.array(up)*np.array(vp)*1e-3
     
-    Re_stressm = np.nanmean(Re_stressp,0)
+#     Re_stressm = np.nanmean(Re_stressp,0)
     
-    Re_str_reshape1 = Re_stressm.reshape((127,126))
+#     Re_str_reshape1 = Re_stressm.reshape((127,126))
     
-    data = case['Re_str_reshape1']       # load the data
-    data[...] = Re_str_reshape1          # assign new values to data
-    rep = case['Re_stressp']
-    rep[...] = Re_stressp
-    rem = case['Re_stressm']
-    rem[...] = Re_stressm
-    fil.flush()
+#     data = case['Re_str_reshape1']       # load the data
+#     data[...] = Re_str_reshape1          # assign new values to data
+#     rep = case['Re_stressp']
+#     rep[...] = Re_stressp
+#     rem = case['Re_stressm']
+#     rem[...] = Re_stressm
+#     fil.flush()
     
     
 def calc_u_profile(case):
@@ -223,14 +213,14 @@ def calc_u_profile(case):
     piv_range = ranges()
     y_range = piv_range[0]
     
-    x_reshape1 = np.array(case['x_reshape1'])
-    x=x_reshape1[piv_range]
+    # x_reshape1 = np.array(case['x_reshape1'])
+    # x=x_reshape1[piv_range]
     y_reshape1 = np.array(case['y_reshape1'])
     y=y_reshape1[piv_range]
 
 
     u_reshape1 = np.array(case['u_reshape1'][piv_range])
-    v_reshape1 = np.array(case['v_reshape1'][piv_range])
+    # v_reshape1 = np.array(case['v_reshape1'][piv_range])
     
     u_profile = np.nanmean(u_reshape1,1)
     
@@ -703,19 +693,19 @@ def dbl_av_all(cases):
     plt.close()
     
 def kontur(case):
-    piv_range = ranges()
+    # piv_range = ranges()
     # y_range = piv_range[0]
     
     x_reshape1 = np.array(case['x_reshape1'])
-    x=x_reshape1[piv_range]
+    # x=x_reshape1[piv_range]
     y_reshape1 = np.array(case['y_reshape1'])
-    y=y_reshape1[piv_range]
+    # y=y_reshape1[piv_range]
 
 
-    u_profile = np.array(case['u_profile'][piv_range[0]])
+    # u_profile = np.array(case['u_profile'][piv_range[0]])
     u_reshape1 = np.array(case['u_reshape1'])
-    v_reshape1 = np.array(case['v_reshape1'])
-    Re_str_reshape1 = np.array(case['Re_str_reshape1'])
+    # v_reshape1 = np.array(case['v_reshape1'])
+    # Re_str_reshape1 = np.array(case['Re_str_reshape1'])
     
   
     
@@ -725,6 +715,8 @@ def kontur(case):
     
     ax.contour(x_reshape1, y_reshape1, u_reshape1, colors='black')
     draw_rect(ax)
+    
+    
 def t_quadrant(case):
     '''Lag plott av kvadrantanalysen'''
     x_reshape1= np.array(case['x_reshape1'])
@@ -732,27 +724,27 @@ def t_quadrant(case):
     up = np.array(case['up'])
     vp = np.array(case['vp'])
     
-    qua1 = np.logical_and(up > 0, vp > 0)
-    qua2 = np.logical_and(up < 0, vp > 0)
-    qua3 = np.logical_and(up < 0, vp < 0)
-    qua4 = np.logical_and(up > 0, vp < 0)
+    # qua1 = np.logical_and(up > 0, vp > 0)
+    # qua2 = np.logical_and(up < 0, vp > 0)
+    # qua3 = np.logical_and(up < 0, vp < 0)
+    # qua4 = np.logical_and(up > 0, vp < 0)
     
-    qua1num = qua1 * 1
-    qua2num = qua2 * 2
-    qua3num = qua3 * 3
-    qua4num = qua4 * 4
+    # qua1num = qua1 * 1
+    # qua2num = qua2 * 2
+    # qua3num = qua3 * 3
+    # qua4num = qua4 * 4
     
-    quanum = qua1num + qua2num + qua3num + qua4num
+    # quanum = qua1num + qua2num + qua3num + qua4num
     
-    quanum_reshape = quanum.reshape((3600,127,126))
+    # quanum_reshape = quanum.reshape((3600,127,126))
     
     myDPI = 200
     
     
-    fargar = ['green', 'red', 'yellow', 'blue', 'purple']
-    bounds = [0,1,2,3,4]
+    # fargar = ['green', 'red', 'yellow', 'blue', 'purple']
+    # bounds = [0,1,2,3,4]
 
-    fargekart = colors.Colormap(colors)
+    # fargekart = colors.Colormap(colors)
     
     
     # fig, ax = plt.subplots(figsize=(1000/myDPI,1000/myDPI),dpi=myDPI)
