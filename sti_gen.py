@@ -56,6 +56,17 @@ def reshape(dataset):
     
     return
 
+def sjekktull():
+    for i in range(113):
+        for j in range(124):
+            if np.any(nonanUmx_reshape[:,i,j]):
+                if np.all(nonanUmx_reshape[:,i,j]):
+                    print("ingen false i ",i,j)
+                else:
+                    print( "nokon false i ",i,j)
+    
+    return
+
 # def lag_mindredatasett(case):
 #     '''
 #     Ein metode som tek inn eit case frå den store alle.hdf5-fila og tek ut berre dei viktige delane og lagrar i ei ny fil med maks kompresjon. Må laga ein tilsvarande metode for å henta fram data og laga alle dei bearbeida versjonane, på eit per case-basis.
@@ -449,72 +460,6 @@ def lagra(dataset):
         for k in dataset[q]:
             gr.create_dataset(k, data=dataset[q][k], compression="gzip", compression_opts=9)
     f.close()
-
-
-# lag straumfelt-bilete
-def plottingar(cases):
-    '''kall med plottingar(fil['vassføringar'])'''
-    
-    maxmin(cases)
-    for q in cases:
-        straumfelt_normalisert(cases[str(q)])
-        straumfelt(cases[str(q)])
-        reynolds_plot(cases[str(q)])
-        straumfelt_og_piler(cases[str(q)])
-        vortisiteten(cases[str(q)])
-        kvervel_naerbilete(cases[str(q)])
-        #film_fartogpiler(cases[str(q)])
-        #film_vortisitetogpiler(cases[str(q)])
-        
-
-
-def maxmin(case):
-    '''Skal finna maks og min for over, midt på og under ribbene'''
-    maxmin = {}
-    for q in case:
-        maxmin[q] = dict(over=np.max(case[q]['u_profile'][0:62]), 
-                         under= np.max(case[q]['u_profile'][66:113]),
-                         midt=np.min(case[q]['u_profile'][60:100])
-                         )
-        
-    over, under, midt = (np.zeros(7),np.zeros(7),np.zeros(7))
- 
-    for i,q in enumerate(discharges):  
-        over[i] = maxmin[str(q)]['over']
-        under[i] = maxmin[str(q)]['under']
-        midt[i] = maxmin[str(q)]['midt']
-        
-    maxmin = dict(over=over, under=under, midt=midt)
-   
-    myDPI = 200
-    fig, axes = plt.subplots(figsize=(900/myDPI,900/myDPI),dpi=myDPI)
-    
-    
-    axes.plot(discharges,over,'r-', label=r'$u_{max,over}$')
-    axes.plot(discharges, under,'b-', label=r'$u_{max,under}$')
-    axes.plot(discharges,midt,'g-', label=r'$u_{min}$')
-    # axes.set_yscale('log')
-    # axes.set_title('Maximum and minimum velocities for discharges')
-    axes.set_xlabel(r'$Q$ [l/s]')
-    axes.set_ylabel(r'$u$ [mm/s]')
-    # axes.grid(b=True, which='both')
-    axes.legend(frameon=False)
-
-    
-    filnamn = "max_and_min_velocities.png"
-    
-    fig.savefig(filnamn)
-    
-    axes.set_yscale('log')
-    fig.savefig("max_and_min_velocities_log.png")
-    
-    plt.close()
-    
-    #return maxmin
-        
-
-
-  
   
 def runsTest(l, l_median): 
   
