@@ -44,6 +44,7 @@ def reshape():
     from scipy import interpolate
     import scipy.spatial.qhull as qhull
     import h5py
+    from scipy.spatial import cKDTree
 
     dataset = h5py.File("c:/Users/havrevol/Q40.hdf5", 'r')
     (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
@@ -75,25 +76,23 @@ def reshape():
     y_lang = y_3d.ravel()[nonan]
     
     uvw = (0,-88.5,87)
-    
-    interpolate.griddata((t_lang, x_lang, y_lang), Umx_lang, uvw, method='linear')
-    
     txy = np.vstack((t_lang,x_lang,y_lang)).T
-    
-    tri = qhull.Delaunay(txy)
-    simplex = tri.find_simplex(uvw)
-    vertices = np.take(tri.simplices, simplex, axis=0)
-    temp = np.take(tri.transform, simplex, axis=0)
-    delta = uvw - temp[3, :]
-    bary = np.einsum('njk,nk->nj', temp[:, :d, :], delta)
-    wts = np.hstack((bary, 1 - bary.sum(axis=1, keepdims=True))
-                    
-    interpolate = np.einsum('nj,nj->n', np.take(values, vtx), wts)
 
-    
+    # interpolate.griddata((t_lang, x_lang, y_lang), Umx_lang, uvw, method='linear')
+        
+    # tri = qhull.Delaunay(txy)
+    # simplex = tri.find_simplex(uvw)
+    # vertices = np.take(tri.simplices, simplex, axis=0)
+    # temp = np.take(tri.transform, simplex, axis=0)
+    # delta = uvw - temp[3, :]
+    # bary = np.einsum('njk,nk->nj', temp[:, :d, :], delta)
+    # wts = np.hstack((bary, 1 - bary.sum(axis=1, keepdims=True))
+                    
+    # interpolate = np.einsum('nj,nj->n', np.take(values, vtx), wts)
     
     tree = cKDTree(txy)
-    # dist, i = tree.query((0, -91.7, 92))
+    Umx_lang[tree.query(uvw)[1]]
+    # dist, i = tree.query(uvw)
     
     return
 
