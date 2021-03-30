@@ -16,6 +16,11 @@ import h5py
 import re
 import scipy.stats as stats
 
+import scipy.interpolate as spint
+import scipy.spatial.qhull as qhull
+import itertools
+from scipy.spatial import cKDTree
+
 # from IPython.display import clear_output
 
 
@@ -30,42 +35,114 @@ discharges = [20,40,60,80,100,120,140]
 
 h= -5.9
 
-def reshape(dataset):
+def reshape():
     '''
     Ein metode som tek inn eit datasett og gjer alle reshapings-tinga for x og y, u og v og Re.
 
     '''
+    import numpy as np
+    from scipy import interpolate
+    import scipy.spatial.qhull as qhull
+    import h5py
+
+    dataset = h5py.File("c:/Users/havrevol/Q40.hdf5", 'r')
     (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
+    t_max= 3
     
-    Umx = np.array(dataset['Umx'])
+    Umx = np.array(dataset['Umx'])[0:t_max,:]
     Umx_reshape = Umx.reshape((len(Umx),J,I))[:,1:114,1:125]
-    
-    Vmx = np.array(dataset['Vmx'])
+    Vmx = np.array(dataset['Vmx'])[0:t_max,:]
     Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,1:114,1:125]
     
     x = np.array(dataset['x'])
     y = np.array(dataset['y'])
-    
     x_reshape = x.reshape(J,I)[1:114,1:125]
     y_reshape = y.reshape(J,I)[1:114,1:125]
     
-    nonanUmx = np.invert(np.isnan(Umx))
-    nonanUmx_reshape = np.invert(np.isnan(Umx_reshape))
-    nonanVmx = np.invert(np.isnan(Vmx))
-    nonanVmx_reshape = np.invert(np.isnan(Vmx_reshape))
+    # nonanUmx = np.invert(np.isnan(Umx))
+    # nonanUmx_reshape = np.invert(np.isnan(Umx_reshape))
+    # nonanVmx = np.invert(np.isnan(Vmx))
+    # nonanVmx_reshape = np.invert(np.isnan(Vmx_reshape))
+    
+    t_3d,y_3d,x_3d = np.meshgrid(np.arange(t_max),y_reshape[:,0],x_reshape[0,:],indexing='ij')
+    
+    nonan = np.invert(np.isnan(Umx_reshape.ravel()))
+    
+    Umx_lang = Umx_reshape.ravel()[nonan]
+    Vmx_lang = Vmx_reshape.ravel()[nonan]
+    t_lang = t_3d.ravel()[nonan]
+    x_lang = x_3d.ravel()[nonan]
+    y_lang = y_3d.ravel()[nonan]
+    
+    uvw = (0,-88.5,87)
+    
+    interpolate.griddata((t_lang, x_lang, y_lang), Umx_lang, uvw, method='linear')
+    
+    txy = np.vstack((t_lang,x_lang,y_lang)).T
+    
+    tri = qhull.Delaunay(txy)
+    simplex = tri.find_simplex(uvw)
+    vertices = np.take(tri.simplices, simplex, axis=0)
+    temp = np.take(tri.transform, simplex, axis=0)
+    delta = uvw - temp[3, :]
+    bary = np.einsum('njk,nk->nj', temp[:, :d, :], delta)
+    wts = np.hstack((bary, 1 - bary.sum(axis=1, keepdims=True))
+                    
+    interpolate = np.einsum('nj,nj->n', np.take(values, vtx), wts)
+
+    
+    
+    tree = cKDTree(txy)
+    # dist, i = tree.query((0, -91.7, 92))
     
     return
 
-def sjekktull():
+def sjekktull(dataset):
     for i in range(113):
         for j in range(124):
             if np.any(nonanUmx_reshape[:,i,j]):
-                if np.all(nonanUmx_reshape[:,i,j]):
-                    print("ingen false i ",i,j)
-                else:
+                if not np.all(nonanUmx_reshape[:,i,j]):
                     print( "nokon false i ",i,j)
+
+def lagtulletedata():
+    '''
+    Lag eit demo-datasett med 3 tidssteg og to dimensjonar, a la Umx
+    '''
+                  
+    dataset = h5py.File("c:/Users/havrevol/Q40.hdf5",'r')
+    (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
     
-    return
+    liten = np.array(dataset['Umx'][0:3,:])
+    
+    liten_re=liten.reshape((len(liten),127,126))[:,0:3,0:4]
+    
+    x = np.array(dataset['x'])
+    y = np.array(dataset['y'])
+    x_reshape = x.reshape(J,I)[0:3,0:4]
+    y_reshape = y.reshape(J,I)[0:3,0:4]
+    
+    t_3d,y_3d,x_3d = np.meshgrid(np.arange(3),y_reshape[:,0],x_reshape[0,:],indexing='ij')
+    nonan= np.invert(np.isnan(liten_re.ravel()))
+    interpolate.griddata((t_3d.ravel()[nonan],x_3d.ravel()[nonan],y_3d.ravel()[nonan]), liten_re.ravel()[nonan],(0,-91.7,92),method='nearest')
+    
+def demoNearestNDinterpolator():
+    from scipy.interpolate import NearestNDInterpolator
+    import matplotlib.pyplot as plt
+    np.random.seed(0)
+    x = np.random.random(10) - 0.5
+    y = np.random.random(10) - 0.5
+    z = np.hypot(x, y)
+    X = np.linspace(min(x), max(x))
+    Y = np.linspace(min(y), max(y))
+    X, Y = np.meshgrid(X, Y)  # 2D grid for interpolation
+    interp = NearestNDInterpolator(list(zip(x, y)), z)
+    Z = interp(X, Y)
+    plt.pcolormesh(X, Y, Z, shading='auto')
+    plt.plot(x, y, "ok", label="input point")
+    plt.legend()
+    plt.colorbar()
+    plt.axis("equal")
+    plt.show()
 
 # def lag_mindredatasett(case):
 #     '''
