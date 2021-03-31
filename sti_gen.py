@@ -35,25 +35,20 @@ discharges = [20,40,60,80,100,120,140]
 
 h= -5.9
 
-def reshape():
+def reshape(dataset = h5py.File("c:/Users/havrevol/Q40.hdf5", 'r')):
     '''
     Ein metode som tek inn eit datasett og gjer alle reshapings-tinga for x og y, u og v og Re.
 
     '''
-    import numpy as np
-    from scipy import interpolate
-    import scipy.spatial.qhull as qhull
-    import h5py
-    from scipy.spatial import cKDTree
-
-    dataset = h5py.File("c:/Users/havrevol/Q40.hdf5", 'r')
+    
     (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
-    t_max= 3
+    t_max = 30
+    steps = t_max * 20
     
     Umx = np.array(dataset['Umx'])[0:t_max,:]
     Umx_reshape = Umx.reshape((len(Umx),J,I))[:,1:114,1:125]
-    Vmx = np.array(dataset['Vmx'])[0:t_max,:]
-    Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,1:114,1:125]
+    # Vmx = np.array(dataset['Vmx'])[0:t_max,:]
+    # Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,1:114,1:125]
     
     x = np.array(dataset['x'])
     y = np.array(dataset['y'])
@@ -65,17 +60,17 @@ def reshape():
     # nonanVmx = np.invert(np.isnan(Vmx))
     # nonanVmx_reshape = np.invert(np.isnan(Vmx_reshape))
     
-    t_3d,y_3d,x_3d = np.meshgrid(np.arange(t_max),y_reshape[:,0],x_reshape[0,:],indexing='ij')
+    t_3d,y_3d,x_3d = np.meshgrid(np.arange(t_max, step=0.05),y_reshape[:,0],x_reshape[0,:],indexing='ij')
     
     nonan = np.invert(np.isnan(Umx_reshape.ravel()))
     
-    Umx_lang = Umx_reshape.ravel()[nonan]
-    Vmx_lang = Vmx_reshape.ravel()[nonan]
+    # Umx_lang = Umx_reshape.ravel()[nonan]
+    # Vmx_lang = Vmx_reshape.ravel()[nonan]
     t_lang = t_3d.ravel()[nonan]
     x_lang = x_3d.ravel()[nonan]
     y_lang = y_3d.ravel()[nonan]
     
-    uvw = (0,-88.5,87)
+    # uvw = (0,-88.5,87)
     txy = np.vstack((t_lang,x_lang,y_lang)).T
 
     # interpolate.griddata((t_lang, x_lang, y_lang), Umx_lang, uvw, method='linear')
@@ -91,73 +86,11 @@ def reshape():
     # interpolate = np.einsum('nj,nj->n', np.take(values, vtx), wts)
     
     tree = cKDTree(txy)
-    Umx_lang[tree.query(uvw)[1]]
+    # Umx_lang[tree.query(uvw)[1]]
     # dist, i = tree.query(uvw)
     
-    return
+    return tree
 
-def sjekktull(dataset):
-    for i in range(113):
-        for j in range(124):
-            if np.any(nonanUmx_reshape[:,i,j]):
-                if not np.all(nonanUmx_reshape[:,i,j]):
-                    print( "nokon false i ",i,j)
-
-def lagtulletedata():
-    '''
-    Lag eit demo-datasett med 3 tidssteg og to dimensjonar, a la Umx
-    '''
-                  
-    dataset = h5py.File("c:/Users/havrevol/Q40.hdf5",'r')
-    (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
-    
-    liten = np.array(dataset['Umx'][0:3,:])
-    
-    liten_re=liten.reshape((len(liten),127,126))[:,0:3,0:4]
-    
-    x = np.array(dataset['x'])
-    y = np.array(dataset['y'])
-    x_reshape = x.reshape(J,I)[0:3,0:4]
-    y_reshape = y.reshape(J,I)[0:3,0:4]
-    
-    t_3d,y_3d,x_3d = np.meshgrid(np.arange(3),y_reshape[:,0],x_reshape[0,:],indexing='ij')
-    nonan= np.invert(np.isnan(liten_re.ravel()))
-    interpolate.griddata((t_3d.ravel()[nonan],x_3d.ravel()[nonan],y_3d.ravel()[nonan]), liten_re.ravel()[nonan],(0,-91.7,92),method='nearest')
-    
-def demoNearestNDinterpolator():
-    from scipy.interpolate import NearestNDInterpolator
-    import matplotlib.pyplot as plt
-    np.random.seed(0)
-    x = np.random.random(10) - 0.5
-    y = np.random.random(10) - 0.5
-    z = np.hypot(x, y)
-    X = np.linspace(min(x), max(x))
-    Y = np.linspace(min(y), max(y))
-    X, Y = np.meshgrid(X, Y)  # 2D grid for interpolation
-    interp = NearestNDInterpolator(list(zip(x, y)), z)
-    Z = interp(X, Y)
-    plt.pcolormesh(X, Y, Z, shading='auto')
-    plt.plot(x, y, "ok", label="input point")
-    plt.legend()
-    plt.colorbar()
-    plt.axis("equal")
-    plt.show()
-
-# def lag_mindredatasett(case):
-#     '''
-#     Ein metode som tek inn eit case frå den store alle.hdf5-fila og tek ut berre dei viktige delane og lagrar i ei ny fil med maks kompresjon. Må laga ein tilsvarande metode for å henta fram data og laga alle dei bearbeida versjonane, på eit per case-basis.
-#     '''
-#     utfilnamn = "D:/Tonstad/utvalde/Q{}.hdf5".format(case)
-#     print(utfilnamn)
-        
-    
-#     with h5py.File(utfilnamn, 'a') as utfil:
-#         for sett in ['nonanindex', 'x', 'y', 'nonanu', 'nonanv', 'nonancoords', 'vort', 'Umx', 'Vmx']:
-#             utfil.create_dataset(sett, data=vass[case][sett], compression="gzip", compression_opts=9)
-            
-#         for sett in ['I', 'J', 'd_l', 'filnamn', 'flow_case', 'i', 'j']:
-#             utfil.create_dataset(sett, data=vass[case][sett])
-#     print("hei")
 
 def vegglov(u_star, y, v):
     # nu = 1 # 1 mm²/s
@@ -188,179 +121,6 @@ def ranges():
     
     return piv_range
 
-def hentdata(flow_case):
-    
-    filnamn =  "D:/Q{}.mat".format(flow_case)
-    
-    fil = h5py.File(filnamn, 'r') # https://docs.h5py.org/en/stable/quick.html#quick
-     # list(f.keys())
-     # ['#refs#', 'LEUC', 'LSUC', 'UEUC', 'USUC', 'Umx', 'Vmx', 'x', 'y']
-     # x.shape
-     
-    x = fil['x'][0]
-    y = fil['y'][0]
-    
-    Umx = np.array(fil['Umx'])*1000
-    Vmx = np.array(fil['Vmx'])*1000
-    V_mag = np.sqrt(Umx * Umx + Vmx * Vmx)
-    
-    u_bar = np.nanmean(Umx,0)
-    v_bar = np.nanmean(Vmx,0)
-    
-    up = Umx - u_bar
-    vp = Vmx - v_bar
-    
-    up_sq = (up*up)
-    vp_sq = (vp*vp)
-    
-    up_sq_bar = np.nanmean(up_sq,0)
-    vp_sq_bar = np.nanmean(vp_sq,0)
-    
-    Re_stressp = -1*up*vp*1e-3
-    Re_stressm = np.nanmean(Re_stressp ,0)
-    
-    I = 126  # horisontal lengd
-    J = 127  # vertikal lengd
-    # m = 3 #define number of columns to be cut at the lefthand side of the window
-    # n = 2 #define number of columns to be cut at the righthand side of the window
-    # b = 3 #define number of columns to be cut at the bottom of the window
-    # t = 3 #define number of columns to be cut at the top of the window
-    
-    x_reshape1 = x.reshape((J,I))      # x_reshape=(x_reshape1(t+1:J-b,m+1:I-n))
-    y_reshape1 = y.reshape((J,I))      # y_reshape=(y_reshape1(t+1:J-b,m+1:I-n));
-    u_reshape1 = u_bar.reshape((J,I))  # u_reshape=(u_reshape1(t+1:J-b,m+1:I-n));
-    v_reshape1 = v_bar.reshape((J,I))  # v_reshape=(v_reshape1(t+1:J-b,m+1:I-n));
-    v_bar_mag = np.sqrt(u_reshape1 * u_reshape1 + v_reshape1 * v_reshape1)
-    
-    Umx_reshape = Umx.reshape((len(Umx),J,I))
-    Vmx_reshape = Vmx.reshape((len(Vmx),J,I))
-    V_mag_reshape = V_mag.reshape((len(V_mag),J,I))
-    t_3d,y_3d,x_3d = np.meshgrid(np.arange(3600.0),y_reshape1[:,0],x_reshape1[0,:],indexing='ij')
-    
-    Re_str_reshape1 = Re_stressm.reshape((J,I))   #   Re_str_reshape=(Re_str_reshape1(t+1:J-b,m+1:I-n));
-    up_sq_bar_reshape1 = up_sq_bar.reshape((J,I))  #   up_sq_bar_reshape=(up_sq_bar_reshape1(t+1:J-b,m+1:I-n));
-    vp_sq_bar_reshape1 = vp_sq_bar.reshape((J,I)) #   vp_sq_bar_reshape=(vp_sq_bar_reshape1(t+1:J-b,m+1:I-n));
-
-    u_profile = np.nanmean(u_reshape1,1)
-
-
-    vort = np.zeros((3600,J,I))
-
-    d_l = 186/I
-
-    for t in np.arange(3600):
-        if t % 100 == 0: 
-            print(t, end = '')
-            print(' ', end = '')
-        for j in np.arange(1,J-1):
-            for i in np.arange(1,I-1):
-                vort[t,j,i] = (Umx_reshape[t,j-1,i]-Umx_reshape[t,j+1,i]) / 2 + (Vmx_reshape[t,j,i+1]-Vmx_reshape[t,j,i-1]) / 2
-                
-    
-    vort = vort/d_l
-    
-    vort_bar = np.nanmean(vort,0)
-    
-    
-    # https://stackoverflow.com/questions/59071446/why-does-scipy-griddata-return-nans-with-cubic-interpolation-if-input-values
-
-    #Her tek me vekk alle nan frå x, y og uv.
-    nonanindex=np.invert(np.isnan(x)) * np.invert(np.isnan(y)) * np.invert(np.isnan(u_bar)) * np.invert(np.isnan(v_bar))
-    nonancoords= np.transpose(np.vstack((x[nonanindex], y[nonanindex])))
-    nonanu = u_bar[nonanindex]
-    nonanv = v_bar[nonanindex]
-    
-    nonanxindex = np.invert(np.isnan(Umx))
-    nonanyindex = np.invert(np.isnan(Vmx))
-    
-    
-
-    loc = locals()
-    return dict([(i,loc[i]) for i in loc])
-
-# def calc_Re_stress(case):
-#     up = case['up']
-#     vp = case['vp']
-    
-#     Re_stressp=-1*np.array(up)*np.array(vp)*1e-3
-    
-#     Re_stressm = np.nanmean(Re_stressp,0)
-    
-#     Re_str_reshape1 = Re_stressm.reshape((127,126))
-    
-#     data = case['Re_str_reshape1']       # load the data
-#     data[...] = Re_str_reshape1          # assign new values to data
-#     rep = case['Re_stressp']
-#     rep[...] = Re_stressp
-#     rem = case['Re_stressm']
-#     rem[...] = Re_stressm
-#     fil.flush()
-    
-    
-def calc_u_profile(case):
-
-    
-    piv_range = ranges()
-    y_range = piv_range[0]
-    
-    # x_reshape1 = np.array(case['x_reshape1'])
-    # x=x_reshape1[piv_range]
-    y_reshape1 = np.array(case['y_reshape1'])
-    y=y_reshape1[piv_range]
-
-
-    u_reshape1 = np.array(case['u_reshape1'][piv_range])
-    # v_reshape1 = np.array(case['v_reshape1'][piv_range])
-    
-    u_profile = np.nanmean(u_reshape1,1)
-    
-    gml_u_profile = np.array(case['u_profile'][y_range])
-    
-    myDPI = 300
-    fig, axes = plt.subplots(figsize=(900/myDPI,900/myDPI),dpi=myDPI)
-    
-    axes.plot(u_profile, y[:,0], linewidth=.8, label="ny")
-    axes.plot(gml_u_profile, y[:,0], linewidth=.8, label="gml")
-    
-    draw_shade(axes)
-    # axes.set_title("Reynolds' turbulent shear stress")
-    axes.set_xlabel(r'$u$ [mm/s]')
-    axes.set_ylabel(r'$y$ [mm]')
-    axes.legend()
-    # axes[1].set_xlim(0,500)
-    plt.tight_layout()
-    
-    filnamn = "u_nyoggamal.png"
-    
-    fig.savefig(filnamn)
-    plt.close()
-    
-    
-def fyllopp(discharges):
-    cases = {}
-    for q in discharges:
-        print("byrja på Q", q)
-        cases[q]=hentdata(q)
-    return cases
-
-    # plt.show()
-
-# def f(t,yn, method='nearest'): # yn er array-like, altså np.array(xn,yn)
-#     return np.hstack([interpolate.griddata((x,y), u_bar, yn, method=method), interpolate.griddata((x,y), v_bar, yn, method=method)]) 
-
-def lag_nonan(case):
-    print(case.name)
-   
-        
-    # case.create_dataset('nonanx', data=nonanx, compression="gzip", compression_opts=9)
-    # case.create_dataset('nonany', data=nonany, compression="gzip", compression_opts=9)
-    # case.create_dataset('nonanu', data=nonanu, compression="gzip", compression_opts=9)
-    # case.create_dataset('nonanv', data=nonanv, compression="gzip", compression_opts=9)
-    # case.create_dataset('trix', data=trix, compression="gzip", compression_opts=9)
-    # case.create_dataset('triy', data=triy, compression="gzip", compression_opts=9)
-    
-       
-import scipy.spatial.qhull as qhull
 
 # https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids
 
@@ -470,6 +230,16 @@ def rk(t0, y0, L, f, h=0.02):
         
     return t,y
 
+class Particle:
+    def __init__(self, position, diameter, density=2600, velocity=0 ):
+        self.position = position
+        self.diameter= diameter
+        self.density = density
+        self.velocity = velocity
+    
+    
+    
+    
 
 def lag_sti(case, t_start,t_end,fps=20):
     
