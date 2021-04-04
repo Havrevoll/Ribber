@@ -35,17 +35,17 @@ discharges = [20,40,60,80,100,120,140]
 
 h= -5.9
 
-def reshape(dataset = h5py.File("c:/Users/havrevol/Q40.hdf5", 'r')):
+def reshape(t_max=1, dataset = h5py.File("D:/Tonstad/utvalde/Q40.hdf5", 'r'), nearest=True):
     '''
     Ein metode som tek inn eit datasett og gjer alle reshapings-tinga for x og y, u og v og Re.
 
     '''
     
     (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
-    t_max = 30
+
     steps = t_max * 20
     
-    Umx = np.array(dataset['Umx'])[0:t_max,:]
+    Umx = np.array(dataset['Umx'])[0:steps,:]
     Umx_reshape = Umx.reshape((len(Umx),J,I))[:,1:114,1:125]
     # Vmx = np.array(dataset['Vmx'])[0:t_max,:]
     # Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,1:114,1:125]
@@ -74,8 +74,18 @@ def reshape(dataset = h5py.File("c:/Users/havrevol/Q40.hdf5", 'r')):
     txy = np.vstack((t_lang,x_lang,y_lang)).T
 
     # interpolate.griddata((t_lang, x_lang, y_lang), Umx_lang, uvw, method='linear')
-        
-    # tri = qhull.Delaunay(txy)
+
+    import time
+
+    start = time.time()        
+    if (nearest):
+        tree = cKDTree(txy)
+    else:
+        tree = qhull.Delaunay(txy)
+    
+    end = time.time()
+    print(end - start)
+    
     # simplex = tri.find_simplex(uvw)
     # vertices = np.take(tri.simplices, simplex, axis=0)
     # temp = np.take(tri.transform, simplex, axis=0)
@@ -83,9 +93,8 @@ def reshape(dataset = h5py.File("c:/Users/havrevol/Q40.hdf5", 'r')):
     # bary = np.einsum('njk,nk->nj', temp[:, :d, :], delta)
     # wts = np.hstack((bary, 1 - bary.sum(axis=1, keepdims=True))
                     
-    # interpolate = np.einsum('nj,nj->n', np.take(values, vtx), wts)
+    # interpolate = np.einsum('nj,nj->n', np.take(values, vtx), wts)    
     
-    tree = cKDTree(txy)
     # Umx_lang[tree.query(uvw)[1]]
     # dist, i = tree.query(uvw)
     
@@ -137,7 +146,7 @@ def interp_weights(tri, uv):
 def interpol(coords, values, yn):
     
     #ret[np.any(wts < 0, axis=1)] = fill_value
-    return ret
+    return
 
 
 
@@ -263,48 +272,56 @@ class Particle:
     
     abs_vel = property(get_abs_vel)    
     
-    def move(self):
-        moveObject(self)
-        calcForce(self)
-        updateAccel(self)
-        updateVelo(self)
+
         
     def moveObject(self):
         # ball.pos2D = ball.pos2D.addScaled(ball.velo2D,dt);
-        
         self.position += self.velocity * dt
     
+            
+    def updateAccel(self):    
+        pass
+        
+    def updateVelo(self):
+        pass
+    
+    def move(self):
+        self.moveObject(self)
+        self.calcForce(self)
+        self.updateAccel(self)
+        self.updateVelo(self) 
+        
     def calcForce(self):
-    # //force = new Vector2D(0,ball.mass*g-k*ball.vy);
-    # var gravity = Forces.constantGravity(ball.mass,g);
-    # var rball = ball.radius;
-    # var xball = ball.x;
-    # var yball = ball.y;
-    # var dr = (yball-yLevel)/rball;
-    # var ratio; // volume fraction of object that is submerged
-    # if (dr <= -1){ // object completely out of water
-    # ratio = 0;
-    # }else if (dr < 1){ // object partially in water
-    # //ratio = 0.5 + 0.5*dr; // for cuboid
-    # ratio = 0.5 + 0.25*dr*(3-dr*dr); // for sphere
-    # }else{ // object completely in water
-    # ratio = 1;
-    # }
-    # var upthrust = new Vector2D(0,-rho*V*ratio*g);
-    # var drag = ball.velo2D.multiply(-ratio*k*ball.velo2D.length());
-    # force = Forces.add([gravity, upthrust, drag]);
-    # //force = Forces.add([gravity, upthrust]);
-    gravity = self.mass * g
-    
-    #drag = D = Cd * A * .5 * r * V²
-    
-    # boyancy?
-   
-    R = self.velocity * self.diameter / nu
-    
-    cd = 24 / R
-    
-    drag = 0.5 * cd * 4/3 * self.radius**2 *  
+        # //force = new Vector2D(0,ball.mass*g-k*ball.vy);
+        # var gravity = Forces.constantGravity(ball.mass,g);
+        # var rball = ball.radius;
+        # var xball = ball.x;
+        # var yball = ball.y;
+        # var dr = (yball-yLevel)/rball;
+        # var ratio; // volume fraction of object that is submerged
+        # if (dr <= -1){ // object completely out of water
+        # ratio = 0;
+        # }else if (dr < 1){ // object partially in water
+        # //ratio = 0.5 + 0.5*dr; // for cuboid
+        # ratio = 0.5 + 0.25*dr*(3-dr*dr); // for sphere
+        # }else{ // object completely in water
+        # ratio = 1;
+        # }
+        # var upthrust = new Vector2D(0,-rho*V*ratio*g);
+        # var drag = ball.velo2D.multiply(-ratio*k*ball.velo2D.length());
+        # force = Forces.add([gravity, upthrust, drag]);
+        # //force = Forces.add([gravity, upthrust]);
+        gravity = self.mass * g
+        
+        #drag = D = Cd * A * .5 * r * V²
+        
+        # boyancy?
+       
+        R = self.velocity * self.diameter / nu
+        
+        cd = 24 / R
+        
+        drag = 0.5 * cd * 4/3 * self.radius**2 
     
   
 
