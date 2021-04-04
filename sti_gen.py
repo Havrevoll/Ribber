@@ -24,7 +24,7 @@ from scipy.spatial import cKDTree
 # from IPython.display import clear_output
 
 
-from math import ceil, floor, log, sqrt
+from math import ceil, floor, log, sqrt, pi, hypot
 # import os.path.join as pjoin
 
 # fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
@@ -230,22 +230,86 @@ def rk(t0, y0, L, f, h=0.02):
         
     return t,y
 
+
+g = 9.81
+nu = 1e-6
+dt = 1
+rho = 1000
+
 class Particle:
-    def __init__(self, position, diameter, density=2600, velocity=0 ):
-        self.position = position
+    
+    #Lag ein tabell med tidspunkt og posisjon for kvar einskild partikkel.
+    
+    def __init__(self, initPosition, diameter, density=1600, velocity=0 ):
+        self.initPosition = initPosition
         self.diameter= diameter
         self.density = density
-        self.velocity = velocity
+        self.velocity = velocity #vector format
+        self.force = 0
+        
+    def get_mass(self):
+        # V = 4/3 πr³
+        return self.diameter**3 * pi * 1/6
     
+    mass = property(get_mass)
     
+    def get_radius(self):
+        return self.diameter/2
     
+    radius = property(get_radius)
     
+    def get_abs_vel(self):
+        return hypot(self.velocity)
+    
+    abs_vel = property(get_abs_vel)    
+    
+    def move(self):
+        moveObject(self)
+        calcForce(self)
+        updateAccel(self)
+        updateVelo(self)
+        
+    def moveObject(self):
+        # ball.pos2D = ball.pos2D.addScaled(ball.velo2D,dt);
+        
+        self.position += self.velocity * dt
+    
+    def calcForce(self):
+    # //force = new Vector2D(0,ball.mass*g-k*ball.vy);
+    # var gravity = Forces.constantGravity(ball.mass,g);
+    # var rball = ball.radius;
+    # var xball = ball.x;
+    # var yball = ball.y;
+    # var dr = (yball-yLevel)/rball;
+    # var ratio; // volume fraction of object that is submerged
+    # if (dr <= -1){ // object completely out of water
+    # ratio = 0;
+    # }else if (dr < 1){ // object partially in water
+    # //ratio = 0.5 + 0.5*dr; // for cuboid
+    # ratio = 0.5 + 0.25*dr*(3-dr*dr); // for sphere
+    # }else{ // object completely in water
+    # ratio = 1;
+    # }
+    # var upthrust = new Vector2D(0,-rho*V*ratio*g);
+    # var drag = ball.velo2D.multiply(-ratio*k*ball.velo2D.length());
+    # force = Forces.add([gravity, upthrust, drag]);
+    # //force = Forces.add([gravity, upthrust]);
+    gravity = self.mass * g
+    
+    #drag = D = Cd * A * .5 * r * V²
+    
+    # boyancy?
+   
+    R = self.velocity * self.diameter / nu
+    
+    cd = 24 / R
+    
+    drag = 0.5 * cd * 4/3 * self.radius**2 *  
+    
+  
 
 def lag_sti(case, t_start,t_end,fps=20):
-    
-
-    
-    f_t = lag_ft(case, t_start,t_end,fps=20)
+    # f_t = lag_ft(case, t_start,t_end,fps=20)
     
     p_x,p_y = np.meshgrid([-90,-200],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
     
