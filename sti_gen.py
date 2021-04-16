@@ -13,6 +13,7 @@ from scipy import interpolate
 from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#r179348322575-1
 from scipy.optimize import fsolve
 import h5py
+import pickle
 import re
 import scipy.stats as stats
 
@@ -35,7 +36,7 @@ discharges = [20,40,60,80,100,120,140]
 
 h= -5.9
 
-def reshape(t_max=1, dataset = h5py.File("D:/Tonstad/utvalde/Q40.hdf5", 'r'), nearest=True):
+def lag_tre(t_max=1, dataset = h5py.File("D:/Tonstad/utvalde/Q40.hdf5", 'r'), nearest=True):
     '''
     Ein metode som tek inn eit datasett og gjer alle reshapings-tinga for x og y, u og v og Re.
 
@@ -73,7 +74,7 @@ def reshape(t_max=1, dataset = h5py.File("D:/Tonstad/utvalde/Q40.hdf5", 'r'), ne
     # uvw = (0,-88.5,87)
     txy = np.vstack((t_lang,x_lang,y_lang)).T
 
-    # interpolate.griddata((t_lang, x_lang, y_lang), Umx_lang, uvw, method='linear')
+    # interpolate.griddata((t_lang, x_lang, y_lang), Umx_lang, uvw[0], method='linear')
 
     import time
 
@@ -100,54 +101,66 @@ def reshape(t_max=1, dataset = h5py.File("D:/Tonstad/utvalde/Q40.hdf5", 'r'), ne
     
     return tree
 
+def hent_tre(filnamn="D:/Tonstad/Q40_20s.pickle"):
+    with open(filnamn, 'rb') as f:
+        tri = pickle.load(f)
+ 
+    return tri
 
-def vegglov(u_star, y, v):
-    # nu = 1 # 1 mm²/s
-    y = y - h
-    ks = .0025
-    return 1/0.4 * log(30 * y / ks) - v/u_star
-
-def finn_u(y,v):
-    u = np.zeros(127)
+def get_velocity_data(t_max=1):
+    steps = t_max * 20
     
-    for i in np.arange(0,67):
-        u[i]= fsolve(vegglov, 2, args=(y[i],v[i]))
-     
-    return u
-
-def draw_rect(axes,color='red'):
-    axes.add_patch(Rectangle((-62.4,-9.56),50,8,linewidth=2,edgecolor=color,facecolor='none'))
-    axes.add_patch(Rectangle((37.6,-8.5),50,8,linewidth=2,edgecolor=color,facecolor='none'))
-
-def draw_shade(axes, x0=0, x=430, color='red'):
-    axes.add_patch(Rectangle((x0,-9.8),x,10.8,linewidth=2,edgecolor='none',facecolor='lightcoral'))
-
-def ranges():
-    y_range = np.s_[0:114]
-    x_range = np.s_[40:108]
+    with h5py.File("D:/Tonstad/Utvalde/Q40.hdf5", 'r') as f:
+        Umx = np.array(f['Umx'])[0:steps,:]
+        Vmx = np.array(f['Vmx'])[0:steps,:]
+        (I,J) = (int(np.array(f['I'])),int(np.array(f['J'])))
     
-    piv_range = np.index_exp[y_range,x_range]
+    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,1:114,1:125].ravel()
+    Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,1:114,1:125].ravel()
     
-    return piv_range
+    nonan = np.invert(np.isnan(Umx_reshape))
+        
+    return Umx_reshape[nonan], Vmx_reshape[nonan]
 
 
-# https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids
+def interpol(t, tri=hent_tre(), Umx_lang=get_velocity_data(20)):
+    '''
+    https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
 
-def interp_weights(tri, uv):
-   
-    simplex = tri.find_simplex(uv)
+    Parameters
+    ----------
+    tri : spatial.qhull.Delaunay
+        Eit tre med data.
+    Umx_lang : Array of float64
+        Fartsdata i ei lang remse med same storleik som tri.
+    uvw : Array of float64
+        Eit punkt i tid og rom som du vil finna farten i.
+
+    Returns
+    -------
+    TYPE
+        DESCRIPTION.
+
+    '''
+    
+    d=3
+    simplex = tri.find_simplex(uvw)
     vertices = np.take(tri.simplices, simplex, axis=0)
     temp = np.take(tri.transform, simplex, axis=0)
-    delta = uv - temp[:, 2]
-    bary = np.einsum('njk,nk->nj', temp[:2, :], delta)
-    wts = np.hstack((bary, 1 - bary.sum(axis=1, keepdims=True)))
-    ret = np.einsum('nj,nj->n', np.take(uv, vertices), wts)
-
-def interpol(coords, values, yn):
+    delta = uvw - temp[d]
+    bary = np.einsum('jk,k->j', temp[:d, :], delta)
+    wts = np.hstack((bary, 1 - bary.sum(axis=0, keepdims=True)))
+                
+    return np.einsum('j,j->', np.take(Umx_lang, vertices), wts)
     
-    #ret[np.any(wts < 0, axis=1)] = fill_value
-    return
+def upward_cannon(t, y): return [y[1], -0.5]
+def hit_ground(t, y): return y[0]
+hit_ground.terminal = True
+hit_ground.direction = -1
+sol = solve_ivp(upward_cannon, [0, 100], [0, 10], events=hit_ground)
+print(sol.t_events)
 
+print(sol.t)
 
 
 def interp_lin_near(coords,values, yn):
@@ -246,15 +259,12 @@ dt = 1
 rho = 1000
 
 class Particle:
-    
     #Lag ein tabell med tidspunkt og posisjon for kvar einskild partikkel.
-    
     def __init__(self, initPosition, diameter, density=1600, velocity=0 ):
-        self.initPosition = initPosition
         self.diameter= diameter
         self.density = density
-        self.velocity = velocity #vector format
         self.force = 0
+        self.timeposvel = np.array([0,initPosition,velocity])
         
     def get_mass(self):
         # V = 4/3 πr³
@@ -271,14 +281,11 @@ class Particle:
         return hypot(self.velocity)
     
     abs_vel = property(get_abs_vel)    
-    
-
         
     def moveObject(self):
         # ball.pos2D = ball.pos2D.addScaled(ball.velo2D,dt);
         self.position += self.velocity * dt
-    
-            
+                
     def updateAccel(self):    
         pass
         
@@ -292,36 +299,20 @@ class Particle:
         self.updateVelo(self) 
         
     def calcForce(self):
-        # //force = new Vector2D(0,ball.mass*g-k*ball.vy);
-        # var gravity = Forces.constantGravity(ball.mass,g);
-        # var rball = ball.radius;
-        # var xball = ball.x;
-        # var yball = ball.y;
         # var dr = (yball-yLevel)/rball;
-        # var ratio; // volume fraction of object that is submerged
-        # if (dr <= -1){ // object completely out of water
-        # ratio = 0;
-        # }else if (dr < 1){ // object partially in water
-        # //ratio = 0.5 + 0.5*dr; // for cuboid
-        # ratio = 0.5 + 0.25*dr*(3-dr*dr); // for sphere
-        # }else{ // object completely in water
-        # ratio = 1;
-        # }
-        # var upthrust = new Vector2D(0,-rho*V*ratio*g);
         # var drag = ball.velo2D.multiply(-ratio*k*ball.velo2D.length());
         # force = Forces.add([gravity, upthrust, drag]);
-        # //force = Forces.add([gravity, upthrust]);
+        
         gravity = self.mass * g
         
         #drag = D = Cd * A * .5 * r * V²
-        
-        # boyancy?
        
         R = self.velocity * self.diameter / nu
         
         cd = 24 / R
         
-        drag = 0.5 * cd * 4/3 * self.radius**2 
+        drag = 3/4 * cd/self.diameter * rho/self.density * 
+    
     
   
 
@@ -377,42 +368,17 @@ def sti_animasjon(case):
     plt.close()
 
 
-def lagra(dataset):
-    f = h5py.File('alle2.hdf5','w')
+def draw_rect(axes,color='red'):
+    axes.add_patch(Rectangle((-62.4,-9.56),50,8,linewidth=2,edgecolor=color,facecolor='none'))
+    axes.add_patch(Rectangle((37.6,-8.5),50,8,linewidth=2,edgecolor=color,facecolor='none'))
+
+def ranges():
+    y_range = np.s_[0:114]
+    x_range = np.s_[40:108]
     
-    vassf = f.create_group("vassføringar")
+    piv_range = np.index_exp[y_range,x_range]
     
-    for q in dataset:
-        gr = vassf.create_group(str(q))
-        for k in dataset[q]:
-            gr.create_dataset(k, data=dataset[q][k], compression="gzip", compression_opts=9)
-    f.close()
-  
-def runsTest(l, l_median): 
-  
-    runs, n1, n2 = 0, 0, 0
-      
-    # Checking for start of new run 
-    for i in range(len(l)): 
-          
-        # no. of runs 
-        if (l[i] >= l_median and l[i-1] < l_median) or (l[i] < l_median and l[i-1] >= l_median): 
-            runs += 1  
-          
-        # no. of positive values 
-        if(l[i]) >= l_median: 
-            n1 += 1   
-          
-        # no. of negative values 
-        else: 
-            n2 += 1   
-  
-    runs_exp = ((2*n1*n2)/(n1+n2))+1
-    stan_dev = sqrt((2*n1*n2*(2*n1*n2-n1-n2))/(((n1+n2)**2)*(n1+n2-1))) 
-  
-    z = (runs-runs_exp)/stan_dev 
-  
-    return z 
+    return piv_range
 
 
 
