@@ -22,11 +22,25 @@ import scipy.spatial.qhull as qhull
 import itertools
 from scipy.spatial import cKDTree
 
-# from IPython.display import clear_output
-
+import os.path
 
 from math import ceil, floor, log, sqrt, pi, hypot
+
 # import os.path.join as pjoin
+
+if os.path.isfile("D:/Tonstad/utvalde/Q40.hdf5"):
+    filnamn = "D:/Tonstad/utvalde/Q40.hdf5"
+elif os.path.isfile("C:/Users/havrevol/Q40.hdf5"):
+    filnamn = "C:/Users/havrevol/Q40.hdf5"
+else:
+    filnamn ="D:/Tonstad/Q40.hdf5"
+    
+if os.path.isfile("D:/Tonstad/Q40_20s.pickle"):
+    pickle_fil = "D:/Tonstad/Q40_20s.pickle"
+elif os.path.isfile("C:/Users/havrevol/Q40_2s.pickle"):
+    pickle_fil = "C:/Users/havrevol/Q40_2s.pickle"
+else:
+    pickle_fil ="D:/Tonstad/Q40_2s.pickle"
 
 # fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
 # vass = fil['vassføringar']
@@ -36,7 +50,8 @@ discharges = [20,40,60,80,100,120,140]
 
 h= -5.9
 
-def lag_tre(t_max=1, dataset = h5py.File("D:/Tonstad/utvalde/Q40.hdf5", 'r'), nearest=True):
+
+def lag_tre(t_max=1, dataset = h5py.File(filnamn, 'r'), nearest=True):
     '''
     Ein metode som tek inn eit datasett og gjer alle reshapings-tinga for x og y, u og v og Re.
 
@@ -101,8 +116,8 @@ def lag_tre(t_max=1, dataset = h5py.File("D:/Tonstad/utvalde/Q40.hdf5", 'r'), ne
     
     return tree
 
-def hent_tre(filnamn="D:/Tonstad/Q40_20s.pickle"):
-    with open(filnamn, 'rb') as f:
+def hent_tre(fil=pickle_fil):
+    with open(fil, 'rb') as f:
         tri = pickle.load(f)
  
     return tri
@@ -110,7 +125,7 @@ def hent_tre(filnamn="D:/Tonstad/Q40_20s.pickle"):
 def get_velocity_data(t_max=1):
     steps = t_max * 20
     
-    with h5py.File("D:/Tonstad/Utvalde/Q40.hdf5", 'r') as f:
+    with h5py.File(filnamn, 'r') as f:
         Umx = np.array(f['Umx'])[0:steps,:]
         Vmx = np.array(f['Vmx'])[0:steps,:]
         (I,J) = (int(np.array(f['I'])),int(np.array(f['J'])))
@@ -122,8 +137,11 @@ def get_velocity_data(t_max=1):
         
     return Umx_reshape[nonan], Vmx_reshape[nonan]
 
+Umx_lang, Vmx_lang = get_velocity_data(2)
+tri = hent_tre()
 
-def interpol(t, tri=hent_tre(), Umx_lang=get_velocity_data(20)):
+# Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
+def U(t, x):
     '''
     https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
 
@@ -133,7 +151,7 @@ def interpol(t, tri=hent_tre(), Umx_lang=get_velocity_data(20)):
         Eit tre med data.
     Umx_lang : Array of float64
         Fartsdata i ei lang remse med same storleik som tri.
-    uvw : Array of float64
+    x : Array of float64
         Eit punkt i tid og rom som du vil finna farten i.
 
     Returns
@@ -142,26 +160,17 @@ def interpol(t, tri=hent_tre(), Umx_lang=get_velocity_data(20)):
         DESCRIPTION.
 
     '''
-    
+    x = np.concatenate(([t], x))
     d=3
-    simplex = tri.find_simplex(uvw)
+    simplex = tri.find_simplex(x)
     vertices = np.take(tri.simplices, simplex, axis=0)
     temp = np.take(tri.transform, simplex, axis=0)
-    delta = uvw - temp[d]
+    delta = x - temp[d]
     bary = np.einsum('jk,k->j', temp[:d, :], delta)
     wts = np.hstack((bary, 1 - bary.sum(axis=0, keepdims=True)))
                 
     return np.einsum('j,j->', np.take(Umx_lang, vertices), wts)
     
-def upward_cannon(t, y): return [y[1], -0.5]
-def hit_ground(t, y): return y[0]
-hit_ground.terminal = True
-hit_ground.direction = -1
-sol = solve_ivp(upward_cannon, [0, 100], [0, 10], events=hit_ground)
-print(sol.t_events)
-
-print(sol.t)
-
 
 def interp_lin_near(coords,values, yn):
     new = interpolate.griddata(coords, values, yn, method='linear')
@@ -311,7 +320,7 @@ class Particle:
         
         cd = 24 / R
         
-        drag = 3/4 * cd/self.diameter * rho/self.density * 
+        drag = 3/4 * cd/self.diameter * rho/self.density * self.velocity**2
     
     
   
