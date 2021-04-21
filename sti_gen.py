@@ -169,7 +169,7 @@ def U(t, x):
     bary = np.einsum('jk,k->j', temp[:d, :], delta)
     wts = np.hstack((bary, 1 - bary.sum(axis=0, keepdims=True)))
                 
-    return np.einsum('j,j->', np.take(Umx_lang, vertices), wts)
+    return np.einsum('j,j->', np.take(Umx_lang, vertices), wts), np.einsum('j,j->', np.take(Vmx_lang, vertices), wts)
     
 
 def interp_lin_near(coords,values, yn):
@@ -322,8 +322,33 @@ class Particle:
         
         drag = 3/4 * cd/self.diameter * rho/self.density * self.velocity**2
     
+        
+    def f(self, t,x):
+        '''
+        Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
+        Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart
     
-  
+        Parameters
+        ----------
+        t : TYPE
+            DESCRIPTION.
+        x : TYPE
+            DESCRIPTION.
+    
+        Returns
+        -------
+        None.
+    
+        '''
+        dx_dt = x[1]
+        
+        R = self.velocity * self.diameter / nu
+        cd = 24 / R
+        
+        du_dt= 3/4 * cd / self.diameter * rho / self.density * abs(U(t,x) - x[1])*(U(t,x) - x[1]) + (rho / self.density - 1)* g
+        
+        return dx_dt,du_dt
+    
 
 def lag_sti(case, t_start,t_end,fps=20):
     # f_t = lag_ft(case, t_start,t_end,fps=20)
