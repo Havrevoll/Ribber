@@ -273,7 +273,7 @@ class Particle:
         self.diameter= diameter
         self.density = density
         self.force = 0
-        self.timeposvel = np.array([0,initPosition,velocity])
+        self.timeposvel = np.array([0,initPosition[0],initPosition[1],velocity])
         
     def get_mass(self):
         # V = 4/3 πr³
@@ -286,11 +286,6 @@ class Particle:
     
     radius = property(get_radius)
     
-    def get_abs_vel(self):
-        return hypot(self.velocity)
-    
-    abs_vel = property(get_abs_vel)    
-        
     def moveObject(self):
         # ball.pos2D = ball.pos2D.addScaled(ball.velo2D,dt);
         self.position += self.velocity * dt
@@ -341,11 +336,13 @@ class Particle:
     
         '''
         dx_dt = x[1]
+        vel = abs(np.array(U(t,x[0])) - np.array(x[1]))
         
-        R = self.velocity * self.diameter / nu
+        R = hypot(vel[0],vel[1]) * self.diameter / nu
+        
         cd = 24 / R
         
-        du_dt= 3/4 * cd / self.diameter * rho / self.density * abs(U(t,x) - x[1])*(U(t,x) - x[1]) + (rho / self.density - 1)* g
+        du_dt= 3/4 * cd / self.diameter * rho / self.density * abs(np.array(U(t,x[0])) - np.array(x[1]))*(np.array(U(t,x[0])) - np.array(x[1])) + (rho / self.density - 1)* g
         
         return dx_dt,du_dt
     
