@@ -262,14 +262,14 @@ def rk(t0, y0, L, f, h=0.02):
     return t,y
 
 
-g = 9.81
-nu = 1e-6
-dt = 1
-rho = 1000
+g = 9.81e3 # mm/s^2 = 9.81 m/s^2
+nu = 1 # 1 mm^2/s = 1e-6 m^2/s
+dt = 1 # s
+rho = 1e-6  # kg/mm^3 = 1000 kg/m^3 
 
 class Particle:
     #Lag ein tabell med tidspunkt og posisjon for kvar einskild partikkel.
-    def __init__(self, initPosition, diameter, density=1600, velocity=0 ):
+    def __init__(self, initPosition, diameter, density=1.6e-6, velocity=0 ):
         self.diameter= diameter
         self.density = density
         self.force = 0
@@ -335,18 +335,28 @@ class Particle:
         None.
     
         '''
-        dx_dt = x[1]
-        vel = abs(np.array(U(t,x[0])) - np.array(x[1]))
+        dx_dt = np.array(x[1])
+        vel = abs(np.array(U(t,x[0])) - np.array(x[1])) # relativ snøggleik
         
-        R = hypot(vel[0],vel[1]) * self.diameter / nu
+        R = hypot(vel[0],vel[1]) * self.diameter / nu 
         
         cd = 24 / R
         
-        du_dt= 3/4 * cd / self.diameter * rho / self.density * abs(np.array(U(t,x[0])) - np.array(x[1]))*(np.array(U(t,x[0])) - np.array(x[1])) + (rho / self.density - 1)* g
+        drag_component =  3/4 * cd / self.diameter * rho / self.density * abs(vel)*vel
+        gravity_component = np.array([0, (rho / self.density - 1) * g])
+        
+        # du_dt= 3/4 * cd / self.diameter * rho / self.density * abs(np.array(U(t,x[0])) - np.array(x[1]))*(np.array(U(t,x[0])) - np.array(x[1])) + (rho / self.density - 1)* g
+        du_dt= drag_component + gravity_component
         
         return dx_dt,du_dt
     
+stein = Particle([-88.5,87],1)
 
+#%%
+
+f_retur = stein.f(0,[[-88.5,87],[0,0]])
+
+#%%
 def lag_sti(case, t_start,t_end,fps=20):
     # f_t = lag_ft(case, t_start,t_end,fps=20)
     
