@@ -116,6 +116,10 @@ def lag_tre(t_max=1, dataset = h5py.File(filnamn, 'r'), nearest=True):
     
     return tree
 
+def lagra_tre(tre, fil):
+    with open(fil, 'wb') as f:
+        pickle.dump(tre, f)
+
 def hent_tre(fil=pickle_fil):
     with open(fil, 'rb') as f:
         tri = pickle.load(f)
@@ -137,11 +141,10 @@ def get_velocity_data(t_max=1):
         
     return Umx_reshape[nonan], Vmx_reshape[nonan]
 
-Umx_lang, Vmx_lang = get_velocity_data(2)
-tri = hent_tre()
+
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
-def U(t, x):
+def U(t, x, tri, Umx_lang, Vmx_lang):
     '''
     https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
 
@@ -170,6 +173,8 @@ def U(t, x):
     wts = np.hstack((bary, 1 - bary.sum(axis=0, keepdims=True)))
                 
     return np.einsum('j,j->', np.take(Umx_lang, vertices), wts), np.einsum('j,j->', np.take(Vmx_lang, vertices), wts)
+    
+cd = interpolate.interp1d(np.array([0.001,0.01,0.1,1,10,20,40,60,80,100,200,400,600,800,1000,2000,4000,6000,8000,10000,100000]), np.array([2.70E+04,2.40E+03,2.50E+02,2.70E+01,4.40E+00,2.80E+00,1.80E+00,1.45E+00,1.25E+00,1.12E+00,8.00E-01,6.20E-01,5.50E-01,5.00E-01,4.70E-01,4.20E-01,4.10E-01,4.15E-01,4.30E-01,4.38E-01,5.40E-01,]))
     
 
 def interp_lin_near(coords,values, yn):
@@ -261,15 +266,42 @@ def rk(t0, y0, L, f, h=0.02):
         
     return t,y
 
+def rk_2(f, y0, L, h, tri, Umx_lang, Vmx_lang):
+    ''' Heimelaga Runge-Kutta-metode '''
+    t0, t1 = L
+    N=int((t1-t0)/h)
 
-g = 9.81e3 # mm/s^2 = 9.81 m/s^2
+    t=[0]*N # initialize lists
+    y=[0]*N # initialize lists
+    
+    t[0] = t0
+    y[0] = y0
+    
+    for n in range(0, N-1):
+        #print(n,t[n], y[n], f(t[n],y[n]))
+        k1 = h*f(t[n], y[n], tri, Umx_lang, Vmx_lang)
+        k2 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k1, tri, Umx_lang, Vmx_lang)
+        k3 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k2, tri, Umx_lang, Vmx_lang)
+        k4 = h*f(t[n] + h, y[n] + k3, tri, Umx_lang, Vmx_lang)
+        
+        if (np.isnan(k4+k3+k2+k1).any()):
+            #print(k1,k2,k3,k4)
+            return t,y
+        
+        t[n+1] = t[n] + h
+        y[n+1] = y[n] + 1/6 * (k1 + 2*k2 + 2*k3 + k4)
+        
+    return t,y
+
+
+g = np.array([0, 9.81e3]) # mm/s^2 = 9.81 m/s^2
 nu = 1 # 1 mm^2/s = 1e-6 m^2/s
 dt = 1 # s
 rho = 1e-6  # kg/mm^3 = 1000 kg/m^3 
 
 class Particle:
     #Lag ein tabell med tidspunkt og posisjon for kvar einskild partikkel.
-    def __init__(self, initPosition, diameter, density=1.6e-6, velocity=0 ):
+    def __init__(self, initPosition, diameter, density=2.6e-6, velocity=0 ):
         self.diameter= diameter
         self.density = density
         self.force = 0
@@ -318,10 +350,12 @@ class Particle:
         drag = 3/4 * cd/self.diameter * rho/self.density * self.velocity**2
     
         
-    def f(self, t,x):
+    def f(self, t, x, tri, Umx_lang, Vmx_lang):
         '''
         Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
-        Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart
+        Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
+        Men for at solve_ivp skal fungera, må x vera 1-dimensjonal. Altså. x= [x,y,u,v],
+        ikkje x = [[x,y], [u,v]].
     
         Parameters
         ----------
@@ -335,28 +369,48 @@ class Particle:
         None.
     
         '''
-        dx_dt = np.array(x[1])
-        vel = abs(np.array(U(t,x[0])) - np.array(x[1])) # relativ snøggleik
+        dx_dt = np.array([x[2], x[3]])
+        vel = abs(np.array([0,0]) - dx_dt) # relativ snøggleik
+        # vel = abs(np.array(U(t,np.array([x[0],x[1]]),tri, Umx_lang, Vmx_lang)) - dx_dt) # relativ snøggleik
         
-        R = hypot(vel[0],vel[1]) * self.diameter / nu 
+        Re = hypot(vel[0],vel[1]) * self.diameter / nu 
         
-        cd = 24 / R
+        if (Re<1000):
+            try:
+                cd = 24 / Re * (1+0.15*Re**0.687)
+            except ZeroDivisionError:
+                cd = 2e4
+        else:
+            cd = 0.44
         
+        # print("Re = ", Re," cd= ", cd)
         drag_component =  3/4 * cd / self.diameter * rho / self.density * abs(vel)*vel
-        gravity_component = np.array([0, (rho / self.density - 1) * g])
+        gravity_component = (rho / self.density - 1) * g
+        
+        # print("drag_component =",drag_component,", gravity_component = ",gravity_component)
         
         # du_dt= 3/4 * cd / self.diameter * rho / self.density * abs(np.array(U(t,x[0])) - np.array(x[1]))*(np.array(U(t,x[0])) - np.array(x[1])) + (rho / self.density - 1)* g
-        du_dt= drag_component + gravity_component
+        du_dt = drag_component + gravity_component
         
-        return dx_dt,du_dt
+        return np.concatenate((dx_dt,du_dt))
     
-stein = Particle([-88.5,87],1)
+#%% Førebu
+
+Umx_lang, Vmx_lang = get_velocity_data(20)
+tri = hent_tre()
+
+#%% Utfør
+
+stein = Particle([-88.5,87],1) #Partikkel med koordinatar og 1 mm diameter
+f_retur = stein.f(0,[-88.5,87,0,0], tri, Umx_lang, Vmx_lang)
 
 #%%
 
-f_retur = stein.f(0,[[-88.5,87],[0,0]])
-
+svar_profft = solve_ivp(stein.f,(0,2), np.array([-88.5,87,0,0]),t_eval=np.arange(0,2,0.1), args=(tri, Umx_lang, Vmx_lang))
 #%%
+svar = rk_2(stein.f, np.array([-88.5,87,0,0]), (0,0.6), 0.02, tri, Umx_lang, Vmx_lang)
+
+#%% Resten
 def lag_sti(case, t_start,t_end,fps=20):
     # f_t = lag_ft(case, t_start,t_end,fps=20)
     
