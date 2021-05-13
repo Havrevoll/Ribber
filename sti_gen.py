@@ -50,6 +50,8 @@ discharges = [20,40,60,80,100,120,140]
 
 h= -5.9
 
+def norm(v):
+    return v / (v**2).sum()**0.5
 
 def lag_tre(t_max=1, dataset = h5py.File(filnamn, 'r'), nearest=True):
     '''
@@ -166,6 +168,9 @@ def U(t, x, tri, Umx_lang, Vmx_lang):
     x = np.concatenate(([t], x))
     d=3
     simplex = tri.find_simplex(x)
+    if (simplex==-1):
+        raise Exception("Coordinates outside the complex hull")
+        
     vertices = np.take(tri.simplices, simplex, axis=0)
     temp = np.take(tri.transform, simplex, axis=0)
     delta = x - temp[d]
@@ -177,68 +182,6 @@ def U(t, x, tri, Umx_lang, Vmx_lang):
 cd = interpolate.interp1d(np.array([0.001,0.01,0.1,1,10,20,40,60,80,100,200,400,600,800,1000,2000,4000,6000,8000,10000,100000]), np.array([2.70E+04,2.40E+03,2.50E+02,2.70E+01,4.40E+00,2.80E+00,1.80E+00,1.45E+00,1.25E+00,1.12E+00,8.00E-01,6.20E-01,5.50E-01,5.00E-01,4.70E-01,4.20E-01,4.10E-01,4.15E-01,4.30E-01,4.38E-01,5.40E-01,]))
     
 
-def interp_lin_near(coords,values, yn):
-    new = interpolate.griddata(coords, values, yn, method='linear')
-    if np.isnan(new):
-        return interpolate.griddata(coords, values, yn, method='nearest')
-    else:
-        return new
-
-def lag_ft(case, t_start, t_end, fps=20):
-    ''' Funksjon for å laga eit kontinuerleg vektorfelt '''
-    
-    nonanxindex = np.array(case['nonanxindex'])
-    nonanyindex = np.array(case['nonanyindex'])
-    Umx = np.array(case['Umx'])
-    Vmx = np.array(case['Vmx'])
-    x = np.array(case['x'])
-    y = np.array(case['y'])
-    
-    nonanx={}
-    nonany={}
-    nonanu={}
-    nonanv={}
-    trix={}
-    triy={}
-    
-    for t in np.arange(t_start*fps, t_end*fps):
-        
-        nonanx[t]=np.vstack((x[nonanxindex[t]],y[nonanxindex[t]])).T
-        nonany[t]=np.vstack((x[nonanyindex[t]],y[nonanyindex[t]])).T
-        nonanu[t]=Umx[t,nonanxindex[t]]
-        nonanv[t]=Vmx[t,nonanyindex[t]]
-        trix[t] = qhull.Delaunay(nonanx[t])
-        triy[t] = qhull.Delaunay(nonany[t])
-        print(t, end = '')
-        print(' ', end = '')
-        
-    def f_t(t, yn):
-        
-        if yn[0] > 100:
-            return np.hstack([0,0])
-        
-        t_0 = floor(t)
-        t_1 = ceil(t)
-        
-        if t_0 == t_1:
-            u_0 = interp_lin_near((nonanx[t_0], nonany[t_0]), nonanu[t_0], yn, tri) #interpolate.griddata((x[nonanxindex[t_0]], y[nonanxindex[t_0]]), Umx[t_0,nonanxindex[t_0,:]], yn)
-            v_0 = interp_lin_near((x[nonanyindex[t_0]], y[nonanyindex[t_0]]), Vmx[t_0,nonanyindex[t_0,:]], yn)
-            
-            return np.hstack([u_0,v_0])
-        
-        u_0 = interp_lin_near((x[nonanxindex[t_0]], y[nonanxindex[t_0]]), Umx[t_0,nonanxindex[t_0,:]], yn)
-        v_0 = interp_lin_near((x[nonanyindex[t_0]], y[nonanyindex[t_0]]), Vmx[t_0,nonanyindex[t_0,:]], yn)
-        
-        u_1 = interp_lin_near((x[nonanxindex[t_1]], y[nonanxindex[t_1]]), Umx[t_1,nonanxindex[t_1,:]], yn)
-        v_1 = interp_lin_near((x[nonanyindex[t_1]], y[nonanyindex[t_1]]), Vmx[t_1,nonanyindex[t_1,:]], yn)
-        
-        u_x = u_0 + (t- t_0) * (u_1 - u_0) / (t_1 - t_0) 
-        v_y = v_0 + (t- t_0) * (v_1 - v_0) / (t_1 - t_0) 
-        
-        print("ferdig med interpolering")
-        print(t,yn,np.hstack([u_x,v_y]))
-        return np.hstack([u_x,v_y])
-    return f_t
     
 def rk(t0, y0, L, f, h=0.02):
     ''' Heimelaga Runge-Kutta-metode '''
@@ -301,7 +244,7 @@ rho = 1e-6  # kg/mm^3 = 1000 kg/m^3
 
 class Particle:
     #Lag ein tabell med tidspunkt og posisjon for kvar einskild partikkel.
-    def __init__(self, initPosition, diameter, density=2.6e-6, velocity=0 ):
+    def __init__(self, initPosition, diameter, density=2.65e-6, velocity=0 ):
         self.diameter= diameter
         self.density = density
         self.force = 0
@@ -333,22 +276,7 @@ class Particle:
         self.calcForce(self)
         self.updateAccel(self)
         self.updateVelo(self) 
-        
-    def calcForce(self):
-        # var dr = (yball-yLevel)/rball;
-        # var drag = ball.velo2D.multiply(-ratio*k*ball.velo2D.length());
-        # force = Forces.add([gravity, upthrust, drag]);
-        
-        gravity = self.mass * g
-        
-        #drag = D = Cd * A * .5 * r * V²
-       
-        R = self.velocity * self.diameter / nu
-        
-        cd = 24 / R
-        
-        drag = 3/4 * cd/self.diameter * rho/self.density * self.velocity**2
-    
+            
         
     def f(self, t, x, tri, Umx_lang, Vmx_lang):
         '''
@@ -370,8 +298,8 @@ class Particle:
     
         '''
         dx_dt = np.array([x[2], x[3]])
-        vel = abs(np.array([0,0]) - dx_dt) # relativ snøggleik
-        # vel = abs(np.array(U(t,np.array([x[0],x[1]]),tri, Umx_lang, Vmx_lang)) - dx_dt) # relativ snøggleik
+        # vel = np.array([100,0]) - dx_dt # relativ snøggleik
+        vel = np.array(U(t,np.array([x[0],x[1]]),tri, Umx_lang, Vmx_lang)) - dx_dt # relativ snøggleik
         
         Re = hypot(vel[0],vel[1]) * self.diameter / nu 
         
@@ -394,36 +322,163 @@ class Particle:
         
         return np.concatenate((dx_dt,du_dt))
     
+    def checkCollision(self, position, rib, collisionInfo):
+        
+        inside = True
+        bestDistance = -99999
+        nearestEdge = 0
+        
+        #Step A - compute nearest edge
+        vertices = rib.vertices
+        normals = rib.normals
+        
+        for i in range(len(vertices)):
+            v = position - vertices[i]
+            projection = np.dot(v, normals[i])
+            if (projection > 0):
+                # if the center of circle is outside of rectangle
+                bestDistance = projection
+                nearestEdge = i
+                inside = False
+                break
+            
+            if (projection > bestDistance):
+                # If the center of the circle is inside the rectangle
+                bestDistance = projection
+                nearestEdge = i
+                
+        
+        if (not inside):            
+            #  Step B1: If center is in Region R1
+            # the center of circle is in corner region of mVertex[nearestEdge]
+
+            # //v1 is from left vertex of face to center of circle
+            # //v2 is from left vertex of face to right vertex of face
+            v1 = position - vertices[nearestEdge]
+            v2 = vertices[(nearestEdge + 1) % 4] - vertices[nearestEdge]
+            
+            dot = np.dot(v1, v2)
+            
+            if (dot < 0): #region R1
+                dis = np.sqrt(v1.dot(v1))
+                
+                if (dis > self.radius):
+                    return 0
+                
+                normal = norm(v1)
+                
+                radiusVec = normal*self.radius
+                
+                # sender informasjon til collisioninfo:                    
+                # collisionInfo. setInfo(otherCir.mRadius - dis, normal,
+                # circ2Pos.add(radiusVec));
+            else:
+                # //the center of circle is in corner region of mVertex[nearestEdge+1]
+        
+                #         //v1 is from right vertex of face to center of circle 
+                #         //v2 is from right vertex of face to left vertex of face
+                v1 = position - vertices[(nearestEdge +1) % 4]
+                v2 = (-1) * v2
+                dot = v1.dot(v2)
+                
+                if (dot < 0):
+                    dis = np.sqrt(v1.dot(v1))
+                                        
+                    # //compare the distance with radium to decide collision
+            
+                    if (dis > self.radius):
+                        return 0
+                    normal = norm(v1)
+                    radiusVec = normal * (-1) * self.radius
+                    
+                    #  collisionInfo.setInfo(otherCir.mRadius - dis, normal, circ2Pos.add(radiusVec));
+                else:
+                    #//the center of circle is in face region of face[nearestEdge]
+                    if (bestDistance < self.radius):
+                        radiusVec = normals[nearestEdge] * self.radius
+                        #  collisionInfo.setInfo(otherCir.mRadius - bestDistance, this.mFaceNormal[nearestEdge], circ2Pos.subtract(radiusVec));
+                    else:
+                        return 0
+        else:
+            #     //the center of circle is inside of rectangle
+            radiusVec = normals[nearestEdge] * self.radius
+            #     collisionInfo.setInfo(otherCir.mRadius - bestDistance, this.mFaceNormal[nearestEdge], circ2Pos.subtract(radiusVec));
+            
+        return True
+    
+class Rib:
+    def __init__(self, origin, width, height):
+        # Bør kanskje ha informasjon om elastisiteten ved kollisjonar òg?
+        self.origin = np.array(origin)
+        self.width = width
+        self.height = height
+        
+    def get_vertices(self):
+        return [self.origin,
+                self.origin + np.array([self.width,0]),
+                self.origin + np.array([self.width, self.height]),
+                self.origin + np.array([0, self.height])]
+    
+    vertices = property(get_vertices)
+    
+    def get_face_normal(self):
+        vertices = self.vertices
+        # 0 - botn, 1 -- høgre, 2 -- topp, 3 -- venstre
+        return [norm(vertices[1]-vertices[2]), 
+                norm(vertices[2]-vertices[3]),
+                norm(vertices[3]-vertices[0]),
+                norm(vertices[0]-vertices[1])]
+    
+    normals = property(get_face_normal)
+        
+        
+        
 #%% Førebu
 
+# %timeit U(random.randint(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, Umx_lang, Vmx_lang)
 Umx_lang, Vmx_lang = get_velocity_data(20)
 tri = hent_tre()
 
 #%% Utfør
 
 stein = Particle([-88.5,87],1) #Partikkel med koordinatar og 1 mm diameter
-f_retur = stein.f(0,[-88.5,87,0,0], tri, Umx_lang, Vmx_lang)
+
+ribs = [Rib((-62.4,-9.56),50,8), 
+        Rib((37.6,-8.5), 50, 8), 
+        Rib((-100,-74.3), 200, -10)]
+
+f_retur = stein.f(0,[-88.5,87,100,-155], tri, Umx_lang, Vmx_lang)
+
 
 #%%
 
-svar_profft = solve_ivp(stein.f,(0,2), np.array([-88.5,87,0,0]),t_eval=np.arange(0,2,0.1), args=(tri, Umx_lang, Vmx_lang))
+svar_profft = solve_ivp(stein.f,(0,0.4), np.array([-88.5,87,0,0]),t_eval=np.arange(0,.4,0.02), args=(tri, Umx_lang, Vmx_lang))
 #%%
-svar = rk_2(stein.f, np.array([-88.5,87,0,0]), (0,0.6), 0.02, tri, Umx_lang, Vmx_lang)
+svar = rk_2(stein.f, np.array([-88.5,87,0,0]), (0,0.4), 0.02, tri, Umx_lang, Vmx_lang)
 
 #%% Resten
-def lag_sti(case, t_start,t_end,fps=20):
-    # f_t = lag_ft(case, t_start,t_end,fps=20)
+
+
+# p_x,p_y = np.meshgrid([-90,-200],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
     
-    p_x,p_y = np.meshgrid([-90,-200],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
+# p_x = p_x.T.reshape(-1)
+# p_y= p_y.T.reshape(-1)
     
-    p_x = p_x.T.reshape(-1)
-    p_y= p_y.T.reshape(-1)
     
+
+def lag_sti(particle, t_start,t_end,fps=20):
+    
+    # stien må innehalda posisjon, fart og tid.
     sti = []
     
+    # finn neste steg med rk_2 og standard tidssteg.
+    # sjekk kollisjon. Dersom ikkje kollisjon, bruk resultat frå rk_2 og gå til neste steg
+    # Dersom kollisjon: halver tidssteget, sjekk kollisjon. Dersom ikkje kollisjon
  
+    
+    
     for par in np.column_stack((p_x,p_y)):
-        sti.append(solve_ivp(f_t, [t_start,t_end*fps], par, t_eval=np.arange(t_start, t_end*fps, 1)))
+        sti.append(solve_ivp(particle.f, [t_start,t_end*fps], par, t_eval=np.arange(t_start, t_end*fps, 1)))
         
     sti_ny=[]
     
@@ -476,5 +531,13 @@ def ranges():
     return piv_range
 
 
-
+# Her er ein funksjon for fritt fall av ein 1 mm partikkel i vatn.
+# d u_p/dt = u_p(t,y) der y er vertikal fart. Altså berre modellert drag og gravitasjon.
+def u_p(t,y):
+    if(y==0):
+        cd=1e4
+    else:
+        cd=24/abs(0-y)*(1+0.15*abs(0-y)**0.687)
+        
+    return 3/4*(0-y)*abs(0-y)*cd*1/2.65-9810*1.65/2.65
  
