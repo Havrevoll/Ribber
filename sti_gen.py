@@ -322,11 +322,13 @@ class Particle:
         
         return np.concatenate((dx_dt,du_dt))
     
-    def checkCollision(self, position, rib, collisionInfo):
+    def checkCollision(self, position, rib):
         
         inside = True
         bestDistance = -99999
         nearestEdge = 0
+        
+        collisionInfo = (-1,np.array([-1,-1]), np.array([-1,-1]))
         
         #Step A - compute nearest edge
         vertices = rib.vertices
@@ -363,15 +365,15 @@ class Particle:
                 dis = np.sqrt(v1.dot(v1))
                 
                 if (dis > self.radius):
-                    return 0
+                    return (False, collisionInfo) # må vel endra til (bool, depth, normal, start)
                 
                 normal = norm(v1)
                 
-                radiusVec = normal*self.radius
+                radiusVec = normal*self.radius*(-1)
                 
                 # sender informasjon til collisioninfo:                    
-                # collisionInfo. setInfo(otherCir.mRadius - dis, normal,
-                # circ2Pos.add(radiusVec));
+                collisionInfo = (self.radius - dis, normal, position + radiusVec)
+                
             else:
                 # //the center of circle is in corner region of mVertex[nearestEdge+1]
         
@@ -387,24 +389,25 @@ class Particle:
                     # //compare the distance with radium to decide collision
             
                     if (dis > self.radius):
-                        return 0
-                    normal = norm(v1)
-                    radiusVec = normal * (-1) * self.radius
+                        return (False, collisionInfo)
                     
-                    #  collisionInfo.setInfo(otherCir.mRadius - dis, normal, circ2Pos.add(radiusVec));
+                    normal = norm(v1)
+                    radiusVec = normal * self.radius*(-1)
+                    
+                    collisionInfo = (self.radius - dis, normal, position + radiusVec)
                 else:
                     #//the center of circle is in face region of face[nearestEdge]
                     if (bestDistance < self.radius):
                         radiusVec = normals[nearestEdge] * self.radius
-                        #  collisionInfo.setInfo(otherCir.mRadius - bestDistance, this.mFaceNormal[nearestEdge], circ2Pos.subtract(radiusVec));
+                        collisionInfo = (self.radius - bestDistance, normals[nearestEdge], position - radiusVec)
                     else:
-                        return 0
+                        return (False, collisionInfo)
         else:
             #     //the center of circle is inside of rectangle
             radiusVec = normals[nearestEdge] * self.radius
-            #     collisionInfo.setInfo(otherCir.mRadius - bestDistance, this.mFaceNormal[nearestEdge], circ2Pos.subtract(radiusVec));
+            collisionInfo = (self.radius - bestDistance, normals[nearestEdge], position - radiusVec)
             
-        return True
+        return (True, collisionInfo)
     
 class Rib:
     def __init__(self, origin, width, height):
@@ -413,7 +416,7 @@ class Rib:
         self.width = width
         self.height = height
         
-    def get_vertices(self):
+    def get_vertices(self): # Går mot klokka
         return [self.origin,
                 self.origin + np.array([self.width,0]),
                 self.origin + np.array([self.width, self.height]),
@@ -433,13 +436,13 @@ class Rib:
         
         
         
-#%% Førebu
+# #%% Førebu
 
 # %timeit U(random.randint(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, Umx_lang, Vmx_lang)
 Umx_lang, Vmx_lang = get_velocity_data(20)
 tri = hent_tre()
 
-#%% Utfør
+# #%% Utfør
 
 stein = Particle([-88.5,87],1) #Partikkel med koordinatar og 1 mm diameter
 
@@ -456,6 +459,11 @@ svar_profft = solve_ivp(stein.f,(0,0.4), np.array([-88.5,87,0,0]),t_eval=np.aran
 #%%
 svar = rk_2(stein.f, np.array([-88.5,87,0,0]), (0,0.4), 0.02, tri, Umx_lang, Vmx_lang)
 
+#%% Sjekk kollisjon
+stein2 = Particle([-80,50],3)
+koll = stein2.checkCollision([-63,-1], ribs[0]) #R2
+koll2 = stein2.checkCollision([-40,-1], ribs[0]) #R3 (midten av flata)
+
 #%% Resten
 
 
@@ -466,7 +474,7 @@ svar = rk_2(stein.f, np.array([-88.5,87,0,0]), (0,0.4), 0.02, tri, Umx_lang, Vmx
     
     
 
-def lag_sti(particle, t_start,t_end,fps=20):
+def lag_sti(part, x0, t_span,fps=20):
     
     # stien må innehalda posisjon, fart og tid.
     sti = []
@@ -475,15 +483,21 @@ def lag_sti(particle, t_start,t_end,fps=20):
     # sjekk kollisjon. Dersom ikkje kollisjon, bruk resultat frå rk_2 og gå til neste steg
     # Dersom kollisjon: halver tidssteget, sjekk kollisjon. Dersom ikkje kollisjon
  
-    
-    
-    for par in np.column_stack((p_x,p_y)):
-        sti.append(solve_ivp(particle.f, [t_start,t_end*fps], par, t_eval=np.arange(t_start, t_end*fps, 1)))
+    for t in np.arange(t_span[0], t_span[1], 1/fps):
+        step_new = rk_2(part.f, x0, (t, t+1/fps), 0.01, tri, Umx_lang, Vmx_lang)
         
-    sti_ny=[]
+        for rib in ribs:
+            collision_info = part.checkCollision(step_new[0:1], rib)
+            
+        # sjekk om det er kollisjon
     
-    for el in sti:
-        sti_ny.append(el.y.T)
+    # for par in np.column_stack((p_x,p_y)):
+    #     sti.append(solve_ivp(particle.f, [t_start,t_end*fps], par, t_eval=np.arange(t_start, t_end*fps, 1)))
+        
+    # sti_ny=[]
+    
+    # for el in sti:
+    #     sti_ny.append(el.y.T)
     
     return np.array(sti_ny)
     
