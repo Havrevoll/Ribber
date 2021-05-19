@@ -234,8 +234,12 @@ def rk_2(f, y0, L, h, tri, Umx_lang, Vmx_lang):
         t[n+1] = t[n] + h
         y[n+1] = y[n] + 1/6 * (k1 + 2*k2 + 2*k3 + k4)
         
-    return t,y
+    return t, y
 
+def rk_3 (f, t, y0):
+    resultat = solve_ivp(f, t, y0,  t_eval = [t[1]], args=(tri, Umx_lang, Vmx_lang))
+    
+    return np.concatenate((resultat.t, resultat.y.T[0]))
 
 g = np.array([0, 9.81e3]) # mm/s^2 = 9.81 m/s^2
 nu = 1 # 1 mm^2/s = 1e-6 m^2/s
@@ -306,6 +310,9 @@ class Particle:
         if (Re<1000):
             try:
                 cd = 24 / Re * (1+0.15*Re**0.687)
+                # Cheng (1997) skildrar Cd for kantete og runde steinar. Dette 
+                # er kanskje den viktigaste grunnen til at eg bør gjera dette?
+                # Ferguson og Church (2004) gjev nokre liknande bidrag, men viser til Cheng.
             except ZeroDivisionError:
                 cd = 2e4
         else:
@@ -407,7 +414,7 @@ class Particle:
             radiusVec = normals[nearestEdge] * self.radius
             collisionInfo = (self.radius - bestDistance, normals[nearestEdge], position - radiusVec)
             
-        return (True, collisionInfo)
+        return (True, collisionInfo, rib)
     
 class Rib:
     def __init__(self, origin, width, height):
@@ -453,43 +460,76 @@ ribs = [Rib((-62.4,-9.56),50,8),
 f_retur = stein.f(0,[-88.5,87,100,-155], tri, Umx_lang, Vmx_lang)
 
 
-#%%
+#%% Test løysing av difflikning
 
-svar_profft = solve_ivp(stein.f,(0,0.4), np.array([-88.5,87,0,0]),t_eval=np.arange(0,.4,0.02), args=(tri, Umx_lang, Vmx_lang))
-#%%
-svar = rk_2(stein.f, np.array([-88.5,87,0,0]), (0,0.4), 0.02, tri, Umx_lang, Vmx_lang)
+svar_profft = solve_ivp(stein.f,(0.375,0.4), np.array([-88.5,87,0,0]), args=(tri, Umx_lang, Vmx_lang))
 
-#%% Sjekk kollisjon
+svar_profft2 = rk_3(stein.f, (0.375,0.4), np.array([-88.5,87,0,0]))
+
+svar = rk_2(stein.f, np.array([-88.5,87,0,0]), (0,0.4), 0.01, tri, Umx_lang, Vmx_lang)
+
+#%% Test kollisjon
 stein2 = Particle([-80,50],3)
 koll = stein2.checkCollision([-63,-1], ribs[0]) #R2
 koll2 = stein2.checkCollision([-40,-1], ribs[0]) #R3 (midten av flata)
 
-#%% Resten
+
+    
+
+    
+#%% lag sti-funksjon    
 
 
 # p_x,p_y = np.meshgrid([-90,-200],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
     
 # p_x = p_x.T.reshape(-1)
 # p_y= p_y.T.reshape(-1)
-    
-    
 
 def lag_sti(part, x0, t_span,fps=20):
     
     # stien må innehalda posisjon, fart og tid.
     sti = []
     
+    step_old = np.concatenate(([t_span[0]], x0))
+    sti.append(step_old)
+    
     # finn neste steg med rk_2 og standard tidssteg.
     # sjekk kollisjon. Dersom ikkje kollisjon, bruk resultat frå rk_2 og gå til neste steg
     # Dersom kollisjon: halver tidssteget, sjekk kollisjon. Dersom ikkje kollisjon
- 
-    for t in np.arange(t_span[0], t_span[1], 1/fps):
-        step_new = rk_2(part.f, x0, (t, t+1/fps), 0.01, tri, Umx_lang, Vmx_lang)
+
+    t = t_span[0]
+    t_main = t
+    dt_main = 1/fps
+    dt = dt_main
+    eps = 0.001
+    
+    while (t < t_span[1]):
+        # step_new = rk_2(part.f, step_old, (t, t+dt), 0.01, tri, Umx_lang, Vmx_lang)
+        step_new = rk_3(part.f, (t,t+dt), step_old)
         
         for rib in ribs:
-            collision_info = part.checkCollision(step_new[0:1], rib)
-            
-        # sjekk om det er kollisjon
+            collision_info = part.checkCollision(step_new, rib)
+            if (collision_info[0]):
+                break
+           
+        if (collision_info[0]):
+            if (collision_info[1][0] < eps):
+                #Gjer alt som skal til for å endra retningen på partikkelen:
+                collision_resolve(step_new, collision_info)
+                
+                step_new = rk_3(part.f, (t, t_main+dt_main), step_old)
+                
+            else:
+                dt = dt/2
+                continue
+        else:
+            sti.append(step_new)
+            step_old = step_new
+            t = t + dt
+            if (dt == dt_main):
+                t_main = t
+
+
     
     # for par in np.column_stack((p_x,p_y)):
     #     sti.append(solve_ivp(particle.f, [t_start,t_end*fps], par, t_eval=np.arange(t_start, t_end*fps, 1)))
@@ -499,8 +539,17 @@ def lag_sti(part, x0, t_span,fps=20):
     # for el in sti:
     #     sti_ny.append(el.y.T)
     
-    return np.array(sti_ny)
+    return np.array(sti)
     
+def collision_resolve(step, collision_info):
+    1+1
+
+#%% Test å¨laga sti
+
+lag_sti(stein, [-88.5,87,0,0],(0,5))
+
+
+#%%
 
 def sti_animasjon(case):
     
