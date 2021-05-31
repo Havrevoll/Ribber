@@ -441,7 +441,80 @@ class Rib:
     
     normals = property(get_face_normal)
         
+       
+# p_x,p_y = np.meshgrid([-90,-200],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
+    
+# p_x = p_x.T.reshape(-1)
+# p_y= p_y.T.reshape(-1)
+
+def lag_sti(part, x0, t_span,fps=20):
+    
+    # stien må innehalda posisjon, fart og tid.
+    sti = []
+    sti_komplett = []
+    
+    step_old = np.concatenate(([t_span[0]], x0))
+    sti.append(step_old)
+    sti_komplett.append(step_old)
+    
+    # finn neste steg med rk_2 og standard tidssteg.
+    # sjekk kollisjon. Dersom ikkje kollisjon, bruk resultat frå rk_2 og gå til neste steg
+    # Dersom kollisjon: halver tidssteget, sjekk kollisjon. Dersom ikkje kollisjon
+
+    t = t_span[0]
+    t_main = t
+    dt_main = 1/fps
+    dt = dt_main
+    eps = 0.001
+    
+    while (t < t_span[1]):
+        # step_new = rk_2(part.f, step_old, (t, t+dt), 0.01, tri, Umx_lang, Vmx_lang)
+        step_new = rk_3(part.f, (t,t+dt), step_old[1:])
         
+        for rib in ribs:
+            collision_info = part.checkCollision(step_new[1:3], rib)
+            if (collision_info[0]):
+                break
+           
+        if (collision_info[0]):
+            if (collision_info[1][0] < eps):
+                #Gjer alt som skal til for å endra retningen på partikkelen:
+                collision_resolve(step_new, collision_info)
+                
+                #Fullfør rørsla fram til hovud-steget, vonleg med rett retning 
+                # og fart, så ein kjem inn i rett framerate igjen. 
+                step_new = rk_3(part.f, (t, t_main+dt_main), step_old)
+                
+                sti.append(step_new)
+                sti_komplett.append(step_new)
+                
+                dt = dt_main
+                t = t_main + dt_main
+            else:
+                dt = dt/2
+                continue
+        else:
+            sti_komplett.append(step_new)
+            step_old = step_new
+            t = t + dt
+            if (dt == dt_main):
+                sti.append(step_new)
+                t_main = t
+
+
+    
+    # for par in np.column_stack((p_x,p_y)):
+    #     sti.append(solve_ivp(particle.f, [t_start,t_end*fps], par, t_eval=np.arange(t_start, t_end*fps, 1)))
+        
+    # sti_ny=[]
+    
+    # for el in sti:
+    #     sti_ny.append(el.y.T)
+    
+    return np.array(sti)
+    
+def collision_resolve(step, collision_info):
+    1+1 
         
 # #%% Førebu
 
@@ -460,7 +533,7 @@ ribs = [Rib((-62.4,-9.56),50,8),
 f_retur = stein.f(0,[-88.5,87,100,-155], tri, Umx_lang, Vmx_lang)
 
 
-#%% Test løysing av difflikning
+# #%% Test løysing av difflikning
 
 svar_profft = solve_ivp(stein.f,(0.375,0.4), np.array([-88.5,87,0,0]), args=(tri, Umx_lang, Vmx_lang))
 
@@ -468,88 +541,18 @@ svar_profft2 = rk_3(stein.f, (0.375,0.4), np.array([-88.5,87,0,0]))
 
 svar = rk_2(stein.f, np.array([-88.5,87,0,0]), (0,0.4), 0.01, tri, Umx_lang, Vmx_lang)
 
-#%% Test kollisjon
+# #%% Test kollisjon
 stein2 = Particle([-80,50],3)
 koll = stein2.checkCollision([-63,-1], ribs[0]) #R2
 koll2 = stein2.checkCollision([-40,-1], ribs[0]) #R3 (midten av flata)
 
-
-    
-
-    
-#%% lag sti-funksjon    
-
-
-# p_x,p_y = np.meshgrid([-90,-200],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
-    
-# p_x = p_x.T.reshape(-1)
-# p_y= p_y.T.reshape(-1)
-
-def lag_sti(part, x0, t_span,fps=20):
-    
-    # stien må innehalda posisjon, fart og tid.
-    sti = []
-    
-    step_old = np.concatenate(([t_span[0]], x0))
-    sti.append(step_old)
-    
-    # finn neste steg med rk_2 og standard tidssteg.
-    # sjekk kollisjon. Dersom ikkje kollisjon, bruk resultat frå rk_2 og gå til neste steg
-    # Dersom kollisjon: halver tidssteget, sjekk kollisjon. Dersom ikkje kollisjon
-
-    t = t_span[0]
-    t_main = t
-    dt_main = 1/fps
-    dt = dt_main
-    eps = 0.001
-    
-    while (t < t_span[1]):
-        # step_new = rk_2(part.f, step_old, (t, t+dt), 0.01, tri, Umx_lang, Vmx_lang)
-        step_new = rk_3(part.f, (t,t+dt), step_old)
-        
-        for rib in ribs:
-            collision_info = part.checkCollision(step_new, rib)
-            if (collision_info[0]):
-                break
-           
-        if (collision_info[0]):
-            if (collision_info[1][0] < eps):
-                #Gjer alt som skal til for å endra retningen på partikkelen:
-                collision_resolve(step_new, collision_info)
-                
-                step_new = rk_3(part.f, (t, t_main+dt_main), step_old)
-                
-            else:
-                dt = dt/2
-                continue
-        else:
-            sti.append(step_new)
-            step_old = step_new
-            t = t + dt
-            if (dt == dt_main):
-                t_main = t
-
-
-    
-    # for par in np.column_stack((p_x,p_y)):
-    #     sti.append(solve_ivp(particle.f, [t_start,t_end*fps], par, t_eval=np.arange(t_start, t_end*fps, 1)))
-        
-    # sti_ny=[]
-    
-    # for el in sti:
-    #     sti_ny.append(el.y.T)
-    
-    return np.array(sti)
-    
-def collision_resolve(step, collision_info):
-    1+1
 
 #%% Test å¨laga sti
 
 lag_sti(stein, [-88.5,87,0,0],(0,5))
 
 
-#%%
+#%% ikkje bruk
 
 def sti_animasjon(case):
     
