@@ -283,24 +283,32 @@ class Particle:
             
         
     def f(self, t, x, tri, Umx_lang, Vmx_lang):
-        '''
+        """
         Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
         Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
-        Men for at solve_ivp skal fungera, må x vera 1-dimensjonal. Altså. x= [x,y,u,v],
-        ikkje x = [[x,y], [u,v]].
-    
+        Men for at solve_ivp skal fungera, må x vera 1-dimensjonal. Altså. 
+        x= [x,y,u,v], ikkje x = [[x,y], [u,v]].
+        f (t, x, y) = [dx/dt, du/dt]
+
         Parameters
         ----------
-        t : TYPE
-            DESCRIPTION.
-        x : TYPE
-            DESCRIPTION.
-    
+        t : double
+            Tidspunktet for funksjonen.
+        x : tuple
+            Ein tuple med koordinatane og farten, altså (x0, y0, u0, v0).
+        tri : spatial.qhull.Delaunay
+            Samling av triangulerte data.
+        Umx_lang : Array of float64
+            Ein nd-array med horisontale fartsdata.
+        Vmx_lang : Array of float64
+            Ein nd-array med vertikale fartsdata.
+
         Returns
         -------
-        None.
-    
-        '''
+        tuple
+             Ein tuple med [dx/dt, du/dt]
+
+        """
         dx_dt = np.array([x[2], x[3]])
         # vel = np.array([100,0]) - dx_dt # relativ snøggleik
         vel = np.array(U(t,np.array([x[0],x[1]]),tri, Umx_lang, Vmx_lang)) - dx_dt # relativ snøggleik
@@ -330,6 +338,24 @@ class Particle:
         return np.concatenate((dx_dt,du_dt))
     
     def checkCollision(self, position, rib):
+        """
+        Sjekkar kollisjonar mellom ein partikkel med ein posisjon og ei ribbe.
+
+        Parameters
+        ----------
+        position : tuple
+            Ein tuple (x,y) som gjev koordinatane til senter av partikkelen.
+        rib : Rib
+            Den aktuelle ribba, altså eit rektangel.
+
+        Returns
+        -------
+        tuple
+            Ein tuple med fylgjande data: (boolean, collisionInfo, rib). 
+            CollisionInfo er ein tuple med (collision depth, rib normal, punkt 
+                                            på partikkelen som kolliderer).
+
+        """
         
         inside = True
         bestDistance = -99999
@@ -454,6 +480,8 @@ def lag_sti(part, x0, t_span,fps=20):
     sti_komplett = []
     
     step_old = np.concatenate(([t_span[0]], x0))
+    # Step_old og step_new er ein array med [t, x, y, u, v]. 
+    
     sti.append(step_old)
     sti_komplett.append(step_old)
     
@@ -466,6 +494,7 @@ def lag_sti(part, x0, t_span,fps=20):
     dt_main = 1/fps
     dt = dt_main
     eps = 0.001
+    rest = 0.5
     
     while (t < t_span[1]):
         # step_new = rk_2(part.f, step_old, (t, t+dt), 0.01, tri, Umx_lang, Vmx_lang)
@@ -478,12 +507,19 @@ def lag_sti(part, x0, t_span,fps=20):
            
         if (collision_info[0]):
             if (collision_info[1][0] < eps):
-                #Gjer alt som skal til for å endra retningen på partikkelen:
-                collision_resolve(step_new, collision_info)
+                #Gjer alt som skal til for å endra retningen på partikkelen
+                n = collision_info[1][1]
+                v = np.array(step_new[3:])
+                v_rel = np.dot(n,v)
+                v_new = -(rest + 1) * v_rel * n
+                step_changed = step_new
+                step_changed[3:] = v_new
+                
+                # collision_resolve(step_new, collision_info)
                 
                 #Fullfør rørsla fram til hovud-steget, vonleg med rett retning 
                 # og fart, så ein kjem inn i rett framerate igjen. 
-                step_new = rk_3(part.f, (t, t_main+dt_main), step_old)
+                step_new = rk_3(part.f, (t, t_main+dt_main), step_changed)
                 
                 sti.append(step_new)
                 sti_komplett.append(step_new)
