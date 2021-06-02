@@ -511,7 +511,7 @@ def lag_sti(part, x0, t_span,fps=20):
                 n = collision_info[1][1]
                 v = np.array(step_new[3:])
                 v_rel = np.dot(n,v)
-                v_new = -(rest + 1) * v_rel * n
+                v_new = v - (rest + 1) * v_rel * n
                 step_changed = step_new
                 step_changed[3:] = v_new
                 
@@ -548,10 +548,7 @@ def lag_sti(part, x0, t_span,fps=20):
     #     sti_ny.append(el.y.T)
     
     return np.array(sti)
-    
-def collision_resolve(step, collision_info):
-    1+1 
-        
+            
 # #%% Førebu
 
 # %timeit U(random.randint(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, Umx_lang, Vmx_lang)
@@ -566,21 +563,21 @@ ribs = [Rib((-62.4,-9.56),50,8),
         Rib((37.6,-8.5), 50, 8), 
         Rib((-100,-74.3), 200, -10)]
 
-f_retur = stein.f(0,[-88.5,87,100,-155], tri, Umx_lang, Vmx_lang)
+# f_retur = stein.f(0,[-88.5,87,100,-155], tri, Umx_lang, Vmx_lang)
 
 
 # #%% Test løysing av difflikning
 
-svar_profft = solve_ivp(stein.f,(0.375,0.4), np.array([-88.5,87,0,0]), args=(tri, Umx_lang, Vmx_lang))
+# svar_profft = solve_ivp(stein.f,(0.375,0.4), np.array([-88.5,87,0,0]), args=(tri, Umx_lang, Vmx_lang))
 
-svar_profft2 = rk_3(stein.f, (0.375,0.4), np.array([-88.5,87,0,0]))
+# svar_profft2 = rk_3(stein.f, (0.375,0.4), np.array([-88.5,87,0,0]))
 
-svar = rk_2(stein.f, np.array([-88.5,87,0,0]), (0,0.4), 0.01, tri, Umx_lang, Vmx_lang)
+# svar = rk_2(stein.f, np.array([-88.5,87,0,0]), (0,0.4), 0.01, tri, Umx_lang, Vmx_lang)
 
 # #%% Test kollisjon
-stein2 = Particle([-80,50],3)
-koll = stein2.checkCollision([-63,-1], ribs[0]) #R2
-koll2 = stein2.checkCollision([-40,-1], ribs[0]) #R3 (midten av flata)
+# stein2 = Particle([-80,50],3)
+# koll = stein2.checkCollision([-63,-1], ribs[0]) #R2
+# koll2 = stein2.checkCollision([-40,-1], ribs[0]) #R3 (midten av flata)
 
 
 #%% Test å¨laga sti
