@@ -337,14 +337,14 @@ class Particle:
         
         return np.concatenate((dx_dt,du_dt))
     
-    def checkCollision(self, position, rib):
+    def checkCollision(self, data, rib):
         """
         Sjekkar kollisjonar mellom ein partikkel med ein posisjon og ei ribbe.
 
         Parameters
         ----------
-        position : tuple
-            Ein tuple (x,y) som gjev koordinatane til senter av partikkelen.
+        data : tuple
+            Ein tuple (x,y,u,v) som gjev koordinatane og farten til senter av partikkelen.
         rib : Rib
             Den aktuelle ribba, altså eit rektangel.
 
@@ -353,15 +353,16 @@ class Particle:
         tuple
             Ein tuple med fylgjande data: (boolean, collisionInfo, rib). 
             CollisionInfo er ein tuple med (collision depth, rib normal, punkt 
-                                            på partikkelen som kolliderer).
+                                            på partikkelen som kolliderer, relativ fart).
 
         """
         
+        position = data[0:2]        
         inside = True
         bestDistance = -99999
         nearestEdge = 0
         
-        collisionInfo = (-1,np.array([-1,-1]), np.array([-1,-1]))
+        collisionInfo = (-1,np.array([-1,-1]), np.array([-1,-1]), -1)
         
         #Step A - compute nearest edge
         vertices = rib.vertices
@@ -398,14 +399,14 @@ class Particle:
                 dis = np.sqrt(v1.dot(v1))
                 
                 if (dis > self.radius):
-                    return (False, collisionInfo) # må vel endra til (bool, depth, normal, start)
+                    return (False, collisionInfo, rib) # må vel endra til (bool, depth, normal, start)
                 
                 normal = norm(v1)
                 
                 radiusVec = normal*self.radius*(-1)
                 
                 # sender informasjon til collisioninfo:                    
-                collisionInfo = (self.radius - dis, normal, position + radiusVec)
+                collisionInfo[0], collisionInfo[1],collisionInfo[2] = (self.radius - dis, normal, position + radiusVec)
                 
             else:
                 # //the center of circle is in corner region of mVertex[nearestEdge+1]
@@ -422,25 +423,39 @@ class Particle:
                     # //compare the distance with radium to decide collision
             
                     if (dis > self.radius):
-                        return (False, collisionInfo)
+                        return (False, collisionInfo, rib)
                     
                     normal = norm(v1)
                     radiusVec = normal * self.radius*(-1)
                     
-                    collisionInfo = (self.radius - dis, normal, position + radiusVec)
+                    collisionInfo[0], collisionInfo[1],collisionInfo[2] = (self.radius - dis, normal, position + radiusVec)
                 else:
                     #//the center of circle is in face region of face[nearestEdge]
                     if (bestDistance < self.radius):
                         radiusVec = normals[nearestEdge] * self.radius
-                        collisionInfo = (self.radius - bestDistance, normals[nearestEdge], position - radiusVec)
+                        collisionInfo[0], collisionInfo[1],collisionInfo[2] = (self.radius - bestDistance, normals[nearestEdge], position - radiusVec)
                     else:
-                        return (False, collisionInfo)
+                        return (False, collisionInfo, rib)
         else:
             #     //the center of circle is inside of rectangle
             radiusVec = normals[nearestEdge] * self.radius
-            collisionInfo = (self.radius - bestDistance, normals[nearestEdge], position - radiusVec)
+            collisionInfo[0], collisionInfo[1],collisionInfo[2] = (self.radius - bestDistance, normals[nearestEdge], position - radiusVec)
             
-        return (True, collisionInfo, rib)
+            return (True, collisionInfo, rib) 
+            # Måtte laga denne returen så han ikkje byrja å rekna ut relativ fart når partikkelen uansett er midt inne i ribba.
+ 
+        # Rekna ut relativ fart, jamfør Baraff (2001) formel 8-3.
+        n = collisionInfo[1][1]
+        v = np.array(data[2:])
+        v_rel = np.dot(n,v)
+        collisionInfo[3] = v_rel
+                
+        if (v_rel < 0): # Sjekk om partikkelen er på veg vekk frå veggen.
+            is_collision = True
+        else:
+            is_collision = False
+        
+        return (is_collision, collisionInfo, rib)
     
 class Rib:
     def __init__(self, origin, width, height):
@@ -501,7 +516,7 @@ def lag_sti(part, x0, t_span,fps=20):
         step_new = rk_3(part.f, (t,t+dt), step_old[1:])
         
         for rib in ribs:
-            collision_info = part.checkCollision(step_new[1:3], rib)
+            collision_info = part.checkCollision(step_new[1:], rib)
             if (collision_info[0]):
                 break
            
@@ -509,23 +524,24 @@ def lag_sti(part, x0, t_span,fps=20):
             if (collision_info[1][0] < eps):
                 #Gjer alt som skal til for å endra retningen på partikkelen
                 n = collision_info[1][1]
-                v = np.array(step_new[3:])
-                v_rel = np.dot(n,v)
+                v = step_new[3:]
+                v_rel = collision_info[1][3]
                 v_new = v - (rest + 1) * v_rel * n
-                step_changed = step_new
+                step_changed = np.copy(step_new)
                 step_changed[3:] = v_new
                 
                 # collision_resolve(step_new, collision_info)
                 
                 #Fullfør rørsla fram til hovud-steget, vonleg med rett retning 
                 # og fart, så ein kjem inn i rett framerate igjen. 
-                step_new = rk_3(part.f, (t, t_main+dt_main), step_changed)
+                step_new = rk_3(part.f, (t, t_main+dt_main), step_changed[1:])
                 
                 sti.append(step_new)
                 sti_komplett.append(step_new)
                 
                 dt = dt_main
                 t = t_main + dt_main
+                
             else:
                 dt = dt/2
                 continue
