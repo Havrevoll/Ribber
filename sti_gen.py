@@ -527,20 +527,16 @@ def lag_sti(part, x0, t_span,fps=20):
                 v = step_new[3:]
                 v_rel = collision_info[1][3]
                 v_new = v - (rest + 1) * v_rel * n
-                step_changed = np.copy(step_new)
-                step_changed[3:] = v_new
-                
-                # collision_resolve(step_new, collision_info)
+                step_old = np.copy(step_new)
+                step_old[3:] = v_new
                 
                 #Fullfør rørsla fram til hovud-steget, vonleg med rett retning 
-                # og fart, så ein kjem inn i rett framerate igjen. 
-                step_new = rk_3(part.f, (t, t_main+dt_main), step_changed[1:])
+                # og fart, så ein kjem inn i rett framerate igjen.
+                dt = t_main + dt_main - t
+                                
+                # step_new = rk_3(part.f, (t, t_main+dt_main), step_changed[1:])
                 
-                sti.append(step_new)
-                sti_komplett.append(step_new)
-                
-                dt = dt_main
-                t = t_main + dt_main
+                # t = t_main + dt_main
                 
             else:
                 dt = dt/2
@@ -552,6 +548,7 @@ def lag_sti(part, x0, t_span,fps=20):
             if (dt == dt_main):
                 sti.append(step_new)
                 t_main = t
+                dt = dt_main
 
 
     
