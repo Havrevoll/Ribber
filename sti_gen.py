@@ -536,6 +536,10 @@ def lag_sti(part, x0, t_span,fps=20):
                                 
                 # step_new = rk_3(part.f, (t, t_main+dt_main), step_old[1:])
                 
+                if (abs(v_rel) < 0.1):
+                    sti_komplett.append(step_new)
+                    sti.append(step_new)
+                    break
                 
                 # t = t_main + dt_main
                 
@@ -545,11 +549,16 @@ def lag_sti(part, x0, t_span,fps=20):
         else:
             sti_komplett.append(step_new)
             step_old = step_new
+            
             t = t + dt
-            if (round(t*10000) % round(dt_main*10000) == 0):
+            
+            if (round(step_new[0]*10000) % round(dt_main*10000) == 0):
                 sti.append(step_new)
-                t_main = t
+                t_main = step_new[0]
+                t = t_main
                 dt = dt_main
+                
+            
                 
 
 
@@ -597,7 +606,7 @@ ribs = [Rib((-62.4,-9.56),50,8),
 
 #%% Test å¨laga sti
 
-lag_sti(stein, [-88.5,87,0,0],(0,5))
+stien = lag_sti(stein, [-88.5,87,0,0],(0,5))
 
 
 #%% ikkje bruk
