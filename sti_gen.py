@@ -534,7 +534,8 @@ def lag_sti(part, x0, t_span,fps=20):
                 # og fart, så ein kjem inn i rett framerate igjen.
                 dt = t_main + dt_main - t
                                 
-                # step_new = rk_3(part.f, (t, t_main+dt_main), step_changed[1:])
+                # step_new = rk_3(part.f, (t, t_main+dt_main), step_old[1:])
+                
                 
                 # t = t_main + dt_main
                 
@@ -545,10 +546,11 @@ def lag_sti(part, x0, t_span,fps=20):
             sti_komplett.append(step_new)
             step_old = step_new
             t = t + dt
-            if (dt == dt_main):
+            if (round(t*10000) % round(dt_main*10000) == 0):
                 sti.append(step_new)
                 t_main = t
                 dt = dt_main
+                
 
 
     
