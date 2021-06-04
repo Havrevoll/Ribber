@@ -406,7 +406,7 @@ class Particle:
                 radiusVec = normal*self.radius*(-1)
                 
                 # sender informasjon til collisioninfo:                    
-                collisionInfo[0], collisionInfo[1],collisionInfo[2] = (self.radius - dis, normal, position + radiusVec)
+                collisionInfo = (self.radius - dis, normal, position + radiusVec)
                 
             else:
                 # //the center of circle is in corner region of mVertex[nearestEdge+1]
@@ -428,27 +428,27 @@ class Particle:
                     normal = norm(v1)
                     radiusVec = normal * self.radius*(-1)
                     
-                    collisionInfo[0], collisionInfo[1],collisionInfo[2] = (self.radius - dis, normal, position + radiusVec)
+                    collisionInfo = (self.radius - dis, normal, position + radiusVec)
                 else:
                     #//the center of circle is in face region of face[nearestEdge]
                     if (bestDistance < self.radius):
                         radiusVec = normals[nearestEdge] * self.radius
-                        collisionInfo[0], collisionInfo[1],collisionInfo[2] = (self.radius - bestDistance, normals[nearestEdge], position - radiusVec)
+                        collisionInfo = (self.radius - bestDistance, normals[nearestEdge], position - radiusVec)
                     else:
                         return (False, collisionInfo, rib)
         else:
             #     //the center of circle is inside of rectangle
             radiusVec = normals[nearestEdge] * self.radius
-            collisionInfo[0], collisionInfo[1],collisionInfo[2] = (self.radius - bestDistance, normals[nearestEdge], position - radiusVec)
+            collisionInfo = (self.radius - bestDistance, normals[nearestEdge], position - radiusVec, -1)
             
             return (True, collisionInfo, rib) 
             # Måtte laga denne returen så han ikkje byrja å rekna ut relativ fart når partikkelen uansett er midt inne i ribba.
  
         # Rekna ut relativ fart, jamfør Baraff (2001) formel 8-3.
-        n = collisionInfo[1][1]
+        n = collisionInfo[1]
         v = np.array(data[2:])
         v_rel = np.dot(n,v)
-        collisionInfo[3] = v_rel
+        collisionInfo = (collisionInfo[0], collisionInfo[1],collisionInfo[2], v_rel)
                 
         if (v_rel < 0): # Sjekk om partikkelen er på veg vekk frå veggen.
             is_collision = True
