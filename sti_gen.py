@@ -35,8 +35,8 @@ elif os.path.isfile("C:/Users/havrevol/Q40.hdf5"):
 else:
     filnamn ="D:/Tonstad/Q40.hdf5"
     
-if os.path.isfile("D:/Tonstad/Q40_20s.pickle"):
-    pickle_fil = "D:/Tonstad/Q40_20s.pickle"
+if os.path.isfile("D:/Tonstad/Q40_6s.pickle"):
+    pickle_fil = "D:/Tonstad/Q40_6s.pickle"
 elif os.path.isfile("C:/Users/havrevol/Q40_2s.pickle"):
     pickle_fil = "C:/Users/havrevol/Q40_2s.pickle"
 else:
@@ -139,9 +139,15 @@ def get_velocity_data(t_max=1):
     Umx_reshape = Umx.reshape((len(Umx),J,I))[:,1:114,1:125].ravel()
     Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,1:114,1:125].ravel()
     
+    u_bar = np.nanmean(Umx,0)
+    v_bar = np.nanmean(Vmx,0)
+
+    u_reshape = u_bar.reshape((J,I))[1:114,1:125]
+    v_reshape = v_bar.reshape((J,I))[1:114,1:125]
+    
     nonan = np.invert(np.isnan(Umx_reshape))
         
-    return Umx_reshape[nonan], Vmx_reshape[nonan]
+    return Umx_reshape[nonan], Vmx_reshape[nonan], u_reshape, v_reshape
 
 
 
@@ -169,6 +175,7 @@ def U(t, x, tri, Umx_lang, Vmx_lang):
     d=3
     simplex = tri.find_simplex(x)
     if (simplex==-1):
+        # Her skal eg altså leggja inn å sjekka eit lite nearest-tre for næraste snittverdi.
         raise Exception("Coordinates outside the complex hull")
         
     vertices = np.take(tri.simplices, simplex, axis=0)
@@ -576,7 +583,7 @@ def lag_sti(part, x0, t_span,fps=20):
 # #%% Førebu
 
 # %timeit U(random.randint(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, Umx_lang, Vmx_lang)
-Umx_lang, Vmx_lang = get_velocity_data(20)
+Umx_lang, Vmx_lang, u_reshape, v_reshape = get_velocity_data(6)
 tri = hent_tre()
 
 # #%% Utfør
