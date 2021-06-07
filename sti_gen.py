@@ -152,7 +152,7 @@ def get_velocity_data(t_max=1):
 
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
-def U(t, x, tri, Umx_lang, Vmx_lang):
+def U(t, x, tri, ckdtre, Umx_lang, Vmx_lang):
     '''
     https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
 
@@ -175,6 +175,7 @@ def U(t, x, tri, Umx_lang, Vmx_lang):
     d=3
     simplex = tri.find_simplex(x)
     if (simplex==-1):
+        Umx_lang[ckdtre.query(x)[1]], Vmx_lang[ckdtre.query(x)[1]]
         # Her skal eg altså leggja inn å sjekka eit lite nearest-tre for næraste snittverdi.
         raise Exception("Coordinates outside the complex hull")
         
@@ -244,7 +245,7 @@ def rk_2(f, y0, L, h, tri, Umx_lang, Vmx_lang):
     return t, y
 
 def rk_3 (f, t, y0):
-    resultat = solve_ivp(f, t, y0,  t_eval = [t[1]], args=(tri, Umx_lang, Vmx_lang))
+    resultat = solve_ivp(f, t, y0,  t_eval = [t[1]], args=(tri, ckdtre, Umx_lang, Vmx_lang))
     
     return np.concatenate((resultat.t, resultat.y.T[0]))
 
@@ -289,7 +290,7 @@ class Particle:
         self.updateVelo(self) 
             
         
-    def f(self, t, x, tri, Umx_lang, Vmx_lang):
+    def f(self, t, x, tri, ckdtre, Umx_lang, Vmx_lang):
         """
         Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
         Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
@@ -318,7 +319,7 @@ class Particle:
         """
         dx_dt = np.array([x[2], x[3]])
         # vel = np.array([100,0]) - dx_dt # relativ snøggleik
-        vel = np.array(U(t,np.array([x[0],x[1]]),tri, Umx_lang, Vmx_lang)) - dx_dt # relativ snøggleik
+        vel = np.array(U(t,np.array([x[0],x[1]]),tri, ckdtre, Umx_lang, Vmx_lang)) - dx_dt # relativ snøggleik
         
         Re = hypot(vel[0],vel[1]) * self.diameter / nu 
         
@@ -585,6 +586,7 @@ def lag_sti(part, x0, t_span,fps=20):
 # %timeit U(random.randint(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, Umx_lang, Vmx_lang)
 Umx_lang, Vmx_lang, u_reshape, v_reshape = get_velocity_data(6)
 tri = hent_tre()
+ckdtre = lag_tre(t_max=6)
 
 # #%% Utfør
 
