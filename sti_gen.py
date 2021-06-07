@@ -139,16 +139,15 @@ def get_velocity_data(t_max=1):
     Umx_reshape = Umx.reshape((len(Umx),J,I))[:,1:114,1:125].ravel()
     Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,1:114,1:125].ravel()
     
-    u_bar = np.nanmean(Umx,0)
-    v_bar = np.nanmean(Vmx,0)
+    # u_bar = np.nanmean(Umx,0)
+    # v_bar = np.nanmean(Vmx,0)
 
-    u_reshape = u_bar.reshape((J,I))[1:114,1:125]
-    v_reshape = v_bar.reshape((J,I))[1:114,1:125]
+    # u_reshape = u_bar.reshape((J,I))[1:114,1:125]
+    # v_reshape = v_bar.reshape((J,I))[1:114,1:125]
     
     nonan = np.invert(np.isnan(Umx_reshape))
         
-    return Umx_reshape[nonan], Vmx_reshape[nonan], u_reshape, v_reshape
-
+    return Umx_reshape[nonan], Vmx_reshape[nonan] #, u_reshape, v_reshape
 
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
@@ -175,9 +174,9 @@ def U(t, x, tri, ckdtre, Umx_lang, Vmx_lang):
     d=3
     simplex = tri.find_simplex(x)
     if (simplex==-1):
-        Umx_lang[ckdtre.query(x)[1]], Vmx_lang[ckdtre.query(x)[1]]
+        return Umx_lang[ckdtre.query(x)[1]], Vmx_lang[ckdtre.query(x)[1]]
         # Her skal eg altså leggja inn å sjekka eit lite nearest-tre for næraste snittverdi.
-        raise Exception("Coordinates outside the complex hull")
+        # raise Exception("Coordinates outside the complex hull")
         
     vertices = np.take(tri.simplices, simplex, axis=0)
     temp = np.take(tri.transform, simplex, axis=0)
@@ -584,7 +583,7 @@ def lag_sti(part, x0, t_span,fps=20):
 # #%% Førebu
 
 # %timeit U(random.randint(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, Umx_lang, Vmx_lang)
-Umx_lang, Vmx_lang, u_reshape, v_reshape = get_velocity_data(6)
+Umx_lang, Vmx_lang = get_velocity_data(6)
 tri = hent_tre()
 ckdtre = lag_tre(t_max=6)
 
