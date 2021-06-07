@@ -588,13 +588,7 @@ Umx_lang, Vmx_lang, u_reshape, v_reshape = get_velocity_data(6)
 tri = hent_tre()
 ckdtre = lag_tre(t_max=6)
 
-# #%% Utfør
 
-stein = Particle([-88.5,87],1) #Partikkel med koordinatar og 1 mm diameter
-
-ribs = [Rib((-62.4,-9.56),50,8), 
-        Rib((37.6,-8.5), 50, 8), 
-        Rib((-100,-74.3), 200, -10)]
 
 # f_retur = stein.f(0,[-88.5,87,100,-155], tri, Umx_lang, Vmx_lang)
 
@@ -614,8 +608,18 @@ ribs = [Rib((-62.4,-9.56),50,8),
 
 
 #%% Test å¨laga sti
+# #%% Utfør
 
-stien = lag_sti(stein, [-88.5,87,0,0],(0,5))
+ribs = [Rib((-62.4,-9.56),50,8), 
+        Rib((37.6,-8.5), 50, 8), 
+        Rib((-100,-74.3), 200, -10)]
+
+stein = Particle([-88.5,87],1) #Partikkel med koordinatar og 1 mm diameter
+
+stein2 = Particle([-85,60], 0.5) #Partikkel med koordinatar og 0.5 mm diameter
+
+stien1 = lag_sti(stein, [-88.5,87,0,0],(0,5))
+stien2 = lag_sti(stein2, [-85,60,0,0],(0,5))
 
 
 #%% ikkje bruk
