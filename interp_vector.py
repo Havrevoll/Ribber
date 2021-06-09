@@ -28,7 +28,6 @@ from math import ceil, floor, log, sqrt
 
 discharges = [20,40,60,80,100,120,140]
 
-h= -5.9
 
 class MidpointNormalize(mpl.colors.Normalize):
     '''https://stackoverflow.com/questions/7404116/defining-the-midpoint-of-a-colormap-in-matplotlib 
@@ -70,6 +69,7 @@ def reshape(dataset):
 #     print("hei")
 
 def vegglov(u_star, y, v):
+    h= -5.9
     # nu = 1 # 1 mm²/s
     y = y - h
     ks = .0025

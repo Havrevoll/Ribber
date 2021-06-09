@@ -39,8 +39,6 @@ else:
 # fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
 # vass = fil['vassføringar']
 
-h= -5.9
-
 def norm(v):
     return v / (v**2).sum()**0.5
 
@@ -171,11 +169,9 @@ def U(t, x, tri, ckdtre, Umx_lang, Vmx_lang, linear=True):
     TYPE
         DESCRIPTION.
 
-    '''
-    U.counter += 1
-    
+    '''    
     x = np.concatenate(([t], x))
-    
+    U.counter +=1
     if(linear):
         d=3
         simplex = tri.find_simplex(x)
@@ -194,11 +190,9 @@ def U(t, x, tri, ckdtre, Umx_lang, Vmx_lang, linear=True):
     else:
         return Umx_lang[ckdtre.query(x)[1]], Vmx_lang[ckdtre.query(x)[1]]
   
-U.counter = 0
-
-cd = interpolate.interp1d(np.array([0.001,0.01,0.1,1,10,20,40,60,80,100,200,400,600,800,1000,2000,4000,6000,8000,10000,100000]), np.array([2.70E+04,2.40E+03,2.50E+02,2.70E+01,4.40E+00,2.80E+00,1.80E+00,1.45E+00,1.25E+00,1.12E+00,8.00E-01,6.20E-01,5.50E-01,5.00E-01,4.70E-01,4.20E-01,4.10E-01,4.15E-01,4.30E-01,4.38E-01,5.40E-01,]))
+# cd = interpolate.interp1d(np.array([0.001,0.01,0.1,1,10,20,40,60,80,100,200,400,600,800,1000,2000,4000,6000,8000,10000,100000]), np.array([2.70E+04,2.40E+03,2.50E+02,2.70E+01,4.40E+00,2.80E+00,1.80E+00,1.45E+00,1.25E+00,1.12E+00,8.00E-01,6.20E-01,5.50E-01,5.00E-01,4.70E-01,4.20E-01,4.10E-01,4.15E-01,4.30E-01,4.38E-01,5.40E-01,]))
     
-
+U.counter = 0
     
 def rk(t0, y0, L, f, h=0.02):
     ''' Heimelaga Runge-Kutta-metode '''
@@ -258,9 +252,63 @@ def rk_3 (f, t, y0, linear=True):
     
     return np.concatenate((resultat.t, resultat.y.T[0]))
 
-g = np.array([0, 9.81e3]) # mm/s^2 = 9.81 m/s^2
-nu = 1 # 1 mm^2/s = 1e-6 m^2/s
-rho = 1e-6  # kg/mm^3 = 1000 kg/m^3 
+
+def sti_animasjon(partiklar, t_max=1, dataset = h5py.File(filnamn, 'r') ):
+    
+    # piv_range = ranges()
+    
+    # with h5py.File(filnamn, mode='r') as f:
+    #     x, y = np.array(f['x']), np.array(f['y'])
+        
+    #     I, J = int(np.array(f['I'])),int(np.array(f['J']))
+               
+    #     x_reshape = x.reshape((127,126))[piv_range]
+    #     y_reshape = y.reshape((127,126))[piv_range]
+    
+    (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
+    
+    sti = np.array([part.sti for part in partiklar])
+
+    steps = t_max * 20
+    piv_range = ranges()
+    
+    Umx = np.array(dataset['Umx'])[0:steps,:]
+    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
+    Vmx = np.array(dataset['Vmx'])[0:steps,:]
+    Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
+    
+    x = np.array(dataset['x'])
+    y = np.array(dataset['y'])
+    x_reshape = x.reshape(J,I)[piv_range]
+    y_reshape = y.reshape(J,I)[piv_range]
+            
+    V_mag_reshape = np.hypot(Umx_reshape, Vmx_reshape)
+       
+    myDPI = 300
+    fig, ax = plt.subplots()#figsize=(800/myDPI,600/myDPI),dpi=myDPI)
+    
+    field = ax.imshow(V_mag_reshape[0,:,:], extent=[x_reshape[0,0],x_reshape[0,-1], y_reshape[-1,0], y_reshape[0,0]])
+    particle, =ax.plot(sti[:,0,1], sti[:,0,2], 'ro')
+    ax.set_xlim([x_reshape[0,0],x_reshape[0,-1]])
+    draw_rect(ax)
+    
+    def nypkt(i):
+        field.set_data(V_mag_reshape[i,:,:])
+        particle.set_data(sti[:,i,1], sti[:,i,2])
+        return field,particle
+    
+    print("Skal byrja på filmen")
+    #ax.axis('equal')
+    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,steps),interval=50)
+    plt.show()
+    print("ferdig med animasjon, skal lagra")
+    
+    filnamn = "stiQ40.mp4"
+    ani.save(filnamn)
+    plt.close()
+
+
+
 
 class Particle:
     #Lag ein tabell med tidspunkt og posisjon for kvar einskild partikkel.
@@ -307,6 +355,11 @@ class Particle:
              Ein tuple med [dx/dt, du/dt]
 
         """
+        
+        g = np.array([0, 9.81e3]) # mm/s^2 = 9.81 m/s^2
+        nu = 1 # 1 mm^2/s = 1e-6 m^2/s
+        rho = 1e-6  # kg/mm^3 = 1000 kg/m^3 
+        
         dx_dt = np.array([x[2], x[3]])
         # vel = np.array([100,0]) - dx_dt # relativ snøggleik
         vel = np.array(U(t,np.array([x[0],x[1]]),tri, ckdtre, Umx_lang, Vmx_lang, linear)) - dx_dt # relativ snøggleik
@@ -454,6 +507,86 @@ class Particle:
         
         return (is_collision, collisionInfo, rib)
     
+    def lag_sti(self, x0, t_span,fps=20, linear=False):
+    
+        # stien må innehalda posisjon, fart og tid.
+        sti = []
+        sti_komplett = []
+        
+        step_old = np.concatenate(([t_span[0]], x0))
+        # Step_old og step_new er ein array med [t, x, y, u, v]. 
+        
+        sti.append(step_old)
+        sti_komplett.append(step_old)
+        
+        # finn neste steg med rk_2 og standard tidssteg.
+        # sjekk kollisjon. Dersom ikkje kollisjon, bruk resultat frå rk_2 og gå til neste steg
+        # Dersom kollisjon: halver tidssteget, sjekk kollisjon. Dersom ikkje kollisjon
+    
+        t = t_span[0]
+        t_max = t_span[1]
+        t_main = t
+        dt_main = 1/fps
+        dt = dt_main
+        eps = 0.001
+        rest = 1
+        
+        while (t < t_span[1]):
+            # step_new = rk_2(part.f, step_old, (t, t+dt), 0.01, tri, Umx_lang, Vmx_lang)
+            step_new = rk_3(self.f, (t,t+dt), step_old[1:], linear)
+            
+            for rib in ribs:
+                collision_info = self.checkCollision(step_new[1:], rib)
+                if (collision_info[0]):
+                    break
+               
+            if (collision_info[0]):
+                if (collision_info[1][0] < eps):
+                    #Gjer alt som skal til for å endra retningen på partikkelen
+                    n = collision_info[1][1]
+                    v = step_new[3:]
+                    v_rel = collision_info[1][3]
+                    v_new = v - (rest + 1) * v_rel * n
+                    step_old = np.copy(step_new)
+                    step_old[3:] = v_new
+                    
+                    #Fullfør rørsla fram til hovud-steget, vonleg med rett retning 
+                    # og fart, så ein kjem inn i rett framerate igjen.
+                    dt = t_main + dt_main - t
+                                    
+                    # step_new = rk_3(part.f, (t, t_main+dt_main), step_old[1:])
+                    
+                    if (abs(v_rel) < 0.1):
+                        sti_komplett.append(step_new)
+                        # sti.append(step_new)
+                        break
+                    
+                    # t = t_main + dt_main
+                    
+                else:
+                    dt = dt/2
+                    continue
+            else:
+                sti_komplett.append(step_new)
+                step_old = step_new
+                
+                t = t + dt
+                
+                if (round(step_new[0]*10000) % round(dt_main*10000) == 0):
+                    sti.append(step_new)
+                    t_main = step_new[0]
+                    t = t_main
+                    dt = dt_main
+                
+        if (len(sti) < t_max*fps):
+            sti = np.pad(sti, ((0,t_max*fps - len(sti)),(0,0)),'edge')
+            sti[int(t_main*fps):,0] = np.arange(t_main, t_max, 1/fps)
+        
+        if (len(sti) > t_max*fps):
+            sti = sti[0:t_max*fps]
+            
+        return np.array(sti)
+    
 class Rib:
     def __init__(self, origin, width, height):
         # Bør kanskje ha informasjon om elastisiteten ved kollisjonar òg?
@@ -478,97 +611,11 @@ class Rib:
                 norm(vertices[0]-vertices[1])]
     
     normals = property(get_face_normal)
-        
        
 # p_x,p_y = np.meshgrid([-90,-200],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
     
 # p_x = p_x.T.reshape(-1)
 # p_y= p_y.T.reshape(-1)
-
-def lag_sti(part, x0, t_span,fps=20, linear=False):
-    
-    # stien må innehalda posisjon, fart og tid.
-    sti = []
-    sti_komplett = []
-    
-    step_old = np.concatenate(([t_span[0]], x0))
-    # Step_old og step_new er ein array med [t, x, y, u, v]. 
-    
-    sti.append(step_old)
-    sti_komplett.append(step_old)
-    
-    # finn neste steg med rk_2 og standard tidssteg.
-    # sjekk kollisjon. Dersom ikkje kollisjon, bruk resultat frå rk_2 og gå til neste steg
-    # Dersom kollisjon: halver tidssteget, sjekk kollisjon. Dersom ikkje kollisjon
-
-    t = t_span[0]
-    t_max = t_span[1]
-    t_main = t
-    dt_main = 1/fps
-    dt = dt_main
-    eps = 0.001
-    rest = 0.5
-    
-    while (t < t_span[1]):
-        # step_new = rk_2(part.f, step_old, (t, t+dt), 0.01, tri, Umx_lang, Vmx_lang)
-        step_new = rk_3(part.f, (t,t+dt), step_old[1:], linear)
-        
-        for rib in ribs:
-            collision_info = part.checkCollision(step_new[1:], rib)
-            if (collision_info[0]):
-                break
-           
-        if (collision_info[0]):
-            if (collision_info[1][0] < eps):
-                #Gjer alt som skal til for å endra retningen på partikkelen
-                n = collision_info[1][1]
-                v = step_new[3:]
-                v_rel = collision_info[1][3]
-                v_new = v - (rest + 1) * v_rel * n
-                step_old = np.copy(step_new)
-                step_old[3:] = v_new
-                
-                #Fullfør rørsla fram til hovud-steget, vonleg med rett retning 
-                # og fart, så ein kjem inn i rett framerate igjen.
-                dt = t_main + dt_main - t
-                                
-                # step_new = rk_3(part.f, (t, t_main+dt_main), step_old[1:])
-                
-                if (abs(v_rel) < 0.1):
-                    sti_komplett.append(step_new)
-                    # sti.append(step_new)
-                    break
-                
-                # t = t_main + dt_main
-                
-            else:
-                dt = dt/2
-                continue
-        else:
-            sti_komplett.append(step_new)
-            step_old = step_new
-            
-            t = t + dt
-            
-            if (round(step_new[0]*10000) % round(dt_main*10000) == 0):
-                sti.append(step_new)
-                t_main = step_new[0]
-                t = t_main
-                dt = dt_main
-            
-    if (len(sti) < t_max*fps):
-        sti = np.pad(sti, ((0,t_max*fps - len(sti)),(0,0)),'edge')
-        sti[int(t_main*fps):,0] = np.arange(t_main, t_max, 1/fps)
-    
-    # for par in np.column_stack((p_x,p_y)):
-    #     sti.append(solve_ivp(particle.f, [t_start,t_end*fps], par, t_eval=np.arange(t_start, t_end*fps, 1)))
-        
-    # sti_ny=[]
-    
-    # for el in sti:
-    #     sti_ny.append(el.y.T)
-    
-    return np.array(sti)
             
 # #%% Førebu
 
@@ -577,17 +624,13 @@ Umx_lang, Vmx_lang = get_velocity_data(6)
 tri = hent_tre()
 ckdtre = lag_tre(t_max=6)
 
-
-
-# f_retur = stein.f(0,[-88.5,87,100,-155], tri, Umx_lang, Vmx_lang)
-
+ribs = [Rib((-62.4,-9.56),50,8), 
+        Rib((37.6,-8.5), 50, 8), 
+        Rib((-100,-74.3), 200, -10)]
 
 # #%% Test løysing av difflikning
-
 # svar_profft = solve_ivp(stein.f,(0.375,0.4), np.array([-88.5,87,0,0]), args=(tri, Umx_lang, Vmx_lang))
-
 # svar_profft2 = rk_3(stein.f, (0.375,0.4), np.array([-88.5,87,0,0]))
-
 # svar = rk_2(stein.f, np.array([-88.5,87,0,0]), (0,0.4), 0.01, tri, Umx_lang, Vmx_lang)
 
 # #%% Test kollisjon
@@ -595,83 +638,31 @@ ckdtre = lag_tre(t_max=6)
 # koll = stein2.checkCollision([-63,-1], ribs[0]) #R2
 # koll2 = stein2.checkCollision([-40,-1], ribs[0]) #R3 (midten av flata)
 
-# #%% Initialiser
 
-ribs = [Rib((-62.4,-9.56),50,8), 
-        Rib((37.6,-8.5), 50, 8), 
-        Rib((-100,-74.3), 200, -10)]
-
-stein = Particle(1) #Partikkel med koordinatar og 1 mm diameter
-
-stein2 = Particle(0.5) #Partikkel med koordinatar og 0.5 mm diameter
 #%% Test å laga sti
 
-stien1 = lag_sti(stein, [-88.5,87,0,0],(0,5), linear = True)
+stein = Particle(0.3) 
+stein2 = Particle(0.1) 
+stein3 = Particle(0.05)
+stein4 = Particle(0.01)
+
+stein.sti = stein.lag_sti([-88,90,0,0],(0,5))
 print(U.counter)
-U.counter = 0
-stien1_nn = lag_sti(stein, [-88.5,87,0,0],(0,5), linear = False)
+U.counter=0
+stein2.sti = stein2.lag_sti([-88,80,0,0],(0,5))
 print(U.counter)
-U.counter = 0
-stien2 = lag_sti(stein2, [-88,60,0,0],(0,5))
+U.counter=0
+stein3.sti = stein3.lag_sti([-88,70,0,0],(0,5))
 print(U.counter)
+U.counter=0
+stein4.sti = stein4.lag_sti([-88,60,0,0],(0,5))
+print(U.counter)
+U.counter=0
 
 
+#%% Lag filmen
 
-#%% Animasjon
-
-def sti_animasjon(stiar, t_max=1, dataset = h5py.File(filnamn, 'r') ):
-    
-    # piv_range = ranges()
-    
-    # with h5py.File(filnamn, mode='r') as f:
-    #     x, y = np.array(f['x']), np.array(f['y'])
-        
-    #     I, J = int(np.array(f['I'])),int(np.array(f['J']))
-               
-    #     x_reshape = x.reshape((127,126))[piv_range]
-    #     y_reshape = y.reshape((127,126))[piv_range]
-    
-    (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
-
-    steps = t_max * 20
-    piv_range = ranges()
-    
-    Umx = np.array(dataset['Umx'])[0:steps,:]
-    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
-    Vmx = np.array(dataset['Vmx'])[0:steps,:]
-    Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
-    
-    x = np.array(dataset['x'])
-    y = np.array(dataset['y'])
-    x_reshape = x.reshape(J,I)[piv_range]
-    y_reshape = y.reshape(J,I)[piv_range]
-            
-    V_mag_reshape = np.hypot(Umx_reshape, Vmx_reshape)
-            
-    fig, ax = plt.subplots()
-    
-    field = ax.imshow(V_mag_reshape[0,:,:], extent=[x_reshape[0,0],x_reshape[0,-1], y_reshape[-1,0], y_reshape[0,0]])
-    particle, =ax.plot(sti[:,0,0], sti[:,0,1], 'ro')
-    ax.set_xlim([x_reshape[0,0],x_reshape[0,-1]])
-    draw_rect(ax)
-    
-    def nypkt(i):
-        field.set_data(V_mag_reshape[i,:,:])
-        particle.set_data(sti[:,i,0], sti[:,i,1])
-        return field,particle
-    
-    print("Skal byrja på filmen")
-    #ax.axis('equal')
-    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,600),interval=50)
-    plt.show()
-    print("ferdig med animasjon, skal lagra")
-    
-    filnamn = "stiQ40.mp4"
-    ani.save(filnamn)
-    plt.close()
-
-
-
+sti_animasjon([stein,stein2,stein3,stein4],t_max=5)
 
 #%% For eigne studiar
 
