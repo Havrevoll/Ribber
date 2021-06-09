@@ -4,27 +4,21 @@
 import matplotlib.pyplot as plt
 plt.rcParams["font.family"] = "STIXGeneral"
 plt.rcParams['mathtext.fontset'] = 'stix'
-from matplotlib import animation, colors
-import matplotlib as mpl
+from matplotlib import animation
 from matplotlib.patches import Rectangle
 
 import numpy as np
 from scipy import interpolate
 from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#r179348322575-1
-from scipy.optimize import fsolve
+
 import h5py
 import pickle
-import re
-import scipy.stats as stats
-
-import scipy.interpolate as spint
-import scipy.spatial.qhull as qhull
-import itertools
-from scipy.spatial import cKDTree
-
 import os.path
 
-from math import ceil, floor, log, sqrt, pi, hypot
+import scipy.spatial.qhull as qhull
+from scipy.spatial import cKDTree
+
+from math import pi, hypot
 
 # import os.path.join as pjoin
 
@@ -45,65 +39,68 @@ else:
 # fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
 # vass = fil['vassføringar']
 
-
-discharges = [20,40,60,80,100,120,140]
-
 h= -5.9
 
 def norm(v):
     return v / (v**2).sum()**0.5
+
+def draw_rect(axes,color='red'):
+    axes.add_patch(Rectangle((-62.4,-9.56),50,8,linewidth=2,edgecolor=color,facecolor='none'))
+    axes.add_patch(Rectangle((37.6,-8.5),50,8,linewidth=2,edgecolor=color,facecolor='none'))
+
+def ranges():
+    # Dette var dei eg brukte for å laga kvadrantanalysen.
+    # y_range = np.s_[0:114]
+    # x_range = np.s_[40:108]
+    
+    y_range = np.s_[1:114]
+    x_range = np.s_[1:125]    
+    
+    piv_range = np.index_exp[y_range,x_range]
+    
+    return piv_range
 
 def lag_tre(t_max=1, dataset = h5py.File(filnamn, 'r'), nearest=True):
     '''
     Ein metode som tek inn eit datasett og gjer alle reshapings-tinga for x og y, u og v og Re.
 
     '''
-    
     (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
 
     steps = t_max * 20
+    piv_range = ranges()
     
     Umx = np.array(dataset['Umx'])[0:steps,:]
-    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,1:114,1:125]
-    # Vmx = np.array(dataset['Vmx'])[0:t_max,:]
-    # Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,1:114,1:125]
+    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
     
     x = np.array(dataset['x'])
     y = np.array(dataset['y'])
-    x_reshape = x.reshape(J,I)[1:114,1:125]
-    y_reshape = y.reshape(J,I)[1:114,1:125]
-    
-    # nonanUmx = np.invert(np.isnan(Umx))
-    # nonanUmx_reshape = np.invert(np.isnan(Umx_reshape))
-    # nonanVmx = np.invert(np.isnan(Vmx))
-    # nonanVmx_reshape = np.invert(np.isnan(Vmx_reshape))
-    
+    x_reshape = x.reshape(J,I)[piv_range]
+    y_reshape = y.reshape(J,I)[piv_range]
+        
     t_3d,y_3d,x_3d = np.meshgrid(np.arange(t_max, step=0.05),y_reshape[:,0],x_reshape[0,:],indexing='ij')
     
     nonan = np.invert(np.isnan(Umx_reshape.ravel()))
     
-    # Umx_lang = Umx_reshape.ravel()[nonan]
-    # Vmx_lang = Vmx_reshape.ravel()[nonan]
     t_lang = t_3d.ravel()[nonan]
     x_lang = x_3d.ravel()[nonan]
     y_lang = y_3d.ravel()[nonan]
     
-    # uvw = (0,-88.5,87)
     txy = np.vstack((t_lang,x_lang,y_lang)).T
 
-    # interpolate.griddata((t_lang, x_lang, y_lang), Umx_lang, uvw[0], method='linear')
+    # import time
+    # start = time.time()        
 
-    import time
-
-    start = time.time()        
     if (nearest):
         tree = cKDTree(txy)
     else:
         tree = qhull.Delaunay(txy)
     
-    end = time.time()
-    print(end - start)
+    # end = time.time()
+    # print(end - start)
     
+    # Her er interpoleringa for qhull, lineært, altså.
+    # uvw = (0,-88.5,87)
     # simplex = tri.find_simplex(uvw)
     # vertices = np.take(tri.simplices, simplex, axis=0)
     # temp = np.take(tri.transform, simplex, axis=0)
@@ -112,7 +109,11 @@ def lag_tre(t_max=1, dataset = h5py.File(filnamn, 'r'), nearest=True):
     # wts = np.hstack((bary, 1 - bary.sum(axis=1, keepdims=True))
                     
     # interpolate = np.einsum('nj,nj->n', np.take(values, vtx), wts)    
+
+    # Metoden er den same som denne:
+    # interpolate.griddata((t_lang, x_lang, y_lang), Umx_lang, uvw[0], method='linear')
     
+    # Her er interpoleringa for CKD-tre, nearest neighbor, altså.
     # Umx_lang[tree.query(uvw)[1]]
     # dist, i = tree.query(uvw)
     
@@ -131,13 +132,15 @@ def hent_tre(fil=pickle_fil):
 def get_velocity_data(t_max=1):
     steps = t_max * 20
     
+    piv_range = ranges()
+    
     with h5py.File(filnamn, 'r') as f:
         Umx = np.array(f['Umx'])[0:steps,:]
         Vmx = np.array(f['Vmx'])[0:steps,:]
         (I,J) = (int(np.array(f['I'])),int(np.array(f['J'])))
     
-    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,1:114,1:125].ravel()
-    Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,1:114,1:125].ravel()
+    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]].ravel()
+    Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]].ravel()
     
     # u_bar = np.nanmean(Umx,0)
     # v_bar = np.nanmean(Vmx,0)
@@ -149,9 +152,8 @@ def get_velocity_data(t_max=1):
         
     return Umx_reshape[nonan], Vmx_reshape[nonan] #, u_reshape, v_reshape
 
-
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
-def U(t, x, tri, ckdtre, Umx_lang, Vmx_lang):
+def U(t, x, tri, ckdtre, Umx_lang, Vmx_lang, linear=True):
     '''
     https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
 
@@ -170,22 +172,30 @@ def U(t, x, tri, ckdtre, Umx_lang, Vmx_lang):
         DESCRIPTION.
 
     '''
-    x = np.concatenate(([t], x))
-    d=3
-    simplex = tri.find_simplex(x)
-    if (simplex==-1):
-        return Umx_lang[ckdtre.query(x)[1]], Vmx_lang[ckdtre.query(x)[1]]
-        # Her skal eg altså leggja inn å sjekka eit lite nearest-tre for næraste snittverdi.
-        # raise Exception("Coordinates outside the complex hull")
-        
-    vertices = np.take(tri.simplices, simplex, axis=0)
-    temp = np.take(tri.transform, simplex, axis=0)
-    delta = x - temp[d]
-    bary = np.einsum('jk,k->j', temp[:d, :], delta)
-    wts = np.hstack((bary, 1 - bary.sum(axis=0, keepdims=True)))
-                
-    return np.einsum('j,j->', np.take(Umx_lang, vertices), wts), np.einsum('j,j->', np.take(Vmx_lang, vertices), wts)
+    U.counter += 1
     
+    x = np.concatenate(([t], x))
+    
+    if(linear):
+        d=3
+        simplex = tri.find_simplex(x)
+        if (simplex==-1):
+            return Umx_lang[ckdtre.query(x)[1]], Vmx_lang[ckdtre.query(x)[1]]
+            # Her skal eg altså leggja inn å sjekka eit lite nearest-tre for næraste snittverdi.
+            # raise Exception("Coordinates outside the complex hull")
+            
+        vertices = np.take(tri.simplices, simplex, axis=0)
+        temp = np.take(tri.transform, simplex, axis=0)
+        delta = x - temp[d]
+        bary = np.einsum('jk,k->j', temp[:d, :], delta)
+        wts = np.hstack((bary, 1 - bary.sum(axis=0, keepdims=True)))
+                    
+        return np.einsum('j,j->', np.take(Umx_lang, vertices), wts), np.einsum('j,j->', np.take(Vmx_lang, vertices), wts)
+    else:
+        return Umx_lang[ckdtre.query(x)[1]], Vmx_lang[ckdtre.query(x)[1]]
+  
+U.counter = 0
+
 cd = interpolate.interp1d(np.array([0.001,0.01,0.1,1,10,20,40,60,80,100,200,400,600,800,1000,2000,4000,6000,8000,10000,100000]), np.array([2.70E+04,2.40E+03,2.50E+02,2.70E+01,4.40E+00,2.80E+00,1.80E+00,1.45E+00,1.25E+00,1.12E+00,8.00E-01,6.20E-01,5.50E-01,5.00E-01,4.70E-01,4.20E-01,4.10E-01,4.15E-01,4.30E-01,4.38E-01,5.40E-01,]))
     
 
@@ -243,23 +253,21 @@ def rk_2(f, y0, L, h, tri, Umx_lang, Vmx_lang):
         
     return t, y
 
-def rk_3 (f, t, y0):
-    resultat = solve_ivp(f, t, y0,  t_eval = [t[1]], args=(tri, ckdtre, Umx_lang, Vmx_lang))
+def rk_3 (f, t, y0, linear=True):
+    resultat = solve_ivp(f, t, y0,  t_eval = [t[1]], args=(tri, ckdtre, Umx_lang, Vmx_lang, linear))
     
     return np.concatenate((resultat.t, resultat.y.T[0]))
 
 g = np.array([0, 9.81e3]) # mm/s^2 = 9.81 m/s^2
 nu = 1 # 1 mm^2/s = 1e-6 m^2/s
-dt = 1 # s
 rho = 1e-6  # kg/mm^3 = 1000 kg/m^3 
 
 class Particle:
     #Lag ein tabell med tidspunkt og posisjon for kvar einskild partikkel.
-    def __init__(self, initPosition, diameter, density=2.65e-6, velocity=0 ):
+    def __init__(self, diameter, density=2.65e-6 ):
         self.diameter= diameter
         self.density = density
-        self.force = 0
-        self.timeposvel = np.array([0,initPosition[0],initPosition[1],velocity])
+        
         
     def get_mass(self):
         # V = 4/3 πr³
@@ -271,25 +279,8 @@ class Particle:
         return self.diameter/2
     
     radius = property(get_radius)
-    
-    def moveObject(self):
-        # ball.pos2D = ball.pos2D.addScaled(ball.velo2D,dt);
-        self.position += self.velocity * dt
-                
-    def updateAccel(self):    
-        pass
         
-    def updateVelo(self):
-        pass
-    
-    def move(self):
-        self.moveObject(self)
-        self.calcForce(self)
-        self.updateAccel(self)
-        self.updateVelo(self) 
-            
-        
-    def f(self, t, x, tri, ckdtre, Umx_lang, Vmx_lang):
+    def f(self, t, x, tri, ckdtre, Umx_lang, Vmx_lang, linear):
         """
         Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
         Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
@@ -318,7 +309,7 @@ class Particle:
         """
         dx_dt = np.array([x[2], x[3]])
         # vel = np.array([100,0]) - dx_dt # relativ snøggleik
-        vel = np.array(U(t,np.array([x[0],x[1]]),tri, ckdtre, Umx_lang, Vmx_lang)) - dx_dt # relativ snøggleik
+        vel = np.array(U(t,np.array([x[0],x[1]]),tri, ckdtre, Umx_lang, Vmx_lang, linear)) - dx_dt # relativ snøggleik
         
         Re = hypot(vel[0],vel[1]) * self.diameter / nu 
         
@@ -337,9 +328,8 @@ class Particle:
         drag_component =  3/4 * cd / self.diameter * rho / self.density * abs(vel)*vel
         gravity_component = (rho / self.density - 1) * g
         
-        # print("drag_component =",drag_component,", gravity_component = ",gravity_component)
-        
-        # du_dt= 3/4 * cd / self.diameter * rho / self.density * abs(np.array(U(t,x[0])) - np.array(x[1]))*(np.array(U(t,x[0])) - np.array(x[1])) + (rho / self.density - 1)* g
+        # print("drag_component =",drag_component,", gravity_component = ",gravity_component)        
+
         du_dt = drag_component + gravity_component
         
         return np.concatenate((dx_dt,du_dt))
@@ -495,7 +485,7 @@ class Rib:
 # p_x = p_x.T.reshape(-1)
 # p_y= p_y.T.reshape(-1)
 
-def lag_sti(part, x0, t_span,fps=20):
+def lag_sti(part, x0, t_span,fps=20, linear=False):
     
     # stien må innehalda posisjon, fart og tid.
     sti = []
@@ -512,6 +502,7 @@ def lag_sti(part, x0, t_span,fps=20):
     # Dersom kollisjon: halver tidssteget, sjekk kollisjon. Dersom ikkje kollisjon
 
     t = t_span[0]
+    t_max = t_span[1]
     t_main = t
     dt_main = 1/fps
     dt = dt_main
@@ -520,7 +511,7 @@ def lag_sti(part, x0, t_span,fps=20):
     
     while (t < t_span[1]):
         # step_new = rk_2(part.f, step_old, (t, t+dt), 0.01, tri, Umx_lang, Vmx_lang)
-        step_new = rk_3(part.f, (t,t+dt), step_old[1:])
+        step_new = rk_3(part.f, (t,t+dt), step_old[1:], linear)
         
         for rib in ribs:
             collision_info = part.checkCollision(step_new[1:], rib)
@@ -545,7 +536,7 @@ def lag_sti(part, x0, t_span,fps=20):
                 
                 if (abs(v_rel) < 0.1):
                     sti_komplett.append(step_new)
-                    sti.append(step_new)
+                    # sti.append(step_new)
                     break
                 
                 # t = t_main + dt_main
@@ -564,11 +555,10 @@ def lag_sti(part, x0, t_span,fps=20):
                 t_main = step_new[0]
                 t = t_main
                 dt = dt_main
-                
             
-                
-
-
+    if (len(sti) < t_max*fps):
+        sti = np.pad(sti, ((0,t_max*fps - len(sti)),(0,0)),'edge')
+        sti[int(t_main*fps):,0] = np.arange(t_main, t_max, 1/fps)
     
     # for par in np.column_stack((p_x,p_y)):
     #     sti.append(solve_ivp(particle.f, [t_start,t_end*fps], par, t_eval=np.arange(t_start, t_end*fps, 1)))
@@ -605,36 +595,62 @@ ckdtre = lag_tre(t_max=6)
 # koll = stein2.checkCollision([-63,-1], ribs[0]) #R2
 # koll2 = stein2.checkCollision([-40,-1], ribs[0]) #R3 (midten av flata)
 
-
-#%% Test å¨laga sti
-# #%% Utfør
+# #%% Initialiser
 
 ribs = [Rib((-62.4,-9.56),50,8), 
         Rib((37.6,-8.5), 50, 8), 
         Rib((-100,-74.3), 200, -10)]
 
-stein = Particle([-88.5,87],1) #Partikkel med koordinatar og 1 mm diameter
+stein = Particle(1) #Partikkel med koordinatar og 1 mm diameter
 
-stein2 = Particle([-85,60], 0.5) #Partikkel med koordinatar og 0.5 mm diameter
+stein2 = Particle(0.5) #Partikkel med koordinatar og 0.5 mm diameter
+#%% Test å laga sti
 
 stien1 = lag_sti(stein, [-88.5,87,0,0],(0,5))
 stien2 = lag_sti(stein2, [-85,60,0,0],(0,5))
 
+#%% Animasjon
 
-#%% ikkje bruk
+def sti_animasjon(stiar, t_max=1, dataset = h5py.File(filnamn, 'r') ):
+    
+    # piv_range = ranges()
+    
+    # with h5py.File(filnamn, mode='r') as f:
+    #     x, y = np.array(f['x']), np.array(f['y'])
+        
+    #     I, J = int(np.array(f['I'])),int(np.array(f['J']))
+               
+    #     x_reshape = x.reshape((127,126))[piv_range]
+    #     y_reshape = y.reshape((127,126))[piv_range]
+    
+    (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
 
-def sti_animasjon(case):
+    steps = t_max * 20
+    piv_range = ranges()
     
-    x_reshape1= np.array(case['x_reshape1'])
-    y_reshape1 = np.array(case['y_reshape1'])
-    V_mag_reshape = np.array(case['V_mag_reshape'])
-    sti = np.array(case['sti'])
+    Umx = np.array(dataset['Umx'])[0:steps,:]
+    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
+    Vmx = np.array(dataset['Vmx'])[0:steps,:]
+    Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
     
+    x = np.array(dataset['x'])
+    y = np.array(dataset['y'])
+    x_reshape = x.reshape(J,I)[piv_range]
+    y_reshape = y.reshape(J,I)[piv_range]
+            
+    V_mag_reshape = np.hypot(Umx_reshape, Vmx_reshape)
+            
     fig, ax = plt.subplots()
     
-    field = ax.imshow(V_mag_reshape[0,:,:], extent=[x_reshape1[0,0],x_reshape1[0,-1], y_reshape1[-1,0], y_reshape1[0,0]])
+    for sti in stiar:
+        if (np.size(sti,0) < steps):
+            sti = np.pad(sti,((0,steps-np.size(sti,0)),(0,0)), 'edge' )
+            
+    
+    
+    field = ax.imshow(V_mag_reshape[0,:,:], extent=[x_reshape[0,0],x_reshape[0,-1], y_reshape[-1,0], y_reshape[0,0]])
     particle, =ax.plot(sti[:,0,0], sti[:,0,1], 'ro')
-    ax.set_xlim([x_reshape1[0,0],x_reshape1[0,-1]])
+    ax.set_xlim([x_reshape[0,0],x_reshape[0,-1]])
     draw_rect(ax)
     
     def nypkt(i):
@@ -648,23 +664,14 @@ def sti_animasjon(case):
     plt.show()
     print("ferdig med animasjon, skal lagra")
     
-    filnamn = "stiQ{}.mp4".format(re.split(r'/',case.name)[-1])
+    filnamn = "stiQ40.mp4"
     ani.save(filnamn)
     plt.close()
 
 
-def draw_rect(axes,color='red'):
-    axes.add_patch(Rectangle((-62.4,-9.56),50,8,linewidth=2,edgecolor=color,facecolor='none'))
-    axes.add_patch(Rectangle((37.6,-8.5),50,8,linewidth=2,edgecolor=color,facecolor='none'))
 
-def ranges():
-    y_range = np.s_[0:114]
-    x_range = np.s_[40:108]
-    
-    piv_range = np.index_exp[y_range,x_range]
-    
-    return piv_range
 
+#%% For eigne studiar
 
 # Her er ein funksjon for fritt fall av ein 1 mm partikkel i vatn.
 # d u_p/dt = u_p(t,y) der y er vertikal fart. Altså berre modellert drag og gravitasjon.
