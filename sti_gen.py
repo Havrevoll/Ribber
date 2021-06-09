@@ -253,63 +253,6 @@ def rk_3 (f, t, y0, linear=True):
     return np.concatenate((resultat.t, resultat.y.T[0]))
 
 
-def sti_animasjon(partiklar, t_max=1, dataset = h5py.File(filnamn, 'r') ):
-    
-    # piv_range = ranges()
-    
-    # with h5py.File(filnamn, mode='r') as f:
-    #     x, y = np.array(f['x']), np.array(f['y'])
-        
-    #     I, J = int(np.array(f['I'])),int(np.array(f['J']))
-               
-    #     x_reshape = x.reshape((127,126))[piv_range]
-    #     y_reshape = y.reshape((127,126))[piv_range]
-    
-    (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
-    
-    sti = np.array([part.sti for part in partiklar])
-
-    steps = t_max * 20
-    piv_range = ranges()
-    
-    Umx = np.array(dataset['Umx'])[0:steps,:]
-    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
-    Vmx = np.array(dataset['Vmx'])[0:steps,:]
-    Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
-    
-    x = np.array(dataset['x'])
-    y = np.array(dataset['y'])
-    x_reshape = x.reshape(J,I)[piv_range]
-    y_reshape = y.reshape(J,I)[piv_range]
-            
-    V_mag_reshape = np.hypot(Umx_reshape, Vmx_reshape)
-       
-    myDPI = 300
-    fig, ax = plt.subplots()#figsize=(800/myDPI,600/myDPI),dpi=myDPI)
-    
-    field = ax.imshow(V_mag_reshape[0,:,:], extent=[x_reshape[0,0],x_reshape[0,-1], y_reshape[-1,0], y_reshape[0,0]])
-    particle, =ax.plot(sti[:,0,1], sti[:,0,2], 'ro')
-    ax.set_xlim([x_reshape[0,0],x_reshape[0,-1]])
-    draw_rect(ax)
-    
-    def nypkt(i):
-        field.set_data(V_mag_reshape[i,:,:])
-        particle.set_data(sti[:,i,1], sti[:,i,2])
-        return field,particle
-    
-    print("Skal byrja på filmen")
-    #ax.axis('equal')
-    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,steps),interval=50)
-    plt.show()
-    print("ferdig med animasjon, skal lagra")
-    
-    filnamn = "stiQ40.mp4"
-    ani.save(filnamn)
-    plt.close()
-
-
-
-
 class Particle:
     #Lag ein tabell med tidspunkt og posisjon for kvar einskild partikkel.
     def __init__(self, diameter, density=2.65e-6 ):
@@ -507,7 +450,7 @@ class Particle:
         
         return (is_collision, collisionInfo, rib)
     
-    def lag_sti(self, x0, t_span,fps=20, linear=False):
+    def lag_sti(self, x0, t_span,fps=20, linear=False, wraparound = False):
     
         # stien må innehalda posisjon, fart og tid.
         sti = []
@@ -534,6 +477,12 @@ class Particle:
         while (t < t_span[1]):
             # step_new = rk_2(part.f, step_old, (t, t+dt), 0.01, tri, Umx_lang, Vmx_lang)
             step_new = rk_3(self.f, (t,t+dt), step_old[1:], linear)
+            
+            if (step_new[1] > 67 and wraparound):
+                step_new[1] -= 100
+            elif(step_new[1] > 95):
+                break
+                
             
             for rib in ribs:
                 collision_info = self.checkCollision(step_new[1:], rib)
@@ -638,7 +587,6 @@ ribs = [Rib((-62.4,-9.56),50,8),
 # koll = stein2.checkCollision([-63,-1], ribs[0]) #R2
 # koll2 = stein2.checkCollision([-40,-1], ribs[0]) #R3 (midten av flata)
 
-
 #%% Test å laga sti
 
 stein = Particle(0.3) 
@@ -646,23 +594,84 @@ stein2 = Particle(0.1)
 stein3 = Particle(0.05)
 stein4 = Particle(0.01)
 
-stein.sti = stein.lag_sti([-88,90,0,0],(0,5))
+t_max = 10
+
+stein.sti = stein.lag_sti([-88,90,0,0],(0,t_max), wraparound=True)
 print(U.counter)
 U.counter=0
-stein2.sti = stein2.lag_sti([-88,80,0,0],(0,5))
+stein2.sti = stein2.lag_sti([-88,80,0,0],(0,t_max), wraparound=True)
 print(U.counter)
 U.counter=0
-stein3.sti = stein3.lag_sti([-88,70,0,0],(0,5))
+stein3.sti = stein3.lag_sti([-88,70,0,0],(0,t_max), wraparound=True)
 print(U.counter)
 U.counter=0
-stein4.sti = stein4.lag_sti([-88,60,0,0],(0,5))
+stein4.sti = stein4.lag_sti([-88,60,0,0],(0,t_max), wraparound=True)
 print(U.counter)
 U.counter=0
+
+sti_animasjon([stein,stein2,stein3,stein4],t_max=t_max)
+
+#%%
+
+def sti_animasjon(partiklar, t_max=1, dataset = h5py.File(filnamn, 'r') ):
+    
+    # piv_range = ranges()
+    
+    # with h5py.File(filnamn, mode='r') as f:
+    #     x, y = np.array(f['x']), np.array(f['y'])
+        
+    #     I, J = int(np.array(f['I'])),int(np.array(f['J']))
+               
+    #     x_reshape = x.reshape((127,126))[piv_range]
+    #     y_reshape = y.reshape((127,126))[piv_range]
+    
+    (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
+    
+    sti = np.array([part.sti for part in partiklar])
+
+    steps = t_max * 20
+    piv_range = ranges()
+    
+    Umx = np.array(dataset['Umx'])[0:steps,:]
+    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
+    Vmx = np.array(dataset['Vmx'])[0:steps,:]
+    Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
+    
+    x = np.array(dataset['x'])
+    y = np.array(dataset['y'])
+    x_reshape = x.reshape(J,I)[piv_range]
+    y_reshape = y.reshape(J,I)[piv_range]
+            
+    V_mag_reshape = np.hypot(Umx_reshape, Vmx_reshape)
+       
+    myDPI = 300
+    fig, ax = plt.subplots(figsize=(1000/myDPI,800/myDPI),dpi=myDPI)
+    
+    field = ax.imshow(V_mag_reshape[0,:,:], extent=[x_reshape[0,0],x_reshape[0,-1], y_reshape[-1,0], y_reshape[0,0]], interpolation='none')
+    particle, =ax.plot(sti[:,0,1], sti[:,0,2], color='black', marker='o', linestyle=' ', markersize=2)
+    ax.set_xlim([x_reshape[0,0],x_reshape[0,-1]])
+    draw_rect(ax)
+    
+    def nypkt(i):
+        field.set_data(V_mag_reshape[i,:,:])
+        particle.set_data(sti[:,i,1], sti[:,i,2])
+        return field,particle
+    
+    print("Skal byrja på filmen")
+    #ax.axis('equal')
+    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,steps),interval=50)
+    plt.show()
+    print("ferdig med animasjon, skal lagra")
+    
+    filnamn = "stiQ40.mp4"
+    ani.save(filnamn)
+    plt.close()
+
+
 
 
 #%% Lag filmen
 
-sti_animasjon([stein,stein2,stein3,stein4],t_max=5)
 
 #%% For eigne studiar
 
