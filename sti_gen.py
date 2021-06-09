@@ -247,8 +247,8 @@ def rk_2(f, y0, L, h, tri, Umx_lang, Vmx_lang):
         
     return t, y
 
-def rk_3 (f, t, y0, linear=True):
-    resultat = solve_ivp(f, t, y0,  t_eval = [t[1]], args=(tri, ckdtre, Umx_lang, Vmx_lang, linear))
+def rk_3 (f, t, y0, linear=True, method='RK45'):
+    resultat = solve_ivp(f, t, y0,  t_eval = [t[1]],method=method, args=(tri, ckdtre, Umx_lang, Vmx_lang, linear))
     
     return np.concatenate((resultat.t, resultat.y.T[0]))
 
@@ -450,7 +450,7 @@ class Particle:
         
         return (is_collision, collisionInfo, rib)
     
-    def lag_sti(self, x0, t_span,fps=20, linear=False, wraparound = False):
+    def lag_sti(self, x0, t_span,fps=20, linear=False, wraparound = False, ode_method='RK45'):
     
         # stien må innehalda posisjon, fart og tid.
         sti = []
@@ -476,7 +476,7 @@ class Particle:
         
         while (t < t_span[1]):
             # step_new = rk_2(part.f, step_old, (t, t+dt), 0.01, tri, Umx_lang, Vmx_lang)
-            step_new = rk_3(self.f, (t,t+dt), step_old[1:], linear)
+            step_new = rk_3(self.f, (t,t+dt), step_old[1:], linear, method=ode_method)
             
             if (step_new[1] > 67 and wraparound):
                 step_new[1] -= 100
@@ -589,23 +589,40 @@ ribs = [Rib((-62.4,-9.56),50,8),
 
 #%% Test å laga sti
 
-stein = Particle(0.3) 
+stein = Particle(0.01)
 stein2 = Particle(0.1) 
 stein3 = Particle(0.05)
 stein4 = Particle(0.01)
 
 t_max = 10
 
-stein.sti = stein.lag_sti([-88,90,0,0],(0,t_max), wraparound=True)
+rk45 = stein.lag_sti([-88,90,0,0],(0,t_max), wraparound=True,ode_method='RK45')
 print(U.counter)
 U.counter=0
+
+bdf = stein.lag_sti([-88,90,0,0],(0,t_max), wraparound=True,ode_method='BDF')
+print(U.counter)
+U.counter=0
+radau =  stein.lag_sti([-88,90,0,0],(0,t_max), wraparound=True,ode_method='Radau')
+print(U.counter)
+U.counter=0
+lsoda =  stein.lag_sti([-88,90,0,0],(0,t_max), wraparound=True,ode_method='LSODA')
+print(U.counter)
+U.counter=0
+RK23 = stein.lag_sti([-88,90,0,0],(0,t_max), wraparound=True,ode_method='RK23')
+print(U.counter)
+U.counter=0
+DOP853 = stein.lag_sti([-88,90,0,0],(0,t_max), wraparound=True,ode_method='DOP853')
+print(U.counter)
+U.counter=0
+#%%
 stein2.sti = stein2.lag_sti([-88,80,0,0],(0,t_max), wraparound=True)
 print(U.counter)
 U.counter=0
 stein3.sti = stein3.lag_sti([-88,70,0,0],(0,t_max), wraparound=True)
 print(U.counter)
 U.counter=0
-stein4.sti = stein4.lag_sti([-88,60,0,0],(0,t_max), wraparound=True)
+stein4.sti = stein4.lag_sti([-88,60,0,0],(0,t_max), wraparound=True,ode_method='BDF')
 print(U.counter)
 U.counter=0
 
