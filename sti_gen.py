@@ -572,7 +572,7 @@ def lag_sti(part, x0, t_span,fps=20, linear=False):
             
 # #%% Førebu
 
-# %timeit U(random.randint(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, Umx_lang, Vmx_lang)
+# %timeit U(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, Umx_lang, Vmx_lang, linear=True)
 Umx_lang, Vmx_lang = get_velocity_data(6)
 tri = hent_tre()
 ckdtre = lag_tre(t_max=6)
@@ -606,8 +606,16 @@ stein = Particle(1) #Partikkel med koordinatar og 1 mm diameter
 stein2 = Particle(0.5) #Partikkel med koordinatar og 0.5 mm diameter
 #%% Test å laga sti
 
-stien1 = lag_sti(stein, [-88.5,87,0,0],(0,5))
-stien2 = lag_sti(stein2, [-85,60,0,0],(0,5))
+stien1 = lag_sti(stein, [-88.5,87,0,0],(0,5), linear = True)
+print(U.counter)
+U.counter = 0
+stien1_nn = lag_sti(stein, [-88.5,87,0,0],(0,5), linear = False)
+print(U.counter)
+U.counter = 0
+stien2 = lag_sti(stein2, [-88,60,0,0],(0,5))
+print(U.counter)
+
+
 
 #%% Animasjon
 
@@ -641,12 +649,6 @@ def sti_animasjon(stiar, t_max=1, dataset = h5py.File(filnamn, 'r') ):
     V_mag_reshape = np.hypot(Umx_reshape, Vmx_reshape)
             
     fig, ax = plt.subplots()
-    
-    for sti in stiar:
-        if (np.size(sti,0) < steps):
-            sti = np.pad(sti,((0,steps-np.size(sti,0)),(0,0)), 'edge' )
-            
-    
     
     field = ax.imshow(V_mag_reshape[0,:,:], extent=[x_reshape[0,0],x_reshape[0,-1], y_reshape[-1,0], y_reshape[0,0]])
     particle, =ax.plot(sti[:,0,0], sti[:,0,1], 'ro')
