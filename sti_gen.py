@@ -156,9 +156,11 @@ def get_velocity_data(t_max=1):
     
     Umx_lang = Umx_reshape.ravel()
     Vmx_lang = Vmx_reshape.ravel()
+    dudt_lang = dudt.ravel()
+    dvdt_lang = dvdt.ravel()
     nonan = np.invert(np.isnan(Umx_lang))
         
-    return Umx_lang[nonan], Vmx_lang[nonan], dudt, dvdt
+    return Umx_lang[nonan], Vmx_lang[nonan], dudt_lang[nonan], dvdt_lang[nonan]
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 def get_u(t, x, tri, ckdtre, U, linear=True):
@@ -173,6 +175,8 @@ def get_u(t, x, tri, ckdtre, U, linear=True):
         Fartsdata i ei lang remse med same storleik som tri.
     x : Array of float64
         Eit punkt i tid og rom som du vil finna farten i.
+    linear : Bool
+        Skal det interpolerast lineært eller næraste nabo?
 
     Returns
     -------
@@ -201,9 +205,10 @@ def get_u(t, x, tri, ckdtre, U, linear=True):
         bary = np.einsum('jk,k->j', temp[:d, :], delta)
         wts = np.hstack((bary, 1 - bary.sum(axis=0, keepdims=True)))
                     
-        return np.einsum('j,j->', np.take(U[0], vertices), wts), np.einsum('j,j->', np.take(U[1], vertices), wts)
+        return np.einsum('j,j->', np.take(U[0], vertices), wts), np.einsum('j,j->', np.take(U[1], vertices), wts),  np.einsum('j,j->', np.take(U[2], vertices), wts),  np.einsum('j,j->', np.take(U[3], vertices), wts)
     else:
-        return U[0][ckdtre.query(x)[1]], U[1][ckdtre.query(x)[1]]
+        kd_index = ckdtre.query(x)[1]
+        return U[0][kd_index], U[1][kd_index], U[2][kd_index], U[3][kd_index]
   
 # cd = interpolate.interp1d(np.array([0.001,0.01,0.1,1,10,20,40,60,80,100,200,400,600,800,1000,2000,4000,6000,8000,10000,100000]), np.array([2.70E+04,2.40E+03,2.50E+02,2.70E+01,4.40E+00,2.80E+00,1.80E+00,1.45E+00,1.25E+00,1.12E+00,8.00E-01,6.20E-01,5.50E-01,5.00E-01,4.70E-01,4.20E-01,4.10E-01,4.15E-01,4.30E-01,4.38E-01,5.40E-01,]))
     
@@ -318,7 +323,8 @@ class Particle:
         
         dx_dt = np.array([x[2], x[3]])
         # vel = np.array([100,0]) - dx_dt # relativ snøggleik
-        vel = np.array(get_u(t,np.array([x[0],x[1]]),tri, ckdtre, U, linear)) - dx_dt # relativ snøggleik
+        U_f = get_u(t,np.array([x[0],x[1]]),tri, ckdtre, U, linear)
+        vel = np.array(U_f[0:2]) - dx_dt # relativ snøggleik
         
         Re = hypot(vel[0],vel[1]) * self.diameter / nu 
         
@@ -334,13 +340,20 @@ class Particle:
             cd = 0.44
         
         # print("Re = ", Re," cd= ", cd)
-        drag_component =  3/4 * cd / self.diameter * rho / self.density * abs(vel)*vel
-        gravity_component = (rho / self.density - 1) * g
-        added_mass = 0.5 * rho/self.density * 
+        rho_self_density = rho / self.density
+        
+        drag_component =  3/4 * cd / self.diameter * rho_self_density * abs(vel)*vel
+        gravity_component = (rho_self_density - 1) * g
+        added_mass = 0.5 * rho_self_density * np.array(U_f[2:])
+        lift_component = 1
+        
+        divisor = 1 + 0.5 *rho_self_density 
+        # divisoren trengst for akselerasjonen av partikkel kjem fram i added 
+        # mass på høgre sida, så den må bli flytta over til venstre og delt på resten.
         
         # print("drag_component =",drag_component,", gravity_component = ",gravity_component)        
 
-        du_dt = drag_component + gravity_component
+        du_dt = (drag_component + gravity_component + added_mass ) / divisor
         
         return np.concatenate((dx_dt,du_dt))
     
@@ -605,7 +618,7 @@ ribs = [Rib((-62.4,-9.56),50,8),
 # koll = stein2.checkCollision([-63,-1], ribs[0]) #R2
 # koll2 = stein2.checkCollision([-40,-1], ribs[0]) #R3 (midten av flata)
 
-#%% Test å laga sti
+ #%% Test å laga sti
 
 
 
