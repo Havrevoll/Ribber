@@ -137,8 +137,16 @@ def get_velocity_data(t_max=1):
         Vmx = np.array(f['Vmx'])[0:steps,:]
         (I,J) = (int(np.array(f['I'])),int(np.array(f['J'])))
     
-    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]].ravel()
-    Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]].ravel()
+    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
+    Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
+    
+    dx = 1.4692770000000053
+    dy = 1.4692770000000053
+    dt = 1/20
+    
+    dudt = np.gradient(Umx_reshape,dt,axis=0)+Umx_reshape*np.gradient(Umx_reshape,dx,axis=2)+Vmx_reshape*np.gradient(Umx_reshape,dy,axis=1)
+    dvdt = np.gradient(Vmx_reshape,dt,axis=0)+Umx_reshape*np.gradient(Vmx_reshape,dx,axis=2)+Vmx_reshape*np.gradient(Vmx_reshape,dy,axis=1)
+    
     
     # u_bar = np.nanmean(Umx,0)
     # v_bar = np.nanmean(Vmx,0)
@@ -146,12 +154,14 @@ def get_velocity_data(t_max=1):
     # u_reshape = u_bar.reshape((J,I))[1:114,1:125]
     # v_reshape = v_bar.reshape((J,I))[1:114,1:125]
     
-    nonan = np.invert(np.isnan(Umx_reshape))
+    Umx_lang = Umx_reshape.ravel()
+    Vmx_lang = Vmx_reshape.ravel()
+    nonan = np.invert(np.isnan(Umx_lang))
         
-    return Umx_reshape[nonan], Vmx_reshape[nonan] #, u_reshape, v_reshape
+    return Umx_lang[nonan], Vmx_lang[nonan], dudt, dvdt
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
-def U(t, x, tri, ckdtre, Umx_lang, Vmx_lang, linear=True):
+def get_u(t, x, tri, ckdtre, U, linear=True):
     '''
     https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
 
@@ -159,7 +169,7 @@ def U(t, x, tri, ckdtre, Umx_lang, Vmx_lang, linear=True):
     ----------
     tri : spatial.qhull.Delaunay
         Eit tre med data.
-    Umx_lang : Array of float64
+    U : Tuple
         Fartsdata i ei lang remse med same storleik som tri.
     x : Array of float64
         Eit punkt i tid og rom som du vil finna farten i.
@@ -171,12 +181,17 @@ def U(t, x, tri, ckdtre, Umx_lang, Vmx_lang, linear=True):
 
     '''    
     x = np.concatenate(([t], x))
-    U.counter +=1
+    
+    get_u.counter +=1
+    
+    if (get_u.counter > 2000000):
+        raise Exception("Alt for mange iterasjonar")
+    
     if(linear):
         d=3
         simplex = tri.find_simplex(x)
         if (simplex==-1):
-            return Umx_lang[ckdtre.query(x)[1]], Vmx_lang[ckdtre.query(x)[1]]
+            return U[0][ckdtre.query(x)[1]], U[1][ckdtre.query(x)[1]]
             # Her skal eg altså leggja inn å sjekka eit lite nearest-tre for næraste snittverdi.
             # raise Exception("Coordinates outside the complex hull")
             
@@ -186,13 +201,13 @@ def U(t, x, tri, ckdtre, Umx_lang, Vmx_lang, linear=True):
         bary = np.einsum('jk,k->j', temp[:d, :], delta)
         wts = np.hstack((bary, 1 - bary.sum(axis=0, keepdims=True)))
                     
-        return np.einsum('j,j->', np.take(Umx_lang, vertices), wts), np.einsum('j,j->', np.take(Vmx_lang, vertices), wts)
+        return np.einsum('j,j->', np.take(U[0], vertices), wts), np.einsum('j,j->', np.take(U[1], vertices), wts)
     else:
-        return Umx_lang[ckdtre.query(x)[1]], Vmx_lang[ckdtre.query(x)[1]]
+        return U[0][ckdtre.query(x)[1]], U[1][ckdtre.query(x)[1]]
   
 # cd = interpolate.interp1d(np.array([0.001,0.01,0.1,1,10,20,40,60,80,100,200,400,600,800,1000,2000,4000,6000,8000,10000,100000]), np.array([2.70E+04,2.40E+03,2.50E+02,2.70E+01,4.40E+00,2.80E+00,1.80E+00,1.45E+00,1.25E+00,1.12E+00,8.00E-01,6.20E-01,5.50E-01,5.00E-01,4.70E-01,4.20E-01,4.10E-01,4.15E-01,4.30E-01,4.38E-01,5.40E-01,]))
     
-U.counter = 0
+get_u.counter = 0
     
 def rk(t0, y0, L, f, h=0.02):
     ''' Heimelaga Runge-Kutta-metode '''
@@ -220,7 +235,7 @@ def rk(t0, y0, L, f, h=0.02):
         
     return t,y
 
-def rk_2(f, y0, L, h, tri, Umx_lang, Vmx_lang):
+def rk_2(f, y0, L, h, tri, U):
     ''' Heimelaga Runge-Kutta-metode '''
     t0, t1 = L
     N=int((t1-t0)/h)
@@ -233,10 +248,10 @@ def rk_2(f, y0, L, h, tri, Umx_lang, Vmx_lang):
     
     for n in range(0, N-1):
         #print(n,t[n], y[n], f(t[n],y[n]))
-        k1 = h*f(t[n], y[n], tri, Umx_lang, Vmx_lang)
-        k2 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k1, tri, Umx_lang, Vmx_lang)
-        k3 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k2, tri, Umx_lang, Vmx_lang)
-        k4 = h*f(t[n] + h, y[n] + k3, tri, Umx_lang, Vmx_lang)
+        k1 = h*f(t[n], y[n], tri, U)
+        k2 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k1, tri, U)
+        k3 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k2, tri, U)
+        k4 = h*f(t[n] + h, y[n] + k3, tri, U)
         
         if (np.isnan(k4+k3+k2+k1).any()):
             #print(k1,k2,k3,k4)
@@ -247,8 +262,8 @@ def rk_2(f, y0, L, h, tri, Umx_lang, Vmx_lang):
         
     return t, y
 
-def rk_3 (f, t, y0, linear=True, method='RK45'):
-    resultat = solve_ivp(f, t, y0,  t_eval = [t[1]],method=method, args=(tri, ckdtre, Umx_lang, Vmx_lang, linear))
+def rk_3 (f, t, y0, linear=True, method='RK45', atol = 1e-6, rtol=1e-3):
+    resultat = solve_ivp(f, t, y0,  t_eval = [t[1]], method=method,  atol=atol, rtol=rtol, args=(tri, ckdtre, U, linear))
     
     return np.concatenate((resultat.t, resultat.y.T[0]))
 
@@ -271,7 +286,7 @@ class Particle:
     
     radius = property(get_radius)
         
-    def f(self, t, x, tri, ckdtre, Umx_lang, Vmx_lang, linear):
+    def f(self, t, x, tri, ckdtre, U, linear):
         """
         Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
         Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
@@ -287,10 +302,8 @@ class Particle:
             Ein tuple med koordinatane og farten, altså (x0, y0, u0, v0).
         tri : spatial.qhull.Delaunay
             Samling av triangulerte data.
-        Umx_lang : Array of float64
-            Ein nd-array med horisontale fartsdata.
-        Vmx_lang : Array of float64
-            Ein nd-array med vertikale fartsdata.
+        U : Tuple
+            Ein tuple av dei to fartsvektor-arrayane.
 
         Returns
         -------
@@ -305,7 +318,7 @@ class Particle:
         
         dx_dt = np.array([x[2], x[3]])
         # vel = np.array([100,0]) - dx_dt # relativ snøggleik
-        vel = np.array(U(t,np.array([x[0],x[1]]),tri, ckdtre, Umx_lang, Vmx_lang, linear)) - dx_dt # relativ snøggleik
+        vel = np.array(get_u(t,np.array([x[0],x[1]]),tri, ckdtre, U, linear)) - dx_dt # relativ snøggleik
         
         Re = hypot(vel[0],vel[1]) * self.diameter / nu 
         
@@ -323,6 +336,7 @@ class Particle:
         # print("Re = ", Re," cd= ", cd)
         drag_component =  3/4 * cd / self.diameter * rho / self.density * abs(vel)*vel
         gravity_component = (rho / self.density - 1) * g
+        added_mass = 0.5 * rho/self.density * 
         
         # print("drag_component =",drag_component,", gravity_component = ",gravity_component)        
 
@@ -450,7 +464,7 @@ class Particle:
         
         return (is_collision, collisionInfo, rib)
     
-    def lag_sti(self, x0, t_span,fps=20, linear=False, wraparound = False, ode_method='RK45'):
+    def lag_sti(self, x0, t_span,fps=20, linear=False, wraparound = False, ode_method='RK45',  atol=1e-6, rtol=1e-3):
     
         # stien må innehalda posisjon, fart og tid.
         sti = []
@@ -475,8 +489,12 @@ class Particle:
         rest = 1
         
         while (t < t_span[1]):
-            # step_new = rk_2(part.f, step_old, (t, t+dt), 0.01, tri, Umx_lang, Vmx_lang)
-            step_new = rk_3(self.f, (t,t+dt), step_old[1:], linear, method=ode_method)
+            # step_new = rk_2(part.f, step_old, (t, t+dt), 0.01, tri, U)
+            try:
+                step_new = rk_3(self.f, (t,t+dt), step_old[1:], linear, method=ode_method,  atol=atol, rtol=rtol)
+            except:
+                print("fekk feil.", self.diameter)
+                break
             
             if (step_new[1] > 67 and wraparound):
                 step_new[1] -= 100
@@ -568,19 +586,19 @@ class Rib:
             
 # #%% Førebu
 
-# %timeit U(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, Umx_lang, Vmx_lang, linear=True)
-Umx_lang, Vmx_lang = get_velocity_data(6)
+# %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
+U  = get_velocity_data(20)
 tri = hent_tre()
-ckdtre = lag_tre(t_max=6)
+ckdtre = lag_tre(t_max=20)
 
 ribs = [Rib((-62.4,-9.56),50,8), 
         Rib((37.6,-8.5), 50, 8), 
         Rib((-100,-74.3), 200, -10)]
 
 # #%% Test løysing av difflikning
-# svar_profft = solve_ivp(stein.f,(0.375,0.4), np.array([-88.5,87,0,0]), args=(tri, Umx_lang, Vmx_lang))
+# svar_profft = solve_ivp(stein.f,(0.375,0.4), np.array([-88.5,87,0,0]), args=(tri, U))
 # svar_profft2 = rk_3(stein.f, (0.375,0.4), np.array([-88.5,87,0,0]))
-# svar = rk_2(stein.f, np.array([-88.5,87,0,0]), (0,0.4), 0.01, tri, Umx_lang, Vmx_lang)
+# svar = rk_2(stein.f, np.array([-88.5,87,0,0]), (0,0.4), 0.01, tri, U)
 
 # #%% Test kollisjon
 # stein2 = Particle([-80,50],3)
@@ -589,44 +607,52 @@ ribs = [Rib((-62.4,-9.56),50,8),
 
 #%% Test å laga sti
 
-stein = Particle(0.01)
+
+
+get_u.counter = 0
+
+def test_part(t_max = 10):
+    methods = ['RK45', 'RK23', 'DOP853', 'Radau', 'BDF', 'LSODA']
+    sizes = [0.07,0.06,0.05,0.04,0.03,0.02]
+    steinar = []
+    import time
+    
+    for size in sizes:
+        start  = time.time()
+        pa = Particle(size)
+        try:
+            pa.sti = pa.lag_sti([-80,85,0,0], (0,t_max), wraparound=True)
+        except Exception:
+            print("må gå vidare")
+    
+        end = time.time()            
+        print("Storleik",size,"iterasjonar: ", get_u.counter, "Det tok", end-start)
+        get_u.counter=0
+        steinar.append(pa)
+        
+    sti_animasjon(steinar,t_max)
+test_part()
+
+
+#%%
+stein = Particle(1)
 stein2 = Particle(0.1) 
 stein3 = Particle(0.05)
 stein4 = Particle(0.01)
 
-t_max = 10
+t_max=10
 
-rk45 = stein.lag_sti([-88,90,0,0],(0,t_max), wraparound=True,ode_method='RK45')
-print(U.counter)
-U.counter=0
-
-bdf = stein.lag_sti([-88,90,0,0],(0,t_max), wraparound=True,ode_method='BDF')
-print(U.counter)
-U.counter=0
-radau =  stein.lag_sti([-88,90,0,0],(0,t_max), wraparound=True,ode_method='Radau')
-print(U.counter)
-U.counter=0
-lsoda =  stein.lag_sti([-88,90,0,0],(0,t_max), wraparound=True,ode_method='LSODA')
-print(U.counter)
-U.counter=0
-RK23 = stein.lag_sti([-88,90,0,0],(0,t_max), wraparound=True,ode_method='RK23')
-print(U.counter)
-U.counter=0
-DOP853 = stein.lag_sti([-88,90,0,0],(0,t_max), wraparound=True,ode_method='DOP853')
-print(U.counter)
-U.counter=0
-#%%
-stein2.sti = stein2.lag_sti([-88,80,0,0],(0,t_max), wraparound=True)
-print(U.counter)
-U.counter=0
+stein.sti = stein.lag_sti([-88,80,0,0],(0,t_max), wraparound=True)
+print(get_u.counter)
+get_u.counter=0
 stein3.sti = stein3.lag_sti([-88,70,0,0],(0,t_max), wraparound=True)
-print(U.counter)
-U.counter=0
+print(get_u.counter)
+get_u.counter=0
 stein4.sti = stein4.lag_sti([-88,60,0,0],(0,t_max), wraparound=True,ode_method='BDF')
-print(U.counter)
-U.counter=0
+print(get_u.counter)
+get_u.counter=0
 
-sti_animasjon([stein,stein2,stein3,stein4],t_max=t_max)
+sti_animasjon([stein],t_max=t_max)
 
 #%%
 
@@ -659,7 +685,8 @@ def sti_animasjon(partiklar, t_max=1, dataset = h5py.File(filnamn, 'r') ):
     x_reshape = x.reshape(J,I)[piv_range]
     y_reshape = y.reshape(J,I)[piv_range]
             
-    V_mag_reshape = np.hypot(Umx_reshape, Vmx_reshape)
+    V_mag_reshape = np.hypot(Umx_reshape, Vmx_reshape)        
+    # V_mag_reshape = np.hypot(U[2], U[3])
        
     myDPI = 300
     fig, ax = plt.subplots(figsize=(1000/myDPI,800/myDPI),dpi=myDPI)
