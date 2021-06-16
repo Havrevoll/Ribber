@@ -14,6 +14,7 @@ from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/refere
 import h5py
 import pickle
 import os.path
+from numba import jit
 
 import scipy.spatial.qhull as qhull
 from scipy.spatial import cKDTree
@@ -163,6 +164,7 @@ def get_velocity_data(t_max=1):
     return Umx_lang[nonan], Vmx_lang[nonan], dudt_lang[nonan], dvdt_lang[nonan]
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
+@jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
 def get_u(t, x, tri, ckdtre, U, linear=True):
     '''
     https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
