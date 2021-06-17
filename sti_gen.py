@@ -190,7 +190,7 @@ def get_u(t, x, tri, ckdtre, U, linear=True):
     
     get_u.counter +=1
     
-    if (get_u.counter > 2000000):
+    if (get_u.counter > 1000000):
         raise Exception("Alt for mange iterasjonar")
     
     if(linear):
@@ -508,7 +508,7 @@ class Particle:
             try:
                 step_new = rk_3(self.f, (t,t+dt), step_old[1:], linear, method=ode_method,  atol=atol, rtol=rtol)
             except:
-                print("fekk feil.", self.diameter)
+                print("fekk feil.", t, dt)
                 break
             
             if (step_new[1] > 67 and wraparound):
@@ -626,22 +626,24 @@ ribs = [Rib((-62.4,-9.56),50,8),
 
 get_u.counter = 0
 
-def test_part(t_max = 10):
-    methods = ['RK45', 'RK23', 'DOP853', 'Radau', 'BDF', 'LSODA']
-    sizes = [0.07,0.06,0.05,0.04,0.03,0.02]
+def test_part(t_max = 15):
+    # methods = ['RK45', 'RK23', 'DOP853', 'Radau', 'BDF', 'LSODA']
+    # sizes = [0.07,0.06,0.05,0.04,0.03,0.02]
+    # atol=1e-6, rtol=1e-3
+    tols = [(1e-6,1e-3), (1e-5,1e-3), (1e-5,1e-2), (1e-4,1e-2)]
     steinar = []
     import time
     
-    for size in sizes:
+    for tol in tols:
         start  = time.time()
-        pa = Particle(size)
+        pa = Particle(0.05)
         try:
-            pa.sti = pa.lag_sti([-80,85,0,0], (0,t_max), wraparound=True)
+            pa.sti = pa.lag_sti([-80,85,0,0], (0,t_max), wraparound=True, atol=tol[0], rtol=tol[1])
         except Exception:
             print("må gå vidare")
     
         end = time.time()            
-        print("Storleik",size,"iterasjonar: ", get_u.counter, "Det tok", end-start)
+        print("toleransar: ", tol," iterasjonar: ", get_u.counter, "Det tok", end-start)
         get_u.counter=0
         steinar.append(pa)
         
