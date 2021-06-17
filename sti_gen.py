@@ -30,10 +30,10 @@ elif os.path.isfile("C:/Users/havrevol/Q40.hdf5"):
 else:
     filnamn ="D:/Tonstad/Q40.hdf5"
     
-if os.path.isfile("D:/Tonstad/Q40_6s.pickle"):
-    pickle_fil = "D:/Tonstad/Q40_6s.pickle"
-elif os.path.isfile("C:/Users/havrevol/Q40_2s.pickle"):
-    pickle_fil = "C:/Users/havrevol/Q40_2s.pickle"
+if os.path.isfile("D:/Tonstad/Q40_20s.pickle"):
+    pickle_fil = "D:/Tonstad/Q40_20s.pickle"
+elif os.path.isfile("C:/Users/havrevol/Q40_20s.pickle"):
+    pickle_fil = "C:/Users/havrevol/Q40_20s.pickle"
 else:
     pickle_fil ="D:/Tonstad/Q40_2s.pickle"
 
