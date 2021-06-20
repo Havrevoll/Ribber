@@ -165,7 +165,7 @@ def get_velocity_data(t_max=1):
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
-def get_u(t, x, tri, ckdtre, U, linear=True):
+def get_u(t, x_inn, tri, ckdtre, U, linear=True):
     '''
     https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
 
@@ -174,7 +174,7 @@ def get_u(t, x, tri, ckdtre, U, linear=True):
     tri : spatial.qhull.Delaunay
         Eit tre med data.
     U : Tuple
-        Fartsdata i ei lang remse med same storleik som tri.
+        Fartsdata i ei lang remse med same storleik som tri. Det er (U,V,dU/dt,dV/dt), altså gradienten i kvart punkt og kvar tid.
     x : Array of float64
         Eit punkt i tid og rom som du vil finna farten i.
     linear : Bool
@@ -186,7 +186,7 @@ def get_u(t, x, tri, ckdtre, U, linear=True):
         DESCRIPTION.
 
     '''    
-    x = np.concatenate(([t], x))
+    x = np.concatenate(([t], x_inn))
     
     get_u.counter +=1
     
@@ -210,7 +210,14 @@ def get_u(t, x, tri, ckdtre, U, linear=True):
         return np.einsum('j,j->', np.take(U[0], vertices), wts), np.einsum('j,j->', np.take(U[1], vertices), wts),  np.einsum('j,j->', np.take(U[2], vertices), wts),  np.einsum('j,j->', np.take(U[3], vertices), wts)
     else:
         kd_index = ckdtre.query(x)[1]
-        return U[0][kd_index], U[1][kd_index], U[2][kd_index], U[3][kd_index]
+        
+        # try:
+        returen = (U[0][kd_index], U[1][kd_index], U[2][kd_index], U[3][kd_index])
+        # except IndexError:
+        #     print("kva skjedde")
+        
+        return returen
+        # return U[0][kd_index], U[1][kd_index], U[2][kd_index], U[3][kd_index]
   
 # cd = interpolate.interp1d(np.array([0.001,0.01,0.1,1,10,20,40,60,80,100,200,400,600,800,1000,2000,4000,6000,8000,10000,100000]), np.array([2.70E+04,2.40E+03,2.50E+02,2.70E+01,4.40E+00,2.80E+00,1.80E+00,1.45E+00,1.25E+00,1.12E+00,8.00E-01,6.20E-01,5.50E-01,5.00E-01,4.70E-01,4.20E-01,4.10E-01,4.15E-01,4.30E-01,4.38E-01,5.40E-01,]))
     
@@ -270,7 +277,7 @@ def rk_2(f, y0, L, h, tri, U):
     return t, y
 
 def rk_3 (f, t, y0, linear=True, method='RK45', atol = 1e-6, rtol=1e-3):
-    resultat = solve_ivp(f, t, y0,  t_eval = [t[1]], method=method,  atol=atol, rtol=rtol, args=(tri, ckdtre, U, linear))
+    resultat = solve_ivp(f, t, y0, max_step=0.05,  t_eval = [t[1]], method=method,  atol=atol, rtol=rtol, args=(tri, ckdtre, U, linear))
     
     return np.concatenate((resultat.t, resultat.y.T[0]))
 
@@ -356,6 +363,9 @@ class Particle:
         # print("drag_component =",drag_component,", gravity_component = ",gravity_component)        
 
         du_dt = (drag_component + gravity_component + added_mass ) / divisor
+        
+        if (np.any(np.isnan(du_dt))):
+            print("her er nan!")
         
         return np.concatenate((dx_dt,du_dt))
     
@@ -505,11 +515,14 @@ class Particle:
         
         while (t < t_span[1]):
             # step_new = rk_2(part.f, step_old, (t, t+dt), 0.01, tri, U)
-            try:
-                step_new = rk_3(self.f, (t,t+dt), step_old[1:], linear, method=ode_method,  atol=atol, rtol=rtol)
-            except:
-                print("fekk feil.", t, dt)
-                break
+            # try:
+            #     step_new = rk_3(self.f, (t,t+dt), step_old[1:], linear, method=ode_method,  atol=atol, rtol=rtol)
+            # except:
+            #     print("fekk feil.", t, dt)
+            #     break
+            
+            step_new = rk_3(self.f, (t,t+dt), step_old[1:], linear, method=ode_method,  atol=atol, rtol=rtol)
+
             
             if (step_new[1] > 67 and wraparound):
                 step_new[1] -= 100
@@ -650,6 +663,12 @@ def test_part(t_max = 15):
     sti_animasjon(steinar,t_max)
 test_part()
 
+#%% 
+
+t_max = 15
+tol = (1e-4,1e-2)
+pa = Particle(0.05)
+pa.sti = pa.lag_sti([-80,85,0,0], (0,t_max), wraparound=True, atol=tol[0], rtol=tol[1])
 
 #%%
 stein = Particle(1)
