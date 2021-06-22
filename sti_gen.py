@@ -128,7 +128,7 @@ def hent_tre(fil=pickle_fil):
  
     return tri
 
-def get_velocity_data(t_max=1):
+def get_velocity_data(t_max=1, one_dimensional = True):
     steps = t_max * 20
     
     piv_range = ranges()
@@ -155,10 +155,17 @@ def get_velocity_data(t_max=1):
     # u_reshape = u_bar.reshape((J,I))[1:114,1:125]
     # v_reshape = v_bar.reshape((J,I))[1:114,1:125]
     
-    Umx_lang = Umx_reshape.ravel()
-    Vmx_lang = Vmx_reshape.ravel()
-    dudt_lang = dudt.ravel()
-    dvdt_lang = dvdt.ravel()
+    if (one_dimensional):
+        Umx_lang = Umx_reshape.ravel()
+        Vmx_lang = Vmx_reshape.ravel()
+        dudt_lang = dudt.ravel()
+        dvdt_lang = dvdt.ravel()
+    else:
+        Umx_lang = Umx_reshape
+        Vmx_lang = Vmx_reshape
+        dudt_lang = dudt
+        dvdt_lang = dvdt
+
     nonan = np.invert(np.isnan(Umx_lang))
         
     return Umx_lang[nonan], Vmx_lang[nonan], dudt_lang[nonan], dvdt_lang[nonan]
@@ -249,7 +256,7 @@ def rk(t0, y0, L, f, h=0.02):
         
     return t,y
 
-def rk_2(f, y0, L, h, tri, U):
+def rk_2(f, L, y0, h, tri, U):
     ''' Heimelaga Runge-Kutta-metode '''
     t0, t1 = L
     N=int((t1-t0)/h)
@@ -277,9 +284,66 @@ def rk_2(f, y0, L, h, tri, U):
     return t, y
 
 def rk_3 (f, t, y0, linear=True, method='RK45', atol = 1e-6, rtol=1e-3):
-    resultat = solve_ivp(f, t, y0, max_step=0.05,  t_eval = [t[1]], method=method,  atol=atol, rtol=rtol, args=(tri, ckdtre, U, linear))
+    resultat = solve_ivp(f, t, y0, max_step=0.02,  t_eval = [t[1]], method=method,  atol=atol, rtol=rtol, args=(tri, ckdtre, U, linear))
     
     return np.concatenate((resultat.t, resultat.y.T[0]))
+
+
+def sti_animasjon(partiklar, t_max=1, dataset = h5py.File(filnamn, 'r') ):
+    
+    # piv_range = ranges()
+    
+    # with h5py.File(filnamn, mode='r') as f:
+    #     x, y = np.array(f['x']), np.array(f['y'])
+        
+    #     I, J = int(np.array(f['I'])),int(np.array(f['J']))
+               
+    #     x_reshape = x.reshape((127,126))[piv_range]
+    #     y_reshape = y.reshape((127,126))[piv_range]
+    
+    (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
+    
+    sti = np.array([part.sti for part in partiklar])
+
+    steps = t_max * 20
+    piv_range = ranges()
+    
+    Umx = np.array(dataset['Umx'])[0:steps,:]
+    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
+    Vmx = np.array(dataset['Vmx'])[0:steps,:]
+    Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
+    
+    x = np.array(dataset['x'])
+    y = np.array(dataset['y'])
+    x_reshape = x.reshape(J,I)[piv_range]
+    y_reshape = y.reshape(J,I)[piv_range]
+            
+    V_mag_reshape = np.hypot(Umx_reshape, Vmx_reshape)        
+    # V_mag_reshape = np.hypot(U[2], U[3])
+       
+    myDPI = 300
+    fig, ax = plt.subplots(figsize=(1000/myDPI,800/myDPI),dpi=myDPI)
+    
+    field = ax.imshow(V_mag_reshape[0,:,:], extent=[x_reshape[0,0],x_reshape[0,-1], y_reshape[-1,0], y_reshape[0,0]], interpolation='none')
+    particle, =ax.plot(sti[:,0,1], sti[:,0,2], color='black', marker='o', linestyle=' ', markersize=2)
+    ax.set_xlim([x_reshape[0,0],x_reshape[0,-1]])
+    draw_rect(ax)
+    
+    def nypkt(i):
+        field.set_data(V_mag_reshape[i,:,:])
+        particle.set_data(sti[:,i,1], sti[:,i,2])
+        return field,particle
+    
+    print("Skal byrja på filmen")
+    #ax.axis('equal')
+    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,steps),interval=50)
+    plt.show()
+    print("ferdig med animasjon, skal lagra")
+    
+    filnamn = "stiQ40.mp4"
+    ani.save(filnamn)
+    plt.close()
+
 
 
 class Particle:
@@ -354,6 +418,8 @@ class Particle:
         drag_component =  3/4 * cd / self.diameter * rho_self_density * abs(vel)*vel
         gravity_component = (rho_self_density - 1) * g
         added_mass = 0.5 * rho_self_density * np.array(U_f[2:])
+        
+        
         lift_component = 1
         
         divisor = 1 + 0.5 *rho_self_density 
@@ -365,7 +431,7 @@ class Particle:
         du_dt = (drag_component + gravity_component + added_mass ) / divisor
         
         if (np.any(np.isnan(du_dt))):
-            print("her er nan!")
+            print("her er nan! og t, x og dudt er dette:", t,x, du_dt)
         
         return np.concatenate((dx_dt,du_dt))
     
@@ -616,6 +682,9 @@ class Rib:
 
 # %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
 U  = get_velocity_data(20)
+
+dudt_mean = (np.nanmean(U[2], 0), np.nanmean(U[3], 0))
+
 tri = hent_tre()
 ckdtre = lag_tre(t_max=20)
 
@@ -635,8 +704,13 @@ ribs = [Rib((-62.4,-9.56),50,8),
 
  #%% Test å laga sti
 
+t_max = 15
+tol = (1e-4,1e-2)
+pa = Particle(0.5)
+pa.sti = pa.lag_sti([-80,85,0,0], (0,t_max), wraparound=True, atol=tol[0], rtol=tol[1])
+sti_animasjon([pa],t_max)
 
-
+#%%
 get_u.counter = 0
 
 def test_part(t_max = 15):
@@ -663,12 +737,6 @@ def test_part(t_max = 15):
     sti_animasjon(steinar,t_max)
 test_part()
 
-#%% 
-
-t_max = 15
-tol = (1e-4,1e-2)
-pa = Particle(0.05)
-pa.sti = pa.lag_sti([-80,85,0,0], (0,t_max), wraparound=True, atol=tol[0], rtol=tol[1])
 
 #%%
 stein = Particle(1)
@@ -691,63 +759,6 @@ get_u.counter=0
 sti_animasjon([stein],t_max=t_max)
 
 #%%
-
-def sti_animasjon(partiklar, t_max=1, dataset = h5py.File(filnamn, 'r') ):
-    
-    # piv_range = ranges()
-    
-    # with h5py.File(filnamn, mode='r') as f:
-    #     x, y = np.array(f['x']), np.array(f['y'])
-        
-    #     I, J = int(np.array(f['I'])),int(np.array(f['J']))
-               
-    #     x_reshape = x.reshape((127,126))[piv_range]
-    #     y_reshape = y.reshape((127,126))[piv_range]
-    
-    (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
-    
-    sti = np.array([part.sti for part in partiklar])
-
-    steps = t_max * 20
-    piv_range = ranges()
-    
-    Umx = np.array(dataset['Umx'])[0:steps,:]
-    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
-    Vmx = np.array(dataset['Vmx'])[0:steps,:]
-    Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
-    
-    x = np.array(dataset['x'])
-    y = np.array(dataset['y'])
-    x_reshape = x.reshape(J,I)[piv_range]
-    y_reshape = y.reshape(J,I)[piv_range]
-            
-    V_mag_reshape = np.hypot(Umx_reshape, Vmx_reshape)        
-    # V_mag_reshape = np.hypot(U[2], U[3])
-       
-    myDPI = 300
-    fig, ax = plt.subplots(figsize=(1000/myDPI,800/myDPI),dpi=myDPI)
-    
-    field = ax.imshow(V_mag_reshape[0,:,:], extent=[x_reshape[0,0],x_reshape[0,-1], y_reshape[-1,0], y_reshape[0,0]], interpolation='none')
-    particle, =ax.plot(sti[:,0,1], sti[:,0,2], color='black', marker='o', linestyle=' ', markersize=2)
-    ax.set_xlim([x_reshape[0,0],x_reshape[0,-1]])
-    draw_rect(ax)
-    
-    def nypkt(i):
-        field.set_data(V_mag_reshape[i,:,:])
-        particle.set_data(sti[:,i,1], sti[:,i,2])
-        return field,particle
-    
-    print("Skal byrja på filmen")
-    #ax.axis('equal')
-    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,steps),interval=50)
-    plt.show()
-    print("ferdig med animasjon, skal lagra")
-    
-    filnamn = "stiQ40.mp4"
-    ani.save(filnamn)
-    plt.close()
-
-
 
 
 #%% Lag filmen
