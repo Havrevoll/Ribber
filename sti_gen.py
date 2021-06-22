@@ -160,16 +160,13 @@ def get_velocity_data(t_max=1, one_dimensional = True):
         Vmx_lang = Vmx_reshape.ravel()
         dudt_lang = dudt.ravel()
         dvdt_lang = dvdt.ravel()
-    else:
-        Umx_lang = Umx_reshape
-        Vmx_lang = Vmx_reshape
-        dudt_lang = dudt
-        dvdt_lang = dvdt
-
-    nonan = np.invert(np.isnan(Umx_lang))
         
-    return Umx_lang[nonan], Vmx_lang[nonan], dudt_lang[nonan], dvdt_lang[nonan]
+        nonan = np.invert(np.isnan(Umx_lang))
+        return np.array([Umx_lang[nonan], Vmx_lang[nonan], dudt_lang[nonan], dvdt_lang[nonan]])
+    else:
+        return np.array([Umx_reshape, Vmx_reshape, dudt, dvdt])
 
+    
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
 def get_u(t, x_inn, tri, ckdtre, U, linear=True):
@@ -197,7 +194,7 @@ def get_u(t, x_inn, tri, ckdtre, U, linear=True):
     
     get_u.counter +=1
     
-    if (get_u.counter > 1000000):
+    if (get_u.counter > 2000000):
         raise Exception("Alt for mange iterasjonar")
     
     if(linear):
@@ -396,7 +393,15 @@ class Particle:
         
         dx_dt = np.array([x[2], x[3]])
         # vel = np.array([100,0]) - dx_dt # relativ snøggleik
-        U_f = get_u(t,np.array([x[0],x[1]]),tri, ckdtre, U, linear)
+        U_f = np.array(get_u(t,np.array([x[0],x[1]]),tri, ckdtre, U, linear))
+        if (np.isnan(U_f[2])):
+            U_f[2] = 0
+            # U_f[2] = dudt_mean[0][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
+        if (np.isnan(U_f[3])):
+            U_f[3] = 0
+            # U_f[3] = dudt_mean[1][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
+            
+            
         vel = np.array(U_f[0:2]) - dx_dt # relativ snøggleik
         
         Re = hypot(vel[0],vel[1]) * self.diameter / nu 
@@ -683,7 +688,7 @@ class Rib:
 # %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
 U  = get_velocity_data(20)
 
-dudt_mean = (np.nanmean(U[2], 0), np.nanmean(U[3], 0))
+dudt_mean = np.nanmean(get_velocity_data(20, one_dimensional=False)[2:],1)
 
 tri = hent_tre()
 ckdtre = lag_tre(t_max=20)
@@ -702,8 +707,7 @@ ribs = [Rib((-62.4,-9.56),50,8),
 # koll = stein2.checkCollision([-63,-1], ribs[0]) #R2
 # koll2 = stein2.checkCollision([-40,-1], ribs[0]) #R3 (midten av flata)
 
- #%% Test å laga sti
-
+#%%
 t_max = 15
 tol = (1e-4,1e-2)
 pa = Particle(0.5)
@@ -742,21 +746,24 @@ test_part()
 stein = Particle(1)
 stein2 = Particle(0.1) 
 stein3 = Particle(0.05)
-stein4 = Particle(0.01)
+stein4 = Particle(0.02)
+t_max = 15
+tol = (1e-4,1e-2)
 
-t_max=10
-
-stein.sti = stein.lag_sti([-88,80,0,0],(0,t_max), wraparound=True)
+stein.sti = stein.lag_sti([-88,80,0,0],(0,t_max), wraparound=True, atol=tol[0], rtol=tol[1])
 print(get_u.counter)
 get_u.counter=0
-stein3.sti = stein3.lag_sti([-88,70,0,0],(0,t_max), wraparound=True)
+stein3.sti = stein3.lag_sti([-88,70,0,0],(0,t_max), wraparound=True, atol=tol[0], rtol=tol[1])
 print(get_u.counter)
 get_u.counter=0
-stein4.sti = stein4.lag_sti([-88,60,0,0],(0,t_max), wraparound=True,ode_method='BDF')
+stein2.sti = stein2.lag_sti([-88,70,0,0],(0,t_max), wraparound=True, atol=tol[0], rtol=tol[1])
+print(get_u.counter)
+get_u.counter=0
+stein4.sti = stein4.lag_sti([-88,60,0,0],(0,t_max), wraparound=True, atol=tol[0], rtol=tol[1])
 print(get_u.counter)
 get_u.counter=0
 
-sti_animasjon([stein],t_max=t_max)
+sti_animasjon([stein, stein2, stein3,stein4],t_max=t_max)
 
 #%%
 
