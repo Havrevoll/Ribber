@@ -14,6 +14,7 @@ from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/refere
 import h5py
 import pickle
 import os.path
+import random
 # from numba import jit
 
 import scipy.spatial.qhull as qhull
@@ -322,7 +323,7 @@ def sti_animasjon(partiklar, t_max=1, dataset = h5py.File(filnamn, 'r') ):
     fig, ax = plt.subplots(figsize=(1000/myDPI,800/myDPI),dpi=myDPI)
     
     field = ax.imshow(V_mag_reshape[0,:,:], extent=[x_reshape[0,0],x_reshape[0,-1], y_reshape[-1,0], y_reshape[0,0]], interpolation='none')
-    particle, =ax.plot(sti[:,0,1], sti[:,0,2], color='black', marker='o', linestyle=' ', markersize=2)
+    particle, =ax.plot(sti[:,0,1], sti[:,0,2], color='black', marker='o', linestyle=' ', markersize=1)
     ax.set_xlim([x_reshape[0,0],x_reshape[0,-1]])
     draw_rect(ax)
     
@@ -747,25 +748,32 @@ stein = Particle(1)
 stein2 = Particle(0.1) 
 stein3 = Particle(0.05)
 stein4 = Particle(0.02)
+
+stein5 = Particle(0.2)
+
 t_max = 15
 tol = (1e-4,1e-2)
 
-stein.sti = stein.lag_sti([-88,80,0,0],(0,t_max), wraparound=True, atol=tol[0], rtol=tol[1])
+args = {'t_span':(0,t_max), 'wraparound':True, 'atol':tol[0], 'rtol':tol[1]}
+
+stein.sti = stein.lag_sti([-88,90,0,0], **args )
 print(get_u.counter)
 get_u.counter=0
-stein3.sti = stein3.lag_sti([-88,70,0,0],(0,t_max), wraparound=True, atol=tol[0], rtol=tol[1])
+stein3.sti = stein3.lag_sti([-88,80,0,0],**args)
 print(get_u.counter)
 get_u.counter=0
-stein2.sti = stein2.lag_sti([-88,70,0,0],(0,t_max), wraparound=True, atol=tol[0], rtol=tol[1])
+stein2.sti = stein2.lag_sti([-88,70,0,0],**args)
 print(get_u.counter)
 get_u.counter=0
-stein4.sti = stein4.lag_sti([-88,60,0,0],(0,t_max), wraparound=True, atol=tol[0], rtol=tol[1])
+stein4.sti = stein4.lag_sti([-88,60,0,0],**args)
+print(get_u.counter)
+get_u.counter=0
+stein5.sti = stein5.lag_sti([-90, random.uniform(-60,88),0,0], **args)
 print(get_u.counter)
 get_u.counter=0
 
-sti_animasjon([stein, stein2, stein3,stein4],t_max=t_max)
+sti_animasjon([stein, stein2, stein3,stein4,stein5],t_max=t_max)
 
-#%%
 
 
 #%% Lag filmen
