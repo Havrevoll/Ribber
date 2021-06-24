@@ -323,13 +323,23 @@ def sti_animasjon(partiklar, t_max=1, dataset = h5py.File(filnamn, 'r') ):
     fig, ax = plt.subplots(figsize=(1000/myDPI,800/myDPI),dpi=myDPI)
     
     field = ax.imshow(V_mag_reshape[0,:,:], extent=[x_reshape[0,0],x_reshape[0,-1], y_reshape[-1,0], y_reshape[0,0]], interpolation='none')
-    particle, =ax.plot(sti[:,0,1], sti[:,0,2], color='black', marker='o', linestyle=' ', markersize=1)
+    # particle, =ax.plot(sti[:,0,1], sti[:,0,2], color='black', marker='o', linestyle=' ', markersize=1)
+    
+    # https://stackoverflow.com/questions/9215658/plot-a-circle-with-pyplot
+    # particle = 
+    circle1 = plt.Circle((0, 0), 0.2, color='r')
+    ax.add_patch(circle1)
+    
     ax.set_xlim([x_reshape[0,0],x_reshape[0,-1]])
     draw_rect(ax)
     
     def nypkt(i):
         field.set_data(V_mag_reshape[i,:,:])
-        particle.set_data(sti[:,i,1], sti[:,i,2])
+        # particle.set_data(sti[:,i,1], sti[:,i,2])
+        
+        # https://stackoverflow.com/questions/16527930/matplotlib-update-position-of-patches-or-set-xy-for-circles
+        circle1.center = new_!x, new_y
+        
         return field,particle
     
     print("Skal byrja på filmen")
