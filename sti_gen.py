@@ -27,6 +27,7 @@ from hjelpefunksjonar import norm, draw_rect, ranges, finn_fil
 
 from datagenerering import lag_tre, lagra_tre, hent_tre, get_velocity_data, auk_datatettleik
 
+from datagenerering import get_txy
 
 filnamn = finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
 pickle_fil = finn_fil(["D:/Tonstad/Q40_20s.pickle", "C:/Users/havrevol/Q40_20s.pickle", "D:/Tonstad/Q40_2s.pickle"])
@@ -586,7 +587,7 @@ if U is None:
     U  = get_velocity_data(20)
     dudt_mean = np.nanmean(get_velocity_data(20, one_dimensional=False)[2:],1)
     tri = hent_tre()
-    ckdtre = lag_tre(t_max=20)
+    ckdtre = lag_tre(t_span=(0,20))
 
 
 ribs = [Rib((-61.07,-8.816),50.2,7.8), 
