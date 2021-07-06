@@ -5,169 +5,35 @@ import matplotlib.pyplot as plt
 plt.rcParams["font.family"] = "STIXGeneral"
 plt.rcParams['mathtext.fontset'] = 'stix'
 from matplotlib import animation
-from matplotlib.patches import Rectangle
 
 import numpy as np
-from scipy import interpolate
+# from scipy import interpolate
 from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#r179348322575-1
 
 import h5py
-import pickle
-import os.path
+
 import random
 # from numba import jit
 
-import scipy.spatial.qhull as qhull
-from scipy.spatial import cKDTree
-
 from math import pi, hypot
 
-# import os.path.join as pjoin
-
-if os.path.isfile("D:/Tonstad/utvalde/Q40.hdf5"):
-    filnamn = "D:/Tonstad/utvalde/Q40.hdf5"
-elif os.path.isfile("C:/Users/havrevol/Q40.hdf5"):
-    filnamn = "C:/Users/havrevol/Q40.hdf5"
-else:
-    filnamn ="D:/Tonstad/Q40.hdf5"
-    
-if os.path.isfile("D:/Tonstad/Q40_20s.pickle"):
-    pickle_fil = "D:/Tonstad/Q40_20s.pickle"
-elif os.path.isfile("C:/Users/havrevol/Q40_20s.pickle"):
-    pickle_fil = "C:/Users/havrevol/Q40_20s.pickle"
-else:
-    pickle_fil ="D:/Tonstad/Q40_2s.pickle"
 
 # fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
+# x = np.array(h5py.File(filnamn, 'r')['x']).reshape(127,126)[ranges()]
 # vass = fil['vassføringar']
 
-def norm(v):
-    return v / (v**2).sum()**0.5
 
-def draw_rect(axes,color='red'):
-    axes.add_patch(Rectangle((-62.4,-9.56),50,8,linewidth=2,edgecolor=color,facecolor='none'))
-    axes.add_patch(Rectangle((37.6,-8.5),50,8,linewidth=2,edgecolor=color,facecolor='none'))
+from hjelpefunksjonar import norm, draw_rect, ranges, finn_fil
 
-def ranges():
-    # Dette var dei eg brukte for å laga kvadrantanalysen.
-    # y_range = np.s_[0:114]
-    # x_range = np.s_[40:108]
-    
-    y_range = np.s_[1:114]
-    x_range = np.s_[1:125]    
-    
-    piv_range = np.index_exp[y_range,x_range]
-    
-    return piv_range
+from datagenerering import lag_tre, lagra_tre, hent_tre, get_velocity_data, auk_datatettleik
 
-def lag_tre(t_max=1, dataset = h5py.File(filnamn, 'r'), nearest=True):
-    '''
-    Ein metode som tek inn eit datasett og gjer alle reshapings-tinga for x og y, u og v og Re.
 
-    '''
-    (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
+filnamn = finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
+pickle_fil = finn_fil(["D:/Tonstad/Q40_20s.pickle", "C:/Users/havrevol/Q40_20s.pickle", "D:/Tonstad/Q40_2s.pickle"])
 
-    steps = t_max * 20
-    piv_range = ranges()
-    
-    Umx = np.array(dataset['Umx'])[0:steps,:]
-    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
-    
-    x = np.array(dataset['x'])
-    y = np.array(dataset['y'])
-    x_reshape = x.reshape(J,I)[piv_range]
-    y_reshape = y.reshape(J,I)[piv_range]
-        
-    t_3d,y_3d,x_3d = np.meshgrid(np.arange(t_max, step=0.05),y_reshape[:,0],x_reshape[0,:],indexing='ij')
-    
-    nonan = np.invert(np.isnan(Umx_reshape.ravel()))
-    
-    t_lang = t_3d.ravel()[nonan]
-    x_lang = x_3d.ravel()[nonan]
-    y_lang = y_3d.ravel()[nonan]
-    
-    txy = np.vstack((t_lang,x_lang,y_lang)).T
+t_max_global = 20
+t_min_global = 0
 
-    # import time
-    # start = time.time()        
-
-    if (nearest):
-        tree = cKDTree(txy)
-    else:
-        tree = qhull.Delaunay(txy)
-    
-    # end = time.time()
-    # print(end - start)
-    
-    # Her er interpoleringa for qhull, lineært, altså.
-    # uvw = (0,-88.5,87)
-    # simplex = tri.find_simplex(uvw)
-    # vertices = np.take(tri.simplices, simplex, axis=0)
-    # temp = np.take(tri.transform, simplex, axis=0)
-    # delta = uvw - temp[3, :]
-    # bary = np.einsum('njk,nk->nj', temp[:, :d, :], delta)
-    # wts = np.hstack((bary, 1 - bary.sum(axis=1, keepdims=True))
-                    
-    # interpolate = np.einsum('nj,nj->n', np.take(values, vtx), wts)    
-
-    # Metoden er den same som denne:
-    # interpolate.griddata((t_lang, x_lang, y_lang), Umx_lang, uvw[0], method='linear')
-    
-    # Her er interpoleringa for CKD-tre, nearest neighbor, altså.
-    # Umx_lang[tree.query(uvw)[1]]
-    # dist, i = tree.query(uvw)
-    
-    return tree
-
-def lagra_tre(tre, fil):
-    with open(fil, 'wb') as f:
-        pickle.dump(tre, f)
-
-def hent_tre(fil=pickle_fil):
-    with open(fil, 'rb') as f:
-        tri = pickle.load(f)
- 
-    return tri
-
-def get_velocity_data(t_max=1, one_dimensional = True):
-    steps = t_max * 20
-    
-    piv_range = ranges()
-    
-    with h5py.File(filnamn, 'r') as f:
-        Umx = np.array(f['Umx'])[0:steps,:]
-        Vmx = np.array(f['Vmx'])[0:steps,:]
-        (I,J) = (int(np.array(f['I'])),int(np.array(f['J'])))
-    
-    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
-    Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
-    
-    dx = 1.4692770000000053
-    dy = 1.4692770000000053
-    dt = 1/20
-    
-    dudt = np.gradient(Umx_reshape,dt,axis=0)+Umx_reshape*np.gradient(Umx_reshape,dx,axis=2)+Vmx_reshape*np.gradient(Umx_reshape,dy,axis=1)
-    dvdt = np.gradient(Vmx_reshape,dt,axis=0)+Umx_reshape*np.gradient(Vmx_reshape,dx,axis=2)+Vmx_reshape*np.gradient(Vmx_reshape,dy,axis=1)
-    
-    
-    # u_bar = np.nanmean(Umx,0)
-    # v_bar = np.nanmean(Vmx,0)
-
-    # u_reshape = u_bar.reshape((J,I))[1:114,1:125]
-    # v_reshape = v_bar.reshape((J,I))[1:114,1:125]
-    
-    if (one_dimensional):
-        Umx_lang = Umx_reshape.ravel()
-        Vmx_lang = Vmx_reshape.ravel()
-        dudt_lang = dudt.ravel()
-        dvdt_lang = dvdt.ravel()
-        
-        nonan = np.invert(np.isnan(Umx_lang))
-        return np.array([Umx_lang[nonan], Vmx_lang[nonan], dudt_lang[nonan], dvdt_lang[nonan]])
-    else:
-        return np.array([Umx_reshape, Vmx_reshape, dudt, dvdt])
-
-    
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
 def get_u(t, x_inn, tri, ckdtre, U, linear=True):
@@ -287,7 +153,7 @@ def rk_3 (f, t, y0, linear=True, method='RK45', atol = 1e-6, rtol=1e-3):
     return np.concatenate((resultat.t, resultat.y.T[0]))
 
 
-def sti_animasjon(partiklar, t_max=1, dataset = h5py.File(filnamn, 'r') ):
+def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r') ):
     
     # piv_range = ranges()
     
@@ -300,10 +166,14 @@ def sti_animasjon(partiklar, t_max=1, dataset = h5py.File(filnamn, 'r') ):
     #     y_reshape = y.reshape((127,126))[piv_range]
     
     (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
-    
-    sti = np.array([part.sti for part in partiklar])
 
-    steps = t_max * 20
+    t_min = t_span[0]
+    t_max = t_span[1]
+
+    steps = (t_max-t_min) * 20
+    
+    t_list = np.arange(t_min*20,t_max*20)/20
+    
     piv_range = ranges()
     
     Umx = np.array(dataset['Umx'])[0:steps,:]
@@ -320,31 +190,43 @@ def sti_animasjon(partiklar, t_max=1, dataset = h5py.File(filnamn, 'r') ):
     # V_mag_reshape = np.hypot(U[2], U[3])
        
     myDPI = 300
-    fig, ax = plt.subplots(figsize=(1000/myDPI,800/myDPI),dpi=myDPI)
+    fig, ax = plt.subplots(figsize=(1190/myDPI,1080/myDPI),dpi=myDPI)
     
     field = ax.imshow(V_mag_reshape[0,:,:], extent=[x_reshape[0,0],x_reshape[0,-1], y_reshape[-1,0], y_reshape[0,0]], interpolation='none')
     # particle, =ax.plot(sti[:,0,1], sti[:,0,2], color='black', marker='o', linestyle=' ', markersize=1)
     
     # https://stackoverflow.com/questions/9215658/plot-a-circle-with-pyplot
     # particle = 
-    circle1 = plt.Circle((0, 0), 0.2, color='r')
-    ax.add_patch(circle1)
     
+    # sti = np.array([part.sti for part in partiklar])    
+
+    
+    for part in partiklar:
+        circle = plt.Circle((part.sti[0,1], part.sti[0,2]), part.radius, color='r')
+        ax.add_patch(circle)
+        part.circle = circle
+        part.annotation  = ax.annotate("Partikkel", xy=(np.interp(0,pa.sti[:,0],pa.sti[:,1]), np.interp(0,pa.sti[:,0],pa.sti[:,2])), xycoords="data",
+                        xytext=(-50, 20), fontsize=10, #textcoords="offset points",
+                        arrowprops=dict(arrowstyle="->", connectionstyle="arc3, rad=.5"))
     ax.set_xlim([x_reshape[0,0],x_reshape[0,-1]])
     draw_rect(ax)
     
     def nypkt(i):
         field.set_data(V_mag_reshape[i,:,:])
         # particle.set_data(sti[:,i,1], sti[:,i,2])
-        
+        t = t_list[i]
         # https://stackoverflow.com/questions/16527930/matplotlib-update-position-of-patches-or-set-xy-for-circles
-        circle1.center = new_!x, new_y
+        for part in partiklar:
+            part.circle.center = np.interp(t,pa.sti[:,0],pa.sti[:,1]), np.interp(t,pa.sti[:,0],pa.sti[:,2])
+            # part.circle.center = part.sti[i,1], part.sti[i,2]
+            part.annotation.xy = (np.interp(t,pa.sti[:,0],pa.sti[:,1]), np.interp(t,pa.sti[:,0],pa.sti[:,2]))
         
-        return field,particle
+        return 1 #field,particle
     
     print("Skal byrja på filmen")
     #ax.axis('equal')
-    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,steps),interval=50)
+    # ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,steps),interval=50)
+    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps),interval=50)
     plt.show()
     print("ferdig med animasjon, skal lagra")
     
@@ -697,15 +579,18 @@ class Rib:
 # #%% Førebu
 
 # %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
-U  = get_velocity_data(20)
+try: U
+except NameError: U = None
 
-dudt_mean = np.nanmean(get_velocity_data(20, one_dimensional=False)[2:],1)
+if U is None:
+    U  = get_velocity_data(20)
+    dudt_mean = np.nanmean(get_velocity_data(20, one_dimensional=False)[2:],1)
+    tri = hent_tre()
+    ckdtre = lag_tre(t_max=20)
 
-tri = hent_tre()
-ckdtre = lag_tre(t_max=20)
 
-ribs = [Rib((-62.4,-9.56),50,8), 
-        Rib((37.6,-8.5), 50, 8), 
+ribs = [Rib((-61.07,-8.816),50.2,7.8), 
+        Rib((39.03,-7.53), 50, 7.8), 
         Rib((-100,-74.3), 200, -10)]
 
 # #%% Test løysing av difflikning
@@ -721,9 +606,10 @@ ribs = [Rib((-62.4,-9.56),50,8),
 #%%
 t_max = 15
 tol = (1e-4,1e-2)
-pa = Particle(0.5)
+pa = Particle(0.05)
 pa.sti = pa.lag_sti([-80,85,0,0], (0,t_max), wraparound=True, atol=tol[0], rtol=tol[1])
-sti_animasjon([pa],t_max)
+
+sti_animasjon([pa],t_span=(0,t_max))
 
 #%%
 get_u.counter = 0
