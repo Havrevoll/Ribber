@@ -55,10 +55,10 @@ def get_txy(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), fortetting=0):
     t_min = t_span[0]
     t_max = t_span[1]
 
-    steps = t_max * 20
+    
     piv_range = ranges()
     
-    Umx = np.array(dataset['Umx'])[0:steps,:]
+    Umx = np.array(dataset['Umx'])[t_min*20:t_max*20,:]
     Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
     
     x = np.array(dataset['x']).reshape(J,I)[piv_range]
