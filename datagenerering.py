@@ -58,7 +58,7 @@ def get_txy(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), fortetting=0):
     
     piv_range = ranges()
     
-    Umx = np.array(dataset['Umx'])[t_min*20:t_max*20,:]
+    Umx = np.array(dataset['Umx'])[int(t_min*20):int(t_max*20),:]
     Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
     
     x = np.array(dataset['x']).reshape(J,I)[piv_range]
@@ -129,6 +129,12 @@ def lag_tre(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest=True):
     
     return tree
 
+def lag_oppdelt_tre(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), interval=0.1):
+    t_min = t_span[0]
+    t_max = t_span[1]
+    
+    
+
 def lagra_tre(tre, fil):
     with open(fil, 'wb') as f:
         pickle.dump(tre, f)
@@ -138,6 +144,16 @@ def hent_tre(fil=pickle_fil):
         tri = pickle.load(f)
  
     return tri
+
+class tre_objekt:
+    def __init__(self, picklenamn):
+        with open(picklenamn, 'rb') as f:
+            self.tre = pickle.load(f)
+    def find_simplex(self, x):
+        t = x[0]
+        i = int(t*10)
+        
+        return self.tre[i].find_simplex(x)
 
 def get_velocity_data(t_max=1, one_dimensional = True):
     steps = t_max * 20

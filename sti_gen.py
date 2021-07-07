@@ -12,7 +12,6 @@ from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/refere
 
 import h5py
 
-import random
 # from numba import jit
 
 from math import pi, hypot
@@ -25,9 +24,6 @@ from math import pi, hypot
 
 from hjelpefunksjonar import norm, draw_rect, ranges, finn_fil
 
-from datagenerering import lag_tre, lagra_tre, hent_tre, get_velocity_data, auk_datatettleik
-
-from datagenerering import get_txy
 
 filnamn = finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
 pickle_fil = finn_fil(["D:/Tonstad/Q40_20s.pickle", "C:/Users/havrevol/Q40_20s.pickle", "D:/Tonstad/Q40_2s.pickle"])
@@ -148,8 +144,8 @@ def rk_2(f, L, y0, h, tri, U):
         
     return t, y
 
-def rk_3 (f, t, y0, linear=True, method='RK45', atol = 1e-6, rtol=1e-3):
-    resultat = solve_ivp(f, t, y0, max_step=0.02,  t_eval = [t[1]], method=method,  atol=atol, rtol=rtol, args=(tri, ckdtre, U, linear))
+def rk_3 (f, t, y0, args, linear=True, method='RK45', atol = 1e-6, rtol=1e-3):
+    resultat = solve_ivp(f, t, y0, max_step=0.02,  t_eval = [t[1]], method=method,  atol=atol, rtol=rtol, args=args)
     
     return np.concatenate((resultat.t, resultat.y.T[0]))
 
@@ -206,7 +202,7 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r') ):
         circle = plt.Circle((part.sti[0,1], part.sti[0,2]), part.radius, color='r')
         ax.add_patch(circle)
         part.circle = circle
-        part.annotation  = ax.annotate("Partikkel", xy=(np.interp(0,pa.sti[:,0],pa.sti[:,1]), np.interp(0,pa.sti[:,0],pa.sti[:,2])), xycoords="data",
+        part.annotation  = ax.annotate("Partikkel", xy=(np.interp(0,part.sti[:,0],part.sti[:,1]), np.interp(0,part.sti[:,0],part.sti[:,2])), xycoords="data",
                         xytext=(-50, 20), fontsize=10, #textcoords="offset points",
                         arrowprops=dict(arrowstyle="->", connectionstyle="arc3, rad=.5"))
     ax.set_xlim([x_reshape[0,0],x_reshape[0,-1]])
@@ -218,9 +214,9 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r') ):
         t = t_list[i]
         # https://stackoverflow.com/questions/16527930/matplotlib-update-position-of-patches-or-set-xy-for-circles
         for part in partiklar:
-            part.circle.center = np.interp(t,pa.sti[:,0],pa.sti[:,1]), np.interp(t,pa.sti[:,0],pa.sti[:,2])
+            part.circle.center = np.interp(t,part.sti[:,0],part.sti[:,1]), np.interp(t,part.sti[:,0],part.sti[:,2])
             # part.circle.center = part.sti[i,1], part.sti[i,2]
-            part.annotation.xy = (np.interp(t,pa.sti[:,0],pa.sti[:,1]), np.interp(t,pa.sti[:,0],pa.sti[:,2]))
+            part.annotation.xy = (np.interp(t,part.sti[:,0],part.sti[:,1]), np.interp(t,part.sti[:,0],part.sti[:,2]))
         
         return 1 #field,particle
     
@@ -454,7 +450,7 @@ class Particle:
         
         return (is_collision, collisionInfo, rib)
     
-    def lag_sti(self, x0, t_span,fps=20, linear=False, wraparound = False, ode_method='RK45',  atol=1e-6, rtol=1e-3):
+    def lag_sti(self, x0, ribs, t_span, args, fps=20, linear=False, wraparound = False, ode_method='RK45',  atol=1e-6, rtol=1e-3):
     
         # stien må innehalda posisjon, fart og tid.
         sti = []
@@ -486,7 +482,7 @@ class Particle:
             #     print("fekk feil.", t, dt)
             #     break
             
-            step_new = rk_3(self.f, (t,t+dt), step_old[1:], linear, method=ode_method,  atol=atol, rtol=rtol)
+            step_new = rk_3(self.f, (t,t+dt), step_old[1:], args, linear, method=ode_method,  atol=atol, rtol=rtol)
 
             
             if (step_new[1] > 67 and wraparound):
@@ -577,106 +573,8 @@ class Rib:
 # p_x = p_x.T.reshape(-1)
 # p_y= p_y.T.reshape(-1)
             
-# #%% Førebu
-
-# %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
-try: U
-except NameError: U = None
-
-if U is None:
-    U  = get_velocity_data(20)
-    dudt_mean = np.nanmean(get_velocity_data(20, one_dimensional=False)[2:],1)
-    tri = hent_tre()
-    ckdtre = lag_tre(t_span=(0,20))
 
 
-ribs = [Rib((-61.07,-8.816),50.2,7.8), 
-        Rib((39.03,-7.53), 50, 7.8), 
-        Rib((-100,-74.3), 200, -10)]
-
-# #%% Test løysing av difflikning
-# svar_profft = solve_ivp(stein.f,(0.375,0.4), np.array([-88.5,87,0,0]), args=(tri, U))
-# svar_profft2 = rk_3(stein.f, (0.375,0.4), np.array([-88.5,87,0,0]))
-# svar = rk_2(stein.f, np.array([-88.5,87,0,0]), (0,0.4), 0.01, tri, U)
-
-# #%% Test kollisjon
-# stein2 = Particle([-80,50],3)
-# koll = stein2.checkCollision([-63,-1], ribs[0]) #R2
-# koll2 = stein2.checkCollision([-40,-1], ribs[0]) #R3 (midten av flata)
-
-#%%
-t_max = 15
-tol = (1e-4,1e-2)
-pa = Particle(0.05)
-pa.sti = pa.lag_sti([-80,85,0,0], (0,t_max), wraparound=True, atol=tol[0], rtol=tol[1])
-
-sti_animasjon([pa],t_span=(0,t_max))
-
-#%%
-get_u.counter = 0
-
-def test_part(t_max = 15):
-    # methods = ['RK45', 'RK23', 'DOP853', 'Radau', 'BDF', 'LSODA']
-    # sizes = [0.07,0.06,0.05,0.04,0.03,0.02]
-    # atol=1e-6, rtol=1e-3
-    tols = [(1e-6,1e-3), (1e-5,1e-3), (1e-5,1e-2), (1e-4,1e-2)]
-    steinar = []
-    import time
-    
-    for tol in tols:
-        start  = time.time()
-        pa = Particle(0.05)
-        try:
-            pa.sti = pa.lag_sti([-80,85,0,0], (0,t_max), wraparound=True, atol=tol[0], rtol=tol[1])
-        except Exception:
-            print("må gå vidare")
-    
-        end = time.time()            
-        print("toleransar: ", tol," iterasjonar: ", get_u.counter, "Det tok", end-start)
-        get_u.counter=0
-        steinar.append(pa)
-        
-    sti_animasjon(steinar,t_max)
-test_part()
-
-
-#%%
-stein = Particle(1)
-stein2 = Particle(0.1) 
-stein3 = Particle(0.05)
-stein4 = Particle(0.02)
-
-stein5 = Particle(0.2)
-
-t_max = 15
-tol = (1e-4,1e-2)
-
-args = {'t_span':(0,t_max), 'wraparound':True, 'atol':tol[0], 'rtol':tol[1]}
-
-stein.sti = stein.lag_sti([-88,90,0,0], **args )
-print(get_u.counter)
-get_u.counter=0
-stein3.sti = stein3.lag_sti([-88,80,0,0],**args)
-print(get_u.counter)
-get_u.counter=0
-stein2.sti = stein2.lag_sti([-88,70,0,0],**args)
-print(get_u.counter)
-get_u.counter=0
-stein4.sti = stein4.lag_sti([-88,60,0,0],**args)
-print(get_u.counter)
-get_u.counter=0
-stein5.sti = stein5.lag_sti([-90, random.uniform(-60,88),0,0], **args)
-print(get_u.counter)
-get_u.counter=0
-
-sti_animasjon([stein, stein2, stein3,stein4,stein5],t_max=t_max)
-
-
-
-#%% Lag filmen
-
-
-#%% For eigne studiar
 
 # Her er ein funksjon for fritt fall av ein 1 mm partikkel i vatn.
 # d u_p/dt = u_p(t,y) der y er vertikal fart. Altså berre modellert drag og gravitasjon.
