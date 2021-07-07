@@ -7,20 +7,28 @@ Created on Wed Jul  7 09:22:39 2021
 
 import numpy as np
 from sti_gen import get_u, Rib, Particle, sti_animasjon
-from datagenerering import get_velocity_data, hent_tre, lag_tre
+from datagenerering import get_velocity_data, hent_tre, lag_tre, tre_objekt, get_vel_snippets
+from multitull import lag_tre_multi
+from hjelpefunksjonar import finn_fil
 import random
 
 # #%% Førebu
+
+tre_fil = finn_fil(["D:/Tonstad/trees_0-5.pickle", "C:/Users/havrevol/trees_0-5.pickle"])
 
 # %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
 try: U
 except NameError: U = None
 
+t_span = (0,5)
+
 if U is None:
-    # U  = get_velocity_data(20)
-    # dudt_mean = np.nanmean(get_velocity_data(20, one_dimensional=False)[2:],1)
+    # U  = get_velocity_data(t_span)
+    # U = get_vel_snippets(t_span)
+    dudt_mean = np.nanmean(get_velocity_data(t_span, one_dimensional=False)[2:],1)
+    tri = tre_objekt(tre_fil, t_span)
     # tri = hent_tre()
-    # ckdtre = lag_tre(t_span=(0,20))
+    ckdtre = lag_tre(t_span=t_span, nearest=True)
     linear = True
 
 
@@ -29,26 +37,22 @@ ribs = [Rib((-61.07,-8.816),50.2,7.8),
         Rib((-100,-74.3), 200, -10)]
 
 
-trees = {}
+# trees = {}
 
-import time
-
-     
+# import time
    
-for i in range(5*10):
-    start = time.time()   
-    trees[i] = lag_tre((i/10, (i+1.5)/10), nearest=False)
+# for i in range(5*10):
+#     start = time.time()   
+#     trees[i] = lag_tre((i/10, (i+1.5)/10), nearest=False)
 
-    end = time.time()
-    print("i = ", i)
-    print("Det tok så mange sekund å laga dette treet:", end - start)
+#     end = time.time()
+#     print("i = ", i)
+#     print("Det tok så mange sekund å laga dette treet:", end - start)
 
-del start,end
+# del start,end
 
 #%%
-from datagenerering import lagra_tre
 
-lagra_tre(trees, "C:/Users/havrevol/trees_0-5s.pickle")
 
 # #%% Test løysing av difflikning
 # svar_profft = solve_ivp(stein.f,(0.375,0.4), np.array([-88.5,87,0,0]), args=(tri, U))
