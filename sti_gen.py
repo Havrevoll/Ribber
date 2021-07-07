@@ -33,7 +33,7 @@ t_min_global = 0
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
-def get_u(t, x_inn, tri, ckdtre, U, linear=True):
+def get_u(t, x_inn, tri, ckdtre, linear=True):
     '''
     https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
 
@@ -55,6 +55,8 @@ def get_u(t, x_inn, tri, ckdtre, U, linear=True):
 
     '''    
     x = np.concatenate(([t], x_inn))
+    
+    U = tri.get_U(x)
     
     get_u.counter +=1
     
