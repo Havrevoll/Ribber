@@ -7,8 +7,7 @@ Created on Wed Jul  7 09:22:39 2021
 
 import numpy as np
 from sti_gen import get_u, Rib, Particle, sti_animasjon
-from datagenerering import get_velocity_data, hent_tre, lag_tre, tre_objekt
-from multitull import lag_tre_multi
+from datagenerering import get_velocity_data, hent_tre, lag_tre, tre_objekt, lag_tre_multi
 from hjelpefunksjonar import finn_fil
 import random
 
@@ -28,7 +27,7 @@ if U is None:
     dudt_mean = np.nanmean(get_velocity_data(t_span, one_dimensional=False)[2:],1)
     tri = tre_objekt(tre_fil, t_span)
     # tri = hent_tre()
-    ckdtre = lag_tre(t_span=t_span, nearest=True)
+    ckdtre, U = lag_tre(t_span=t_span, nearest=True)
     linear = True
 
 

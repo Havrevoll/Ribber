@@ -14,10 +14,34 @@ from hjelpefunksjonar import ranges, finn_fil, dobla
 import scipy.spatial.qhull as qhull
 from scipy.spatial import cKDTree
 
+import multiprocessing
+
 fps = 20
 
 filnamn = finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
 pickle_fil = finn_fil(["D:/Tonstad/Q40_20s.pickle", "C:/Users/havrevol/Q40_20s.pickle", "D:/Tonstad/Q40_2s.pickle"])
+
+def lag_tre_multi(t_span, filnamn=None):
+    
+    a_pool = multiprocessing.Pool()
+    
+    t_min = t_span[0]
+    t_max = t_span[1]
+    
+    i = [(i/10,(i+1.5)/10) for i in range(int(t_min)*10,int(t_max)*10)]
+    
+    result = a_pool.map(lag_tre, i)
+    
+    
+    i_0 =  range(int(t_min)*10,int(t_max)*10)
+    
+    trees = dict(zip(i_0, result))
+    
+    if filnamn is None:
+        return trees
+    else:
+        lagra_tre(trees, filnamn)
+    
 
 def auk_datatettleik(t_span=(0,1), dataset = h5py.File(filnamn, 'r'),tal=1):
     (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
@@ -134,9 +158,9 @@ def lag_tre(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest=False):
     # Umx_lang[tree.query(uvw)[1]]
     # dist, i = tree.query(uvw)
     
-    tree.U = U
+    # tree.U = U
     
-    return tree
+    return tree, U
 
 def lagra_tre(tre, fil):
     with open(fil, 'wb') as f:
