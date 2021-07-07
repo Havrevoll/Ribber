@@ -51,7 +51,7 @@ def interp_weights(xyz, uvw):
 def interpolate(values, vtx, wts):
     return np.einsum('nj,nj->n', np.take(values, vtx), wts)
     
-def get_txy(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), fortetting=0, legg_ved_U=False):
+def get_txy(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), fortetting=0):
     (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
     
     t_min = t_span[0]
@@ -60,8 +60,10 @@ def get_txy(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), fortetting=0, legg_
     
     piv_range = ranges()
     
-    Umx = np.array(dataset['Umx'])[int(t_min*fps):int(t_max*fps),:]
-    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
+    U = get_velocity_data(t_span=t_span, one_dimensional = False)
+    
+    
+    Umx_reshape = U[0]
     
     x = np.array(dataset['x']).reshape(J,I)[piv_range]
     y = np.array(dataset['y']).reshape(J,I)[piv_range]
@@ -90,21 +92,18 @@ def get_txy(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), fortetting=0, legg_
         
     txy = np.vstack((t_lang,x_lang,y_lang)).T
     
-    if not legg_ved_U:
-        return txy
-    else:
-        return txy, Umx_reshape.ravel()[nonan]
+    U = [i.ravel()[nonan] for i in U]
+    
+    return txy, U
 
-def lag_tre_med_U(t_span):
-    return lag_tre(t_span, legg_ved_U=True)
 
-def lag_tre(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest=False, legg_ved_U=False):
+def lag_tre(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest=False):
     '''
     Ein metode som tek inn eit datasett og gjer alle reshapings-tinga for x og y, u og v og Re.
 
     '''
     
-    txy, U = get_txy(t_span, dataset = h5py.File(filnamn, 'r'), legg_ved_U=True)
+    txy, U = get_txy(t_span, dataset = h5py.File(filnamn, 'r'))
 
     # import time
     # start = time.time()        
@@ -134,16 +133,10 @@ def lag_tre(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest=False, legg
     # Her er interpoleringa for CKD-tre, nearest neighbor, altså.
     # Umx_lang[tree.query(uvw)[1]]
     # dist, i = tree.query(uvw)
-    if not legg_ved_U:
-        return tree
-    else:
-        return tree, U
-
-def lag_oppdelt_tre(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), interval=0.1):
-    t_min = t_span[0]
-    t_max = t_span[1]
     
+    tree.U = U
     
+    return tree
 
 def lagra_tre(tre, fil):
     with open(fil, 'wb') as f:
@@ -166,22 +159,27 @@ class tre_objekt:
         
         return self.tre[i].find_simplex(x)
     
+    def get_U(self,x):
+        t = x[0]
+        i = int(t*10)
+        return self.tre[i].U
     
     
-def get_vel_snippets(t_span):
-    t_min = t_span[0]
-    t_max = t_span[1]
     
-    velocities= {}
+# def get_vel_snippets(t_span):
+#     t_min = t_span[0]
+#     t_max = t_span[1]
     
-    for i in range(t_min*10,t_max*10):
-        i_span = (i/10,(i+1.5)/10)
+#     velocities= {}
+    
+#     for i in range(t_min*10,t_max*10):
+#         i_span = (i/10,(i+1.5)/10)
         
      
         
-        velocities[i] = get_velocity_data(i_span)
+#         velocities[i] = get_velocity_data(i_span)
         
-    return velocities
+#     return velocities
 
 def get_velocity_data(t_span=(0,1), one_dimensional = True):
     t_min = t_span[0]

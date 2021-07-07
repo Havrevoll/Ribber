@@ -7,7 +7,7 @@ Created on Wed Jul  7 09:22:39 2021
 
 import numpy as np
 from sti_gen import get_u, Rib, Particle, sti_animasjon
-from datagenerering import get_velocity_data, hent_tre, lag_tre, tre_objekt, get_vel_snippets
+from datagenerering import get_velocity_data, hent_tre, lag_tre, tre_objekt
 from multitull import lag_tre_multi
 from hjelpefunksjonar import finn_fil
 import random
