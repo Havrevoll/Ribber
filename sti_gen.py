@@ -33,7 +33,7 @@ t_min_global = 0
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
-def get_u(t, x_inn, tri, ckdtre, linear=True):
+def get_u(t, x_inn, tre_samla, linear=True):
     '''
     https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
 
@@ -56,7 +56,12 @@ def get_u(t, x_inn, tri, ckdtre, linear=True):
     '''    
     x = np.concatenate(([t], x_inn))
     
-    U = tri.get_U(x)
+    U_del = tre_samla.get_U(x)
+    
+    tri = tre_samla.get_tri(x)
+    
+    ckdtre = tre_samla.kdtre
+    U_kd = tre_samla.U_kd
     
     get_u.counter +=1
     
@@ -67,7 +72,7 @@ def get_u(t, x_inn, tri, ckdtre, linear=True):
         d=3
         simplex = tri.find_simplex(x)
         if (simplex==-1):
-            return U[0][ckdtre.query(x)[1]], U[1][ckdtre.query(x)[1]]
+            return U_kd[0][ckdtre.query(x)[1]], U_kd[1][ckdtre.query(x)[1]], U_kd[2][ckdtre.query(x)[1]], U_kd[3][ckdtre.query(x)[1]]
             # Her skal eg altså leggja inn å sjekka eit lite nearest-tre for næraste snittverdi.
             # raise Exception("Coordinates outside the complex hull")
             
@@ -77,12 +82,12 @@ def get_u(t, x_inn, tri, ckdtre, linear=True):
         bary = np.einsum('jk,k->j', temp[:d, :], delta)
         wts = np.hstack((bary, 1 - bary.sum(axis=0, keepdims=True)))
                     
-        return np.einsum('j,j->', np.take(U[0], vertices), wts), np.einsum('j,j->', np.take(U[1], vertices), wts),  np.einsum('j,j->', np.take(U[2], vertices), wts),  np.einsum('j,j->', np.take(U[3], vertices), wts)
+        return np.einsum('j,j->', np.take(U_del[0], vertices), wts), np.einsum('j,j->', np.take(U_del[1], vertices), wts),  np.einsum('j,j->', np.take(U_del[2], vertices), wts),  np.einsum('j,j->', np.take(U_del[3], vertices), wts)
     else:
         kd_index = ckdtre.query(x)[1]
         
         # try:
-        returen = (U[0][kd_index], U[1][kd_index], U[2][kd_index], U[3][kd_index])
+        returen = (U_kd[0][kd_index], U_kd[1][kd_index], U_kd[2][kd_index], U_kd[3][kd_index])
         # except IndexError:
         #     print("kva skjedde")
         
@@ -146,13 +151,13 @@ def rk_2(f, L, y0, h, tri, U):
         
     return t, y
 
-def rk_3 (f, t, y0, args, linear=True, method='RK45', atol = 1e-6, rtol=1e-3):
+def rk_3 (f, t, y0, args, method='RK45', atol = 1e-6, rtol=1e-3):
     resultat = solve_ivp(f, t, y0, max_step=0.02,  t_eval = [t[1]], method=method,  atol=atol, rtol=rtol, args=args)
     
     return np.concatenate((resultat.t, resultat.y.T[0]))
 
 
-def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r') ):
+def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), fps=20 ):
     
     # piv_range = ranges()
     
@@ -169,9 +174,9 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r') ):
     t_min = t_span[0]
     t_max = t_span[1]
 
-    steps = (t_max-t_min) * 20
+    steps = (t_max-t_min) * fps
     
-    t_list = np.arange(t_min*20,t_max*20)/20
+    t_list = np.arange(t_min*fps,t_max*fps)/fps
     
     piv_range = ranges()
     
@@ -225,7 +230,7 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r') ):
     print("Skal byrja på filmen")
     #ax.axis('equal')
     # ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,steps),interval=50)
-    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps),interval=50)
+    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps),interval=int(1000/fps))
     plt.show()
     print("ferdig med animasjon, skal lagra")
     
@@ -240,20 +245,24 @@ class Particle:
     def __init__(self, diameter, density=2.65e-6 ):
         self.diameter= diameter
         self.density = density
-        
-        
+    
     def get_mass(self):
+        return self.volume * self.density
+    
+    mass = property(get_mass)
+        
+    def get_volume(self):
         # V = 4/3 πr³
         return self.diameter**3 * pi * 1/6
     
-    mass = property(get_mass)
+    volume = property(get_volume)
     
     def get_radius(self):
         return self.diameter/2
     
     radius = property(get_radius)
         
-    def f(self, t, x, tri, ckdtre, U, linear):
+    def f(self, t, x, tri, linear):
         """
         Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
         Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
@@ -285,7 +294,7 @@ class Particle:
         
         dx_dt = np.array([x[2], x[3]])
         # vel = np.array([100,0]) - dx_dt # relativ snøggleik
-        U_f = np.array(get_u(t,np.array([x[0],x[1]]),tri, ckdtre, U, linear))
+        U_f = np.array(get_u(t,np.array([x[0],x[1]]),tri, linear))
         if (np.isnan(U_f[2])):
             U_f[2] = 0
             # U_f[2] = dudt_mean[0][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
@@ -484,7 +493,7 @@ class Particle:
             #     print("fekk feil.", t, dt)
             #     break
             
-            step_new = rk_3(self.f, (t,t+dt), step_old[1:], args, linear, method=ode_method,  atol=atol, rtol=rtol)
+            step_new = rk_3(self.f, (t,t+dt), step_old[1:], args, method=ode_method,  atol=atol, rtol=rtol)
 
             
             if (step_new[1] > 67 and wraparound):

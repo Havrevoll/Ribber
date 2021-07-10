@@ -176,18 +176,25 @@ class tre_objekt:
     def __init__(self, picklenamn, t_span):
         with open(picklenamn, 'rb') as f:
             self.tre = pickle.load(f)
+            self.kdtre, self.U_kd = lag_tre(t_span=t_span, nearest=True)
             
-    def find_simplex(self, x):
-        t = x[0]
-        i = int(t*10)
+    # def find_simplex(self, x):
+    #     t = x[0]
+    #     i = int(t*10)
         
-        return self.tre[i].find_simplex(x)
+        # delaunay = self.tre[i][0]
+        
+        # return delaunay.find_simplex(x)
     
     def get_U(self,x):
         t = x[0]
         i = int(t*10)
-        return self.tre[i].U
+        return self.tre[i][1]
     
+    def get_tri(self,x):
+        t = x[0]
+        i = int(t*10)
+        return  self.tre[i][0]
     
     
 # def get_vel_snippets(t_span):

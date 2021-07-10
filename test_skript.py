@@ -13,22 +13,22 @@ import random
 
 # #%% Førebu
 
-tre_fil = finn_fil(["D:/Tonstad/trees_0-5.pickle", "C:/Users/havrevol/trees_0-5.pickle"])
+tre_fil = finn_fil(["D:/Tonstad/trees_0-5.pickle", "C:/Users/havrevol/tree_U_0-20.pickle"])
+
+t_span = (0,15)
 
 # %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
-try: U
-except NameError: U = None
 
-t_span = (0,5)
-
-if U is None:
+# try: U
+# except NameError: U = None
+# if U is None:
     # U  = get_velocity_data(t_span)
     # U = get_vel_snippets(t_span)
-    dudt_mean = np.nanmean(get_velocity_data(t_span, one_dimensional=False)[2:],1)
-    tri = tre_objekt(tre_fil, t_span)
+# dudt_mean = np.nanmean(get_velocity_data(t_span, one_dimensional=False)[2:],1)
+tri = tre_objekt(tre_fil, t_span)
     # tri = hent_tre()
-    ckdtre, U = lag_tre(t_span=t_span, nearest=True)
-    linear = True
+# ckdtre, U = lag_tre(t_span=t_span, nearest=True)
+linear = True
 
 
 ribs = [Rib((-61.07,-8.816),50.2,7.8), 
@@ -65,13 +65,13 @@ ribs = [Rib((-61.07,-8.816),50.2,7.8),
 
 
 
-# #%%
+#%%
 # t_max = 15
-# tol = (1e-4,1e-2)
-# pa = Particle(0.05)
-# pa.sti = pa.lag_sti([-80,85,0,0], (0,t_max), args=(tri, ckdtre, U, linear), wraparound=True, atol=tol[0], rtol=tol[1])
+tol = (1e-4,1e-2)
+pa = Particle(0.05)
+pa.sti = pa.lag_sti([-80,85,0,0], ribs, t_span, args=(tri, linear), wraparound=True, atol=tol[0], rtol=tol[1])
 
-# sti_animasjon([pa],t_span=(0,t_max))
+sti_animasjon([pa],t_span=t_span)
 
 # #%%
 # get_u.counter = 0
