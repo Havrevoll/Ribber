@@ -13,7 +13,7 @@ import random
 
 # #%% Førebu
 
-tre_fil = finn_fil(["D:/Tonstad/trees_0-5.pickle", "C:/Users/havrevol/tree_U_0-20.pickle"])
+tre_fil = finn_fil(["D:/Tonstad/tree_U_0-20.pickle", "C:/Users/havrevol/tree_U_0-20.pickle"])
 
 t_span = (0,15)
 
