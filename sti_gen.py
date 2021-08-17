@@ -10,11 +10,12 @@ import numpy as np
 # from scipy import interpolate
 from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#r179348322575-1
 
+
 import h5py
 
 # from numba import jit
 
-from math import pi, hypot
+from math import pi, hypot, atan2
 
 
 # fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
@@ -242,8 +243,9 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), fps=20 )
 
 class Particle:
     #Lag ein tabell med tidspunkt og posisjon for kvar einskild partikkel.
-    def __init__(self, diameter, density=2.65e-6 ):
+    def __init__(self, diameter, init_position, density=2.65e-6 ):
         self.diameter= diameter
+        self.init_position = init_position
         self.density = density
     
     def get_mass(self):
@@ -262,7 +264,7 @@ class Particle:
     
     radius = property(get_radius)
         
-    def f(self, t, x, tri, linear):
+    def f(self, t, x, tri, linear, lift=False):
         """
         Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
         Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
@@ -304,6 +306,8 @@ class Particle:
             
             
         vel = np.array(U_f[0:2]) - dx_dt # relativ snøggleik
+        # vel_ang = atan2(vel[1], vel[0])
+        
         
         Re = hypot(vel[0],vel[1]) * self.diameter / nu 
         
@@ -325,16 +329,24 @@ class Particle:
         gravity_component = (rho_self_density - 1) * g
         added_mass = 0.5 * rho_self_density * np.array(U_f[2:])
         
-        
-        lift_component = 1
-        
+        if (lift):
+            particle_top =    x[:2] + self.radius * norm(vel) @ np.array([[0, -1],[1, 0]])
+            particle_bottom = x[:2] + self.radius * norm(vel) @ np.array([[0, 1],[-1, 0]])
+            
+            vel_top = np.array(get_u(t, particle_top, tri, linear))
+            vel_bottom = np.array(get_u(t, particle_bottom, tri, linear))
+            
+            lift_component = 3/4* 0.5 / self.diameter * rho_self_density * np.abs(vel_top[:2]*vel_top[:2] - vel_bottom[:2]*vel_bottom[:2])
+        else: 
+            lift_component = 1
+
         divisor = 1 + 0.5 *rho_self_density 
         # divisoren trengst for akselerasjonen av partikkel kjem fram i added 
         # mass på høgre sida, så den må bli flytta over til venstre og delt på resten.
         
         # print("drag_component =",drag_component,", gravity_component = ",gravity_component)        
 
-        du_dt = (drag_component + gravity_component + added_mass ) / divisor
+        du_dt = (drag_component + gravity_component + added_mass + lift_component ) / divisor
         
         if (np.any(np.isnan(du_dt))):
             print("her er nan! og t, x og dudt er dette:", t,x, du_dt)
@@ -461,13 +473,13 @@ class Particle:
         
         return (is_collision, collisionInfo, rib)
     
-    def lag_sti(self, x0, ribs, t_span, args, fps=20, linear=False, wraparound = False, ode_method='RK45',  atol=1e-6, rtol=1e-3):
+    def lag_sti(self, ribs, t_span, args, fps=20, linear=False, wraparound = False, ode_method='RK45',  atol=1e-6, rtol=1e-3):
     
         # stien må innehalda posisjon, fart og tid.
         sti = []
         sti_komplett = []
         
-        step_old = np.concatenate(([t_span[0]], x0))
+        step_old = np.concatenate(([t_span[0]], self.init_position))
         # Step_old og step_new er ein array med [t, x, y, u, v]. 
         
         sti.append(step_old)

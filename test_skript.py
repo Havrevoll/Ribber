@@ -11,6 +11,8 @@ from datagenerering import get_velocity_data, hent_tre, lag_tre, tre_objekt, lag
 from hjelpefunksjonar import finn_fil
 import random
 
+import multiprocessing
+
 # #%% Førebu
 
 tre_fil = finn_fil(["D:/Tonstad/tree_U_0-20.pickle", "C:/Users/havrevol/tree_U_0-20.pickle"])
@@ -30,6 +32,7 @@ tri = tre_objekt(tre_fil, t_span)
 # ckdtre, U = lag_tre(t_span=t_span, nearest=True)
 linear = True
 
+lift = True
 
 ribs = [Rib((-61.07,-8.816),50.2,7.8), 
         Rib((39.03,-7.53), 50, 7.8), 
@@ -66,12 +69,26 @@ ribs = [Rib((-61.07,-8.816),50.2,7.8),
 
 
 #%%
-# t_max = 15
-tol = (1e-4,1e-2)
-pa = Particle(0.05)
-pa.sti = pa.lag_sti([-80,85,0,0], ribs, t_span, args=(tri, linear), wraparound=True, atol=tol[0], rtol=tol[1])
 
-sti_animasjon([pa],t_span=t_span)
+tol = (1e-4,1e-2)
+
+# def pool_helper(pa, t_span=t_span):
+#     pa.sti = pa.lag_sti(ribs, t_span, args=(tri, linear, lift), wraparound=False, atol=tol[0], rtol=tol[1])
+    
+    
+
+particle_list = [Particle(0.05, [-80,85,0,0]), Particle(0.1, [-80,80,0,0]), Particle(0.2, [-80,75,0,0]) ]
+
+for pa in particle_list:
+    pa.sti = pa.lag_sti(ribs, t_span, args=(tri, linear, lift), wraparound=True, atol=tol[0], rtol=tol[1])
+
+
+# particle_pool = multiprocessing.Pool()
+
+# particle_result = particle_pool.map(pool_helper, particle_list)
+
+
+sti_animasjon(particle_list,t_span=t_span)
 
 # #%%
 # get_u.counter = 0
