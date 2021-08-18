@@ -60,34 +60,40 @@ PSD_full = PSD_full.T
 PSD = PSD.T
 
 
-f = interpolate.interp1d(PSD[1], PSD[0])
+f = interpolate.interp1d(PSD_full[3], PSD_full[0])
 
-tal = int(5)
+tal = int(5e8)
+
 
 # np.random.seed()
 a = np.random.uniform(0.0, 1.0, size = tal)
 korndiameter = f(a)
-b = np.random.uniform(0.0, 88.0, size = tal)
-c = np.random.uniform(0.0, 3.0, size = tal)
-d = np.vstack((korndiameter,b,c)).T
 
+#%%
+masse = korndiameter**3 /6 * pi * 2650 * 1e-9 # masse i kg,tettleik i kg/mm³.
 
-# bins = 1.20**(np.arange(-4,18))
+bins = 2.0**(np.arange(-4,5))
+massebins = np.concatenate(([0], bins**3 /6 * pi * 2650 * 1e-9))
 # print( "bins: ", bins)
 
-# x = np.histogram(korndiameter,np.concatenate(([0],bins)))
-# x1 = np.cumsum(x[0])
+x_diameter = np.histogram(korndiameter, np.concatenate(([0], bins)))
+x_masse = np.histogram(masse, massebins)
+sum_masse = np.sum(masse)
+masse_per_gradering = np.array([np.sum(masse[(masse > massebins[i]) & (masse < massebins[i+1])]) for i in range(0,len(massebins)-1)])/sum_masse
 
-# x = np.linspace(-5, 2, 100)
-# y1 = x**3 + 5*x**2 + 10
-# y2 = 3*x**2 + 10*x
-# y3 = 6*x + 10
+x1 = np.cumsum(masse_per_gradering)
+
+#%%
+
 myDPI = 300
+
 fig, ax = plt.subplots(figsize=(1190/myDPI,800/myDPI),dpi=myDPI)
-# ax.semilogx(bins, x1, color="blue", label="kornfordeling")
+
+ax.semilogx(bins, x1, color="blue", label="kornfordeling")
+
 ax.semilogx(PSD_full[0], PSD_full[3], color="red", label="original")
-# ax.set_xticks(bins)
-# ax.set_xticklabels(bins)
+ax.set_xticks(bins)
+ax.set_xticklabels(bins)
 # ax.plot(x, y2, color="red", label="y'(x)")
 # ax.plot(x, y3, color="green", label="y”(x)")
 ax.set_xlabel("d [mm]")
