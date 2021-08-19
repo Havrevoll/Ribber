@@ -66,8 +66,8 @@ def get_u(t, x_inn, tre_samla, linear=True):
     
     get_u.counter +=1
     
-    if (get_u.counter > 2000000):
-        raise Exception("Alt for mange iterasjonar")
+    # if (get_u.counter > 2000000):
+    #     raise Exception("Alt for mange iterasjonar")
     
     if(linear):
         d=3
@@ -76,14 +76,19 @@ def get_u(t, x_inn, tre_samla, linear=True):
             return U_kd[0][ckdtre.query(x)[1]], U_kd[1][ckdtre.query(x)[1]], U_kd[2][ckdtre.query(x)[1]], U_kd[3][ckdtre.query(x)[1]]
             # Her skal eg altså leggja inn å sjekka eit lite nearest-tre for næraste snittverdi.
             # raise Exception("Coordinates outside the complex hull")
+        
+        while True:
             
-        vertices = np.take(tri.simplices, simplex, axis=0)
-        temp = np.take(tri.transform, simplex, axis=0)
-        delta = x - temp[d]
-        bary = np.einsum('jk,k->j', temp[:d, :], delta)
-        wts = np.hstack((bary, 1 - bary.sum(axis=0, keepdims=True)))
+            vertices = np.take(tri.simplices, simplex, axis=0)
+            temp = np.take(tri.transform, simplex, axis=0)
+            delta = x - temp[d]
+            bary = np.einsum('jk,k->j', temp[:d, :], delta)
+            wts = np.hstack((bary, 1 - bary.sum(axis=0, keepdims=True)))
+            
+            if (np.all(wts>0)):
                     
-        return np.einsum('j,j->', np.take(U_del[0], vertices), wts), np.einsum('j,j->', np.take(U_del[1], vertices), wts),  np.einsum('j,j->', np.take(U_del[2], vertices), wts),  np.einsum('j,j->', np.take(U_del[3], vertices), wts)
+        return np.einsum('jn,j->n', np.take(U_del, vertices, axis=0), wts)
+        # return np.einsum('j,j->', np.take(U_del[0], vertices), wts), np.einsum('j,j->', np.take(U_del[1], vertices), wts),  np.einsum('j,j->', np.take(U_del[2], vertices), wts),  np.einsum('j,j->', np.take(U_del[3], vertices), wts)
     else:
         kd_index = ckdtre.query(x)[1]
         

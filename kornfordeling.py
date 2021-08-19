@@ -62,7 +62,7 @@ PSD = PSD.T
 
 f = interpolate.interp1d(PSD_full[3], PSD_full[0])
 
-tal = int(5e8)
+tal = int(1e9)
 
 
 # np.random.seed()

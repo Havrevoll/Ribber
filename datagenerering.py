@@ -227,7 +227,7 @@ def get_velocity_data(t_span=(0,1), one_dimensional = True):
     Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
     Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
     
-    dx = 1.4692770000000053
+    dx = 1.4692770000000053 # eigentleg 91.83 * 16 * 1e-3 = 1.46928
     dy = 1.4692770000000053
     dt = 1/fps
     

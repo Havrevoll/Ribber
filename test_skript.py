@@ -53,9 +53,6 @@ ribs = [Rib((-61.07,-8.816),50.2,7.8),
 
 # del start,end
 
-#%%
-
-
 # #%% Test løysing av difflikning
 # svar_profft = solve_ivp(stein.f,(0.375,0.4), np.array([-88.5,87,0,0]), args=(tri, U))
 # svar_profft2 = rk_3(stein.f, (0.375,0.4), np.array([-88.5,87,0,0]))
@@ -67,9 +64,6 @@ ribs = [Rib((-61.07,-8.816),50.2,7.8),
 # koll2 = stein2.checkCollision([-40,-1], ribs[0]) #R3 (midten av flata)
 
 
-
-#%%
-
 tol = (1e-4,1e-2)
 
 # def pool_helper(pa, t_span=t_span):
@@ -78,6 +72,8 @@ tol = (1e-4,1e-2)
     
 
 particle_list = [Particle(0.05, [-80,85,0,0]), Particle(0.1, [-80,80,0,0]), Particle(0.2, [-80,75,0,0]) ]
+
+#%%
 
 for pa in particle_list:
     pa.sti = pa.lag_sti(ribs, t_span, args=(tri, linear, lift), wraparound=True, atol=tol[0], rtol=tol[1])
