@@ -34,7 +34,7 @@ t_min_global = 0
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
-def get_u(t, x_inn, tre_samla, linear=True):
+def get_u(t, x_inn, radius, tre_samla, linear=True):
     '''
     https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
 
@@ -55,10 +55,14 @@ def get_u(t, x_inn, tre_samla, linear=True):
         DESCRIPTION.
 
     '''    
-    x = np.concatenate(([t], x_inn))
+    x = np.concatenate(([t], x_inn[:2]))
+    U_p = x_inn[2:]
+        
+    dt, dx, dy = 0.01, 0.1, 0.1
+        
+    x = np.vstack((x,x + np.array([dt,0,0]), x + np.array([0,dx,0]), x +np.array([0,0,dy])))
     
     U_del = tre_samla.get_U(x)
-    
     tri = tre_samla.get_tri(x)
     
     ckdtre = tre_samla.kdtre
@@ -71,23 +75,47 @@ def get_u(t, x_inn, tre_samla, linear=True):
     
     if(linear):
         d=3
-        simplex = tri.find_simplex(x)
+        # simplex = tri.find_simplex(x)
+        simplex = np.tile(tri.find_simplex(x[0]), 4)
+        
         if (simplex==-1):
             return U_kd[0][ckdtre.query(x)[1]], U_kd[1][ckdtre.query(x)[1]], U_kd[2][ckdtre.query(x)[1]], U_kd[3][ckdtre.query(x)[1]]
             # Her skal eg altså leggja inn å sjekka eit lite nearest-tre for næraste snittverdi.
             # raise Exception("Coordinates outside the complex hull")
+          
+        vertices = np.take(tri.simplices, simplex, axis=0)
+        temp = np.take(tri.transform, simplex, axis=0)
+                
+        delta = x - temp[:,d]
+        bary = np.einsum('njk,nk->nj', temp[:,:d, :], delta)
+        wts = np.hstack((bary, 1 - bary.sum(axis=1, keepdims=True)))
         
-        while True:
+        # U_f = np.einsum('nij,ni->nj', np.take(np.column_stack(U_del),vertices,axis=0),wts)
+        # U_f = np.einsum('ijn,ij->n', np.take(U_del, vertices, axis=0), wts)
+        U_f = np.einsum('jni,ni->jn', np.take(U_del,vertices,axis=1),wts)
+        
+        dUdt = (U_f[:,1] - U_f[:,0]) / dt # Fyrste verdien er dU/dt og andre er dV/dt
+        dUdx = (U_f[:,2] - U_f[:,0]) / dx # Fyrste verdien er dU/dx og andre er dV/dy
+        dUdy = (U_f[:,3] - U_f[:,0]) / dt # Fyrste verdien er dU/dy og andre er dV/dy
+
+        # skal finna gradienten i t, u og v-retning for å bruka på added mass.
+        # DU/Dt = dU/dt + u * dU/dx + v*dU/dy
+        
+        dudt_total = dUdt + U_f[:,0] * dUdx + U_f[:,0] * dUdy
             
-            vertices = np.take(tri.simplices, simplex, axis=0)
-            temp = np.take(tri.transform, simplex, axis=0)
-            delta = x - temp[d]
-            bary = np.einsum('jk,k->j', temp[:d, :], delta)
-            wts = np.hstack((bary, 1 - bary.sum(axis=0, keepdims=True)))
+        # skal finna farten i passande punkt over og under partikkelen for lyftekraft
+        U_rel = U_f[:, 0] - U_p
+        
+        particle_top =    x[:2] + radius * norm(U_rel) @ np.array([[0, -1],[1, 0]])
+        particle_bottom = x[:2] + radius * norm(U_rel) @ np.array([[0, 1],[-1, 0]])
+        
+        part = np.array([t, ])
+        
+        vel_top = np.array(get_u(t, particle_top, tri, linear))
+        vel_bottom = np.array(get_u(t, particle_bottom, tri, linear))
             
-            if (np.all(wts>0)):
                     
-        return np.einsum('jn,j->n', np.take(U_del, vertices, axis=0), wts)
+        return 
         # return np.einsum('j,j->', np.take(U_del[0], vertices), wts), np.einsum('j,j->', np.take(U_del[1], vertices), wts),  np.einsum('j,j->', np.take(U_del[2], vertices), wts),  np.einsum('j,j->', np.take(U_del[3], vertices), wts)
     else:
         kd_index = ckdtre.query(x)[1]
@@ -301,7 +329,10 @@ class Particle:
         
         dx_dt = np.array([x[2], x[3]])
         # vel = np.array([100,0]) - dx_dt # relativ snøggleik
-        U_f = np.array(get_u(t,np.array([x[0],x[1]]),tri, linear))
+        # U_f = np.array(get_u(t,np.array([x[0],x[1]]),tri, linear))
+        
+        U_f = np.array(get_u(t, x, self.radius, tri, linear))
+        
         if (np.isnan(U_f[2])):
             U_f[2] = 0
             # U_f[2] = dudt_mean[0][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
