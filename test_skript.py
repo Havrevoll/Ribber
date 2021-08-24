@@ -72,7 +72,7 @@ particle_list = [Particle(0.05, [-80,85,0,0]), Particle(0.1, [-80,80,0,0]), Part
 
 #%%
 
-f_args = {'tri': tri, 'linear':linear, 'lift':lift, 'addedmass':addedmass}
+f_args = (tri, linear, lift, addedmass)
 solver_args = {'atol': 1e-4, 'rtol':1e-2, 'method':'RK23', 'args':f_args}
 
 for pa in particle_list:

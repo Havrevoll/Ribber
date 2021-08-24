@@ -60,7 +60,7 @@ def get_u(t, x_inn, radius, tre_samla, linear=True, lift = True, addedmass = Tru
     tx = np.concatenate(([t], x_inn[:2]))
     U_p = x_inn[2:]
         
-    dt, dx, dy = 0.01, 0.1, 0.1    
+    dt, dx, dy = 0.01, 0.1, 0.1
     
     U_del = tre_samla.get_U(tx)
     tri = tre_samla.get_tri(tx)
@@ -80,7 +80,7 @@ def get_u(t, x_inn, radius, tre_samla, linear=True, lift = True, addedmass = Tru
         # simplex = tri.find_simplex(x)
         simplex = np.tile(tri.find_simplex(x[0]), 4)
         
-        if (simplex==-1):
+        if (np.any(simplex==-1)):
             get_u.utanfor += 1
             
             return U_kd[:,kdtre.query(x[0])[1]], nullfart, nullfart
