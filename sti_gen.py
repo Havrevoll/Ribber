@@ -32,9 +32,11 @@ pickle_fil = finn_fil(["D:/Tonstad/Q40_20s.pickle", "C:/Users/havrevol/Q40_20s.p
 t_max_global = 20
 t_min_global = 0
 
+nullfart = np.zeros(2)
+
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
-def get_u(t, x_inn, radius, tre_samla, linear=True):
+def get_u(t, x_inn, radius, tre_samla, linear=True, lift = True, addedmass = True):
     '''
     https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
 
@@ -55,17 +57,17 @@ def get_u(t, x_inn, radius, tre_samla, linear=True):
         DESCRIPTION.
 
     '''    
-    x = np.concatenate(([t], x_inn[:2]))
+    tx = np.concatenate(([t], x_inn[:2]))
     U_p = x_inn[2:]
         
-    dt, dx, dy = 0.01, 0.1, 0.1
+    dt, dx, dy = 0.01, 0.1, 0.1    
+    
+    U_del = tre_samla.get_U(tx)
+    tri = tre_samla.get_tri(tx)
+    
+    x = np.vstack((tx,tx + np.array([dt,0,0]), tx + np.array([0,dx,0]), tx +np.array([0,0,dy])))
         
-    x = np.vstack((x,x + np.array([dt,0,0]), x + np.array([0,dx,0]), x +np.array([0,0,dy])))
-    
-    U_del = tre_samla.get_U(x)
-    tri = tre_samla.get_tri(x)
-    
-    ckdtre = tre_samla.kdtre
+    kdtre = tre_samla.kdtre
     U_kd = tre_samla.U_kd
     
     get_u.counter +=1
@@ -79,9 +81,10 @@ def get_u(t, x_inn, radius, tre_samla, linear=True):
         simplex = np.tile(tri.find_simplex(x[0]), 4)
         
         if (simplex==-1):
-            return U_kd[0][ckdtre.query(x)[1]], U_kd[1][ckdtre.query(x)[1]], U_kd[2][ckdtre.query(x)[1]], U_kd[3][ckdtre.query(x)[1]]
-            # Her skal eg altså leggja inn å sjekka eit lite nearest-tre for næraste snittverdi.
-            # raise Exception("Coordinates outside the complex hull")
+            get_u.utanfor += 1
+            
+            return U_kd[:,kdtre.query(x[0])[1]], nullfart, nullfart
+            # Gjer added mass og lyftekrafta lik null, sidan den 
           
         vertices = np.take(tri.simplices, simplex, axis=0)
         temp = np.take(tri.transform, simplex, axis=0)
@@ -94,43 +97,59 @@ def get_u(t, x_inn, radius, tre_samla, linear=True):
         # U_f = np.einsum('ijn,ij->n', np.take(U_del, vertices, axis=0), wts)
         U_f = np.einsum('jni,ni->jn', np.take(U_del,vertices,axis=1),wts)
         
-        dUdt = (U_f[:,1] - U_f[:,0]) / dt # Fyrste verdien er dU/dt og andre er dV/dt
-        dUdx = (U_f[:,2] - U_f[:,0]) / dx # Fyrste verdien er dU/dx og andre er dV/dy
-        dUdy = (U_f[:,3] - U_f[:,0]) / dt # Fyrste verdien er dU/dy og andre er dV/dy
+        if (addedmass):
+            dUdt = (U_f[:,1] - U_f[:,0]) / dt # Fyrste verdien er dU/dt og andre er dV/dt
+            dUdx = (U_f[:,2] - U_f[:,0]) / dx # Fyrste verdien er dU/dx og andre er dV/dy
+            dUdy = (U_f[:,3] - U_f[:,0]) / dt # Fyrste verdien er dU/dy og andre er dV/dy
+    
+            # skal finna gradienten i t, u og v-retning for å bruka på added mass.
+            # DU/Dt = dU/dt + u * dU/dx + v*dU/dy
+            
+            dudt_material = dUdt + U_f[0,0] * dUdx + U_f[1,0] * dUdy
+        else:
+            dudt_material = nullfart
 
-        # skal finna gradienten i t, u og v-retning for å bruka på added mass.
-        # DU/Dt = dU/dt + u * dU/dx + v*dU/dy
-        
-        dudt_total = dUdt + U_f[:,0] * dUdx + U_f[:,0] * dUdy
+        if (lift):
+            # skal finna farten i passande punkt over og under partikkelen for lyftekraft
+            U_rel = U_f[:, 0] - U_p
             
-        # skal finna farten i passande punkt over og under partikkelen for lyftekraft
-        U_rel = U_f[:, 0] - U_p
-        
-        particle_top =    x[:2] + radius * norm(U_rel) @ np.array([[0, -1],[1, 0]])
-        particle_bottom = x[:2] + radius * norm(U_rel) @ np.array([[0, 1],[-1, 0]])
-        
-        part = np.array([t, ])
-        
-        vel_top = np.array(get_u(t, particle_top, tri, linear))
-        vel_bottom = np.array(get_u(t, particle_bottom, tri, linear))
+            particle_top =    x_inn[0:2] + radius * norm(U_rel) @ np.array([[0, 1],[-1, 0]])
+            particle_bottom = x_inn[0:2] + radius * norm(U_rel) @ np.array([[0, -1],[1, 0]])
             
+            part = np.array([[t, particle_top[0], particle_top[1]], [t, particle_bottom[0], particle_bottom[1]] ])
+            
+            
+            part_simplex = simplex[:2]
+            part_vertices = vertices[:2]
+            part_temp = temp[:2]
+                
+            while (True):
+                part_delta = part - part_temp[:,d]
+                part_bary = np.einsum('njk,nk->nj', part_temp[:,:d, :], part_delta)
+                part_wts = np.hstack((part_bary, 1 - part_bary.sum(axis=1, keepdims=True)))
+            
+                if (np.any(part_wts < 0)):
+                    part_simplex = tri.find_simplex(part)
+                    part_vertices = np.take(tri.simplices, part_simplex, axis=0)
+                    part_temp = np.take(tri.transform, part_simplex, axis=0)
+                else:
+                    break
+            U_top_bottom = np.einsum('jni,ni->jn', np.take(U_del, part_vertices, axis=1), part_wts)
+        else:
+            U_top_bottom = nullfart
                     
-        return 
+        return (U_f, dudt_material, U_top_bottom)
         # return np.einsum('j,j->', np.take(U_del[0], vertices), wts), np.einsum('j,j->', np.take(U_del[1], vertices), wts),  np.einsum('j,j->', np.take(U_del[2], vertices), wts),  np.einsum('j,j->', np.take(U_del[3], vertices), wts)
     else:
-        kd_index = ckdtre.query(x)[1]
+        kd_index = kdtre.query(x)[1]
         
-        # try:
-        returen = (U_kd[0][kd_index], U_kd[1][kd_index], U_kd[2][kd_index], U_kd[3][kd_index])
-        # except IndexError:
-        #     print("kva skjedde")
-        
-        return returen
+        return U_kd[:,kd_index], nullfart, nullfart
         # return U[0][kd_index], U[1][kd_index], U[2][kd_index], U[3][kd_index]
   
 # cd = interpolate.interp1d(np.array([0.001,0.01,0.1,1,10,20,40,60,80,100,200,400,600,800,1000,2000,4000,6000,8000,10000,100000]), np.array([2.70E+04,2.40E+03,2.50E+02,2.70E+01,4.40E+00,2.80E+00,1.80E+00,1.45E+00,1.25E+00,1.12E+00,8.00E-01,6.20E-01,5.50E-01,5.00E-01,4.70E-01,4.20E-01,4.10E-01,4.15E-01,4.30E-01,4.38E-01,5.40E-01,]))
     
 get_u.counter = 0
+get_u.utanfor = 0
     
 def rk(t0, y0, L, f, h=0.02):
     ''' Heimelaga Runge-Kutta-metode '''
@@ -185,8 +204,10 @@ def rk_2(f, L, y0, h, tri, U):
         
     return t, y
 
-def rk_3 (f, t, y0, args, method='RK45', atol = 1e-6, rtol=1e-3):
-    resultat = solve_ivp(f, t, y0, max_step=0.02,  t_eval = [t[1]], method=method,  atol=atol, rtol=rtol, args=args)
+def rk_3 (f, t, y0, solver_args):
+    
+    resultat = solve_ivp(f, t, y0,   t_eval = [t[1]], **solver_args)
+    # har teke ut max_ste=0.02, for det vart aldri aktuelt, ser det ut til.  method=solver_args['method'], args=solver_args['args'],
     
     return np.concatenate((resultat.t, resultat.y.T[0]))
 
@@ -297,7 +318,7 @@ class Particle:
     
     radius = property(get_radius)
         
-    def f(self, t, x, tri, linear, lift=False):
+    def f(self, t, x, tri, linear=True, lift=False, addedmass=True):
         """
         Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
         Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
@@ -331,17 +352,17 @@ class Particle:
         # vel = np.array([100,0]) - dx_dt # relativ snøggleik
         # U_f = np.array(get_u(t,np.array([x[0],x[1]]),tri, linear))
         
-        U_f = np.array(get_u(t, x, self.radius, tri, linear))
+        U_f, dudt_material, U_top_bottom = get_u(t, x, self.radius, tri, linear=linear, lift=lift, addedmass=addedmass)
         
-        if (np.isnan(U_f[2])):
-            U_f[2] = 0
-            # U_f[2] = dudt_mean[0][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
-        if (np.isnan(U_f[3])):
-            U_f[3] = 0
-            # U_f[3] = dudt_mean[1][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
+        # if (np.isnan(U_f[2])):
+        #     U_f[2] = 0
+        #     # U_f[2] = dudt_mean[0][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
+        # if (np.isnan(U_f[3])):
+        #     U_f[3] = 0
+        #     # U_f[3] = dudt_mean[1][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
             
             
-        vel = np.array(U_f[0:2]) - dx_dt # relativ snøggleik
+        vel = U_f - dx_dt # relativ snøggleik
         # vel_ang = atan2(vel[1], vel[0])
         
         
@@ -363,20 +384,12 @@ class Particle:
         
         drag_component =  3/4 * cd / self.diameter * rho_self_density * abs(vel)*vel
         gravity_component = (rho_self_density - 1) * g
-        added_mass = 0.5 * rho_self_density * np.array(U_f[2:])
-        
-        if (lift):
-            particle_top =    x[:2] + self.radius * norm(vel) @ np.array([[0, -1],[1, 0]])
-            particle_bottom = x[:2] + self.radius * norm(vel) @ np.array([[0, 1],[-1, 0]])
-            
-            vel_top = np.array(get_u(t, particle_top, tri, linear))
-            vel_bottom = np.array(get_u(t, particle_bottom, tri, linear))
-            
-            lift_component = 3/4* 0.5 / self.diameter * rho_self_density * np.abs(vel_top[:2]*vel_top[:2] - vel_bottom[:2]*vel_bottom[:2])
-        else: 
-            lift_component = 1
 
-        divisor = 1 + 0.5 *rho_self_density 
+        added_mass = 0.5 * rho_self_density * dudt_material
+        
+        lift_component = 3/4 * 0.5 / self.diameter * rho_self_density * np.abs(U_top_bottom[0]*U_top_bottom[0] - U_top_bottom[1]*U_top_bottom[1])
+        
+        divisor = 1 + 0.5 * rho_self_density 
         # divisoren trengst for akselerasjonen av partikkel kjem fram i added 
         # mass på høgre sida, så den må bli flytta over til venstre og delt på resten.
         
@@ -509,7 +522,7 @@ class Particle:
         
         return (is_collision, collisionInfo, rib)
     
-    def lag_sti(self, ribs, t_span, args, fps=20, linear=False, wraparound = False, ode_method='RK45',  atol=1e-6, rtol=1e-3):
+    def lag_sti(self, ribs, t_span, solver_args, fps=20, wraparound = False):
     
         # stien må innehalda posisjon, fart og tid.
         sti = []
@@ -541,7 +554,7 @@ class Particle:
             #     print("fekk feil.", t, dt)
             #     break
             
-            step_new = rk_3(self.f, (t,t+dt), step_old[1:], args, method=ode_method,  atol=atol, rtol=rtol)
+            step_new = rk_3(self.f, (t,t+dt), step_old[1:], solver_args)
 
             
             if (step_new[1] > 67 and wraparound):

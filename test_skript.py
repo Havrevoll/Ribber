@@ -7,7 +7,7 @@ Created on Wed Jul  7 09:22:39 2021
 
 import numpy as np
 from sti_gen import get_u, Rib, Particle, sti_animasjon
-from datagenerering import get_velocity_data, hent_tre, lag_tre, tre_objekt, lag_tre_multi
+from datagenerering import hent_tre, lag_tre, tre_objekt, lag_tre_multi
 from hjelpefunksjonar import finn_fil
 import random
 
@@ -17,7 +17,7 @@ import multiprocessing
 
 tre_fil = finn_fil(["D:/Tonstad/tree_U_0-20.pickle", "C:/Users/havrevol/tree_U_0-20.pickle"])
 
-t_span = (0,15)
+t_span = (2,4)
 
 # %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
 
@@ -31,8 +31,8 @@ tri = tre_objekt(tre_fil, t_span)
     # tri = hent_tre()
 # ckdtre, U = lag_tre(t_span=t_span, nearest=True)
 linear = True
-
 lift = True
+addedmass = True
 
 ribs = [Rib((-61.07,-8.816),50.2,7.8), 
         Rib((39.03,-7.53), 50, 7.8), 
@@ -63,9 +63,6 @@ ribs = [Rib((-61.07,-8.816),50.2,7.8),
 # koll = stein2.checkCollision([-63,-1], ribs[0]) #R2
 # koll2 = stein2.checkCollision([-40,-1], ribs[0]) #R3 (midten av flata)
 
-
-tol = (1e-4,1e-2)
-
 # def pool_helper(pa, t_span=t_span):
 #     pa.sti = pa.lag_sti(ribs, t_span, args=(tri, linear, lift), wraparound=False, atol=tol[0], rtol=tol[1])
     
@@ -75,8 +72,11 @@ particle_list = [Particle(0.05, [-80,85,0,0]), Particle(0.1, [-80,80,0,0]), Part
 
 #%%
 
+f_args = {'tri': tri, 'linear':linear, 'lift':lift, 'addedmass':addedmass}
+solver_args = {'atol': 1e-4, 'rtol':1e-2, 'method':'RK23', 'args':f_args}
+
 for pa in particle_list:
-    pa.sti = pa.lag_sti(ribs, t_span, args=(tri, linear, lift), wraparound=True, atol=tol[0], rtol=tol[1])
+    pa.sti = pa.lag_sti(ribs, t_span, solver_args, wraparound=True)
 
 
 # particle_pool = multiprocessing.Pool()
@@ -84,7 +84,7 @@ for pa in particle_list:
 # particle_result = particle_pool.map(pool_helper, particle_list)
 
 
-sti_animasjon(particle_list,t_span=t_span)
+# sti_animasjon(particle_list,t_span=t_span)
 
 # #%%
 # get_u.counter = 0
