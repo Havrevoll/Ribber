@@ -16,3 +16,4 @@ def e_alg(m, n):
             m = n
             n = r
             
+            
