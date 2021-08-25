@@ -26,8 +26,8 @@ from math import pi, hypot, atan2
 from hjelpefunksjonar import norm, draw_rect, ranges, finn_fil
 
 
-filnamn = finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
-pickle_fil = finn_fil(["D:/Tonstad/Q40_20s.pickle", "C:/Users/havrevol/Q40_20s.pickle", "D:/Tonstad/Q40_2s.pickle"])
+filnamn = "../Q40.hdf5" #finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
+# pickle_fil = finn_fil(["D:/Tonstad/Q40_20s.pickle", "C:/Users/havrevol/Q40_20s.pickle", "D:/Tonstad/Q40_2s.pickle"])
 
 t_max_global = 20
 t_min_global = 0
