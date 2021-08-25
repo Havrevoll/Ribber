@@ -15,7 +15,8 @@ import multiprocessing
 
 #%% Førebu
 
-tre_fil = finn_fil(["C:/Users/havrevol/Q40_60s.pickle", "D:/Tonstad/Q40_60s.pickle", "../Q40_60s.pickle"])
+tre_fil = "../Q40_60s.pickle"
+#tre_fil = finn_fil(["C:/Users/havrevol/Q40_60s.pickle", "D:/Tonstad/Q40_60s.pickle", "../Q40_60s.pickle"])
 
 t_span = (2,4)
 
