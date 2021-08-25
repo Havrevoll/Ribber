@@ -13,45 +13,19 @@ import random
 
 import multiprocessing
 
-# #%% Førebu
+#%% Førebu
 
-tre_fil = finn_fil(["D:/Tonstad/tree_U_0-20.pickle", "C:/Users/havrevol/tree_U_0-20.pickle"])
+tre_fil = finn_fil(["C:/Users/havrevol/Q40_60s.pickle", "D:/Tonstad/Q40_60s.pickle", "../Q40_60s.pickle"])
 
 t_span = (2,4)
 
 # %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
 
-# try: U
-# except NameError: U = None
-# if U is None:
-    # U  = get_velocity_data(t_span)
-    # U = get_vel_snippets(t_span)
-# dudt_mean = np.nanmean(get_velocity_data(t_span, one_dimensional=False)[2:],1)
-tri = tre_objekt(tre_fil, t_span)
-    # tri = hent_tre()
-# ckdtre, U = lag_tre(t_span=t_span, nearest=True)
-linear = True
-lift = True
-addedmass = True
 
 ribs = [Rib((-61.07,-8.816),50.2,7.8), 
         Rib((39.03,-7.53), 50, 7.8), 
         Rib((-100,-74.3), 200, -10)]
 
-
-# trees = {}
-
-# import time
-   
-# for i in range(5*10):
-#     start = time.time()   
-#     trees[i] = lag_tre((i/10, (i+1.5)/10), nearest=False)
-
-#     end = time.time()
-#     print("i = ", i)
-#     print("Det tok så mange sekund å laga dette treet:", end - start)
-
-# del start,end
 
 # #%% Test løysing av difflikning
 # svar_profft = solve_ivp(stein.f,(0.375,0.4), np.array([-88.5,87,0,0]), args=(tri, U))
@@ -72,8 +46,17 @@ particle_list = [Particle(0.05, [-80,85,0,0]), Particle(0.1, [-80,80,0,0]), Part
 
 #%%
 
+try: tri
+except NameError: tri = None
+if tri is None:
+    tri = tre_objekt(tre_fil, t_span)
+    
+linear = True
+lift = True
+addedmass = True
+
 f_args = (tri, linear, lift, addedmass)
-solver_args = {'atol': 1e-4, 'rtol':1e-2, 'method':'RK23', 'args':f_args}
+solver_args = {'atol': 1e-4, 'rtol':1e-2, 'method':'RK45', 'args':f_args}
 
 for pa in particle_list:
     pa.sti = pa.lag_sti(ribs, t_span, solver_args, wraparound=True)

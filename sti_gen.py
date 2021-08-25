@@ -83,7 +83,7 @@ def get_u(t, x_inn, radius, tre_samla, linear=True, lift = True, addedmass = Tru
         if (np.any(simplex==-1)):
             get_u.utanfor += 1
             
-            return U_kd[:,kdtre.query(x[0])[1]], nullfart, nullfart
+            return U_kd[:,kdtre.query(x[0])[1]], nullfart, np.vstack((nullfart,nullfart))
             # Gjer added mass og lyftekrafta lik null, sidan den 
           
         vertices = np.take(tri.simplices, simplex, axis=0)
@@ -136,9 +136,9 @@ def get_u(t, x_inn, radius, tre_samla, linear=True, lift = True, addedmass = Tru
                     break
             U_top_bottom = np.einsum('jni,ni->jn', np.take(U_del, part_vertices, axis=1), part_wts)
         else:
-            U_top_bottom = nullfart
+            U_top_bottom = np.vstack((nullfart,nullfart))
                     
-        return (U_f, dudt_material, U_top_bottom)
+        return (U_f[:,0], dudt_material, U_top_bottom)
         # return np.einsum('j,j->', np.take(U_del[0], vertices), wts), np.einsum('j,j->', np.take(U_del[1], vertices), wts),  np.einsum('j,j->', np.take(U_del[2], vertices), wts),  np.einsum('j,j->', np.take(U_del[3], vertices), wts)
     else:
         kd_index = kdtre.query(x)[1]
@@ -209,7 +209,7 @@ def rk_3 (f, t, y0, solver_args):
     resultat = solve_ivp(f, t, y0,   t_eval = [t[1]], **solver_args)
     # har teke ut max_ste=0.02, for det vart aldri aktuelt, ser det ut til.  method=solver_args['method'], args=solver_args['args'],
     
-    return np.concatenate((resultat.t, resultat.y.T[0]))
+    return np.concatenate((resultat.t, resultat.y[:,0]))
 
 
 def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), fps=20 ):
@@ -348,7 +348,7 @@ class Particle:
         nu = 1 # 1 mm^2/s = 1e-6 m^2/s
         rho = 1e-6  # kg/mm^3 = 1000 kg/m^3 
         
-        dx_dt = np.array([x[2], x[3]])
+        dx_dt = x[2:]
         # vel = np.array([100,0]) - dx_dt # relativ snøggleik
         # U_f = np.array(get_u(t,np.array([x[0],x[1]]),tri, linear))
         
@@ -385,9 +385,9 @@ class Particle:
         drag_component =  3/4 * cd / self.diameter * rho_self_density * abs(vel)*vel
         gravity_component = (rho_self_density - 1) * g
 
-        added_mass = 0.5 * rho_self_density * dudt_material
+        added_mass_component = 0.5 * rho_self_density * dudt_material
         
-        lift_component = 3/4 * 0.5 / self.diameter * rho_self_density * np.abs(U_top_bottom[0]*U_top_bottom[0] - U_top_bottom[1]*U_top_bottom[1])
+        lift_component = 3/4 * 0.5 / self.diameter * rho_self_density * (U_top_bottom[:,0]*U_top_bottom[:,0] - U_top_bottom[:,1]*U_top_bottom[:,1])
         
         divisor = 1 + 0.5 * rho_self_density 
         # divisoren trengst for akselerasjonen av partikkel kjem fram i added 
@@ -395,10 +395,10 @@ class Particle:
         
         # print("drag_component =",drag_component,", gravity_component = ",gravity_component)        
 
-        du_dt = (drag_component + gravity_component + added_mass + lift_component ) / divisor
+        du_dt = (drag_component + gravity_component + added_mass_component + lift_component ) / divisor
         
-        if (np.any(np.isnan(du_dt))):
-            print("her er nan! og t, x og dudt er dette:", t,x, du_dt)
+        # if (np.any(np.isnan(du_dt))):
+        #     print("her er nan! og t, x og dudt er dette:", t,x, du_dt)
         
         return np.concatenate((dx_dt,du_dt))
     
