@@ -27,7 +27,6 @@ from hjelpefunksjonar import norm, draw_rect, ranges, finn_fil
 
 
 filnamn = "../Q40.hdf5" #finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
-# pickle_fil = finn_fil(["D:/Tonstad/Q40_20s.pickle", "C:/Users/havrevol/Q40_20s.pickle", "D:/Tonstad/Q40_2s.pickle"])
 
 t_max_global = 20
 t_min_global = 0
@@ -128,7 +127,7 @@ def get_u(t, x_inn, radius, tre_samla, linear=True, lift = True, addedmass = Tru
                 part_bary = np.einsum('njk,nk->nj', part_temp[:,:d, :], part_delta)
                 part_wts = np.hstack((part_bary, 1 - part_bary.sum(axis=1, keepdims=True)))
             
-                if (np.any(part_wts < 0)):
+                if (np.any(part_wts < -0.02)):
                     part_simplex = tri.find_simplex(part)
                     part_vertices = np.take(tri.simplices, part_simplex, axis=0)
                     part_temp = np.take(tri.transform, part_simplex, axis=0)

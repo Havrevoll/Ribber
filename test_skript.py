@@ -53,7 +53,7 @@ if tri is None:
     tri = tre_objekt(tre_fil, t_span)
     
 linear = True
-lift = False
+lift = True
 addedmass = False
 
 f_args = (tri, linear, lift, addedmass)
@@ -63,6 +63,7 @@ for pa in particle_list:
     pa.sti = pa.lag_sti(ribs, t_span, solver_args, wraparound=True)
     print("Ferdig med ", pa.init_position)
     print("Den som har diameter ", pa.diameter)
+    break
 
 
 # particle_pool = multiprocessing.Pool()
