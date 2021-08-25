@@ -53,14 +53,16 @@ if tri is None:
     tri = tre_objekt(tre_fil, t_span)
     
 linear = True
-lift = True
-addedmass = True
+lift = False
+addedmass = False
 
 f_args = (tri, linear, lift, addedmass)
 solver_args = {'atol': 1e-4, 'rtol':1e-2, 'method':'RK45', 'args':f_args}
 
 for pa in particle_list:
     pa.sti = pa.lag_sti(ribs, t_span, solver_args, wraparound=True)
+    print("Ferdig med ", pa.init_position)
+    print("Den som har diameter ", pa.diameter)
 
 
 # particle_pool = multiprocessing.Pool()
