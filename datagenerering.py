@@ -20,7 +20,7 @@ fps = 20
 
 filnamn = "../Q40.hdf5" #finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
 pickle_fil = finn_fil(["../Q40_60s.pickle", "D:/Tonstad/Q40_20s.pickle", "C:/Users/havrevol/Q40_20s.pickle", "D:/Tonstad/Q40_2s.pickle"])
-print("pickle fil er ", pickle_fil) 
+# print("pickle fil er ", pickle_fil) 
 
 def lag_tre_multi(t_span, filnamn=None):
     
@@ -136,13 +136,7 @@ def lag_tre(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest=False):
     
 #     piv_range = ranges()
     
-
-
-    
 # def get_txy(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest = False):
-
-
-
 
 
 def lagra_tre(tre, fil):
