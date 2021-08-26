@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 '''køyr funksjonar som plottingar(fil['vassføringar'])'''
-
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 plt.rcParams["font.family"] = "STIXGeneral"
 plt.rcParams['mathtext.fontset'] = 'stix'
@@ -123,16 +124,19 @@ def get_u(t, x_inn, radius, tre_samla, linear=True, lift = True, addedmass = Tru
             part_temp = temp[:2]
                 
             while (True):
-                part_delta = part - part_temp[:,d]
-                part_bary = np.einsum('njk,nk->nj', part_temp[:,:d, :], part_delta)
+                part_delta = part - part_temp[:,d] #avstanden til referansepunktet i simpleksen.
+                part_bary = np.einsum('njk,nk->nj', part_temp[:,:d, :], part_delta) 
                 part_wts = np.hstack((part_bary, 1 - part_bary.sum(axis=1, keepdims=True)))
             
                 if (np.any(part_wts < -0.02)):
                     part_simplex = tri.find_simplex(part)
                     part_vertices = np.take(tri.simplices, part_simplex, axis=0)
                     part_temp = np.take(tri.transform, part_simplex, axis=0)
+                    get_u.simplex_prob += 1
                 else:
+                    get_u.simplex_prob = 0
                     break
+                    
             U_top_bottom = np.einsum('jni,ni->jn', np.take(U_del, part_vertices, axis=1), part_wts)
         else:
             U_top_bottom = np.vstack((nullfart,nullfart))
@@ -149,6 +153,7 @@ def get_u(t, x_inn, radius, tre_samla, linear=True, lift = True, addedmass = Tru
     
 get_u.counter = 0
 get_u.utanfor = 0
+get_u.simplex_prob = 0
     
 def rk(t0, y0, L, f, h=0.02):
     ''' Heimelaga Runge-Kutta-metode '''

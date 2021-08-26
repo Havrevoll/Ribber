@@ -47,14 +47,14 @@ particle_list = [Particle(0.05, [-80,85,0,0]), Particle(0.1, [-80,80,0,0]), Part
 
 #%%
 
-try: tri
-except NameError: tri = None
-if tri is None:
-    tri = tre_objekt(tre_fil, t_span)
+# try: tri
+# except NameError: tri = None
+# if tri is None:
+tri = tre_objekt(tre_fil, t_span)
     
 linear = True
 lift = True
-addedmass = False
+addedmass = True
 
 f_args = (tri, linear, lift, addedmass)
 solver_args = {'atol': 1e-4, 'rtol':1e-2, 'method':'RK45', 'args':f_args}
@@ -63,7 +63,7 @@ for pa in particle_list:
     pa.sti = pa.lag_sti(ribs, t_span, solver_args, wraparound=True)
     print("Ferdig med ", pa.init_position)
     print("Den som har diameter ", pa.diameter)
-    break
+    
 
 
 # particle_pool = multiprocessing.Pool()
@@ -71,7 +71,7 @@ for pa in particle_list:
 # particle_result = particle_pool.map(pool_helper, particle_list)
 
 
-# sti_animasjon(particle_list,t_span=t_span)
+sti_animasjon(particle_list,t_span=t_span)
 
 # #%%
 # get_u.counter = 0
