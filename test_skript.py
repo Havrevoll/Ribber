@@ -9,24 +9,22 @@ import numpy as np
 from sti_gen import get_u, Rib, Particle, sti_animasjon
 from datagenerering import hent_tre, lag_tre, tre_objekt, lag_tre_multi
 from hjelpefunksjonar import finn_fil
+import ray
+ray.init() 
 import random
-
-import multiprocessing
 
 #%% Førebu
 
 tre_fil = "../Q40_60s.pickle"
 #tre_fil = finn_fil(["C:/Users/havrevol/Q40_60s.pickle", "D:/Tonstad/Q40_60s.pickle", "../Q40_60s.pickle"])
 
-t_span = (2,4)
+t_span = (0,30)
 
 # %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
-
 
 ribs = [Rib((-61.07,-8.816),50.2,7.8), 
         Rib((39.03,-7.53), 50, 7.8), 
         Rib((-100,-74.3), 200, -10)]
-
 
 # #%% Test løysing av difflikning
 # svar_profft = solve_ivp(stein.f,(0.375,0.4), np.array([-88.5,87,0,0]), args=(tri, U))
@@ -37,11 +35,6 @@ ribs = [Rib((-61.07,-8.816),50.2,7.8),
 # stein2 = Particle([-80,50],3)
 # koll = stein2.checkCollision([-63,-1], ribs[0]) #R2
 # koll2 = stein2.checkCollision([-40,-1], ribs[0]) #R3 (midten av flata)
-
-# def pool_helper(pa, t_span=t_span):
-#     pa.sti = pa.lag_sti(ribs, t_span, args=(tri, linear, lift), wraparound=False, atol=tol[0], rtol=tol[1])
-    
-    
 
 particle_list = [Particle(0.05, [-80,85,0,0]), Particle(0.1, [-80,80,0,0]), Particle(0.2, [-80,75,0,0]) ]
 
