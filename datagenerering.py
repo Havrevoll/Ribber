@@ -65,6 +65,18 @@ def lag_tre(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest=False):
     Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
     Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
     
+    y[63,0:54]=-1.01
+    Umx_reshape[:,63:70,0:53]=0
+    Vmx_reshape[:,63:70,0:53]=0
+    Umx_reshape[:,63:69,53] =0
+    Vmx_reshape[:,63:69,53] =0
+    
+    Umx_reshape[:,62:68,87:]=0
+    Vmx_reshape[:,62:68,87:]=0
+    Umx_reshape[:,68:70,89:]=0
+    Vmx_reshape[:,68:70,89:]=0
+    
+    
     # if (nearest):
     #     dx = 1.4692770000000053 # eigentleg 91.83 * 16 * 1e-3 = 1.46928
     #     dy = 1.4692770000000053
@@ -154,7 +166,8 @@ class tre_objekt:
         with open(picklenamn, 'rb') as f:
             self.tre = pickle.load(f)
             self.kdtre, self.U_kd = lag_tre(t_span=t_span, nearest=True)
-            
+    
+    
     # def find_simplex(self, x):
     #     t = x[0]
     #     i = int(t*10)

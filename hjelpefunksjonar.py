@@ -33,6 +33,7 @@ def ranges():
     # y_range = np.s_[0:114]
     # x_range = np.s_[40:108]
     
+    # Her får me med heile biletet med data, og kuttar ut berre ytste kolonne og golvet:    
     y_range = np.s_[1:114]
     x_range = np.s_[1:125]    
     

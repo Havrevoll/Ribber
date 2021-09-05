@@ -3,6 +3,7 @@
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from cycler import cycler
 plt.rcParams["font.family"] = "STIXGeneral"
 plt.rcParams['mathtext.fontset'] = 'stix'
 from matplotlib import animation
@@ -82,7 +83,14 @@ def get_u(t, x_inn, radius, tre_samla, linear=True, lift = True, addedmass = Tru
         
         if (np.any(simplex==-1)):
             get_u.utanfor += 1
-            
+            while True:
+                try:
+                    U_kd[:,kdtre.query(x[0])[1]]
+                    break
+                except IndexError:
+                    x[np.abs(x)>1e100] /= 1e10
+                    
+                
             return U_kd[:,kdtre.query(x[0])[1]], nullfart, np.vstack((nullfart,nullfart))
             # Gjer added mass og lyftekrafta lik null, sidan den 
           
@@ -216,7 +224,7 @@ def rk_3 (f, t, y0, solver_args):
     return np.concatenate((resultat.t, resultat.y[:,0]))
 
 
-def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), fps=20 ):
+def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnamn="stiQ40.mp4",  fps=20 ):
     
     # piv_range = ranges()
     
@@ -239,9 +247,9 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), fps=20 )
     
     piv_range = ranges()
     
-    Umx = np.array(dataset['Umx'])[0:steps,:]
+    Umx = np.array(dataset['Umx'])[t_min*fps:t_max*fps,:]
     Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
-    Vmx = np.array(dataset['Vmx'])[0:steps,:]
+    Vmx = np.array(dataset['Vmx'])[t_min*fps:t_max*fps,:]
     Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
     
     x = np.array(dataset['x'])
@@ -262,15 +270,46 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), fps=20 )
     # particle = 
     
     # sti = np.array([part.sti for part in partiklar])    
+    
+    # prop_cycle = plt.rcParams['axes.prop_cycle']
+    # colors = prop_cycle.by_key()['color']
+    
+    # F8B195   F67280   C06C84   6C5B7B   355C7D 
+    # A7226E   EC2049   F26B38   F7DB4F   2F9599
+    # A8A7A7   CC527A   E8175D   474747   363636 
+    # E5FCC2   9DE0AD   45ADA8   547980   594F4F
+    # Palettar kan finnast her: https://digitalsynopsis.com/design/minimal-web-color-palettes-combination-hex-code/
+    # https://digitalsynopsis.com/design/how-to-make-color-palettes-from-one-color/
+
+    #Denne oppskrifta lagar eit nytt fargesett: 
+    # https://matplotlib.org/stable/gallery/lines_bars_and_markers/markevery_prop_cycle.html#sphx-glr-gallery-lines-bars-and-markers-markevery-prop-cycle-py
+    
+    
+    colors = ['#1f77b4',
+          '#ff7f0e',
+          '#2ca02c',
+          '#d62728',
+          '#9467bd',
+          '#8c564b',
+          '#e377c2',
+          '#7f7f7f',
+          '#bcbd22',
+          '#17becf',
+          '#1a55FF']
+    
+    colors = [ '#F8B195', '#F67280', '#C06C84', '#6C5B7B', '#355C7D', '#A7226E', '#EC2049', '#F26B38', '#F7DB4F', '#2F9599', '#A8A7A7', '#CC527A', '#E8175D', '#474747', '#363636', '#E5FCC2', '#9DE0AD', '#44AA57', '#547980', '#594F4F']
+    # matplotlib.rcParams['axes.prop_cycle'] = cycler(color=colors)
 
     
-    for part in partiklar:
-        circle = plt.Circle((part.sti[0,1], part.sti[0,2]), part.radius, color='r')
+    
+    for part,color in zip(partiklar, colors[:len(partiklar)]):
+        circle = plt.Circle((part.sti[0,1], part.sti[0,2]), part.radius, color=color)
         ax.add_patch(circle)
         part.circle = circle
         part.annotation  = ax.annotate("Partikkel", xy=(np.interp(0,part.sti[:,0],part.sti[:,1]), np.interp(0,part.sti[:,0],part.sti[:,2])), xycoords="data",
                         xytext=(-50, 20), fontsize=10, #textcoords="offset points",
-                        arrowprops=dict(arrowstyle="->", connectionstyle="arc3, rad=.5"))
+                        arrowprops=dict(arrowstyle="->", connectionstyle="arc3, rad=.5", facecolor=color))
+        
     ax.set_xlim([x_reshape[0,0],x_reshape[0,-1]])
     draw_rect(ax)
     
@@ -293,8 +332,7 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), fps=20 )
     plt.show()
     print("ferdig med animasjon, skal lagra")
     
-    filnamn = "stiQ40.mp4"
-    ani.save(filnamn)
+    ani.save(utfilnamn)
     plt.close()
 
 

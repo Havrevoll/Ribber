@@ -9,13 +9,14 @@ import numpy as np
 from sti_gen import get_u, Rib, Particle, sti_animasjon
 from datagenerering import hent_tre, lag_tre, tre_objekt, lag_tre_multi
 from hjelpefunksjonar import finn_fil
-import ray
-ray.init() 
+# import ray
+# ray.init() 
 import random
+import matplotlib.pyplot as plt
 
-#%% Førebu
+# #%% Førebu
 
-tre_fil = "../Q40_60s.pickle"
+tre_fil = "../tre_0_20_mednullribbe.pickle"
 #tre_fil = finn_fil(["C:/Users/havrevol/Q40_60s.pickle", "D:/Tonstad/Q40_60s.pickle", "../Q40_60s.pickle"])
 
 t_span = (0,30)
@@ -38,7 +39,7 @@ ribs = [Rib((-61.07,-8.816),50.2,7.8),
 
 particle_list = [Particle(0.05, [-80,85,0,0]), Particle(0.1, [-80,80,0,0]), Particle(0.2, [-80,75,0,0]) ]
 
-#%%
+# #%%
 
 # try: tri
 # except NameError: tri = None
@@ -50,13 +51,51 @@ lift = True
 addedmass = True
 
 f_args = (tri, linear, lift, addedmass)
-solver_args = {'atol': 1e-4, 'rtol':1e-2, 'method':'RK45', 'args':f_args}
+solver_args = {'atol': 1e-3, 'rtol':1e-1, 'method':'RK45', 'args':f_args}
 
-for pa in particle_list:
-    pa.sti = pa.lag_sti(ribs, t_span, solver_args, wraparound=True)
-    print("Ferdig med ", pa.init_position)
-    print("Den som har diameter ", pa.diameter)
-    
+fig, ax = plt.subplots()
+
+tols = [(1e-3,1e-1), (1e-2,1e-1), (1e-1,1e-1) ]
+
+pa = particle_list[0]
+
+methods = ['RK45', 'RK23', 'DOP853', 'Radau', 'BDF', 'LSODA']
+
+stiar = []
+
+import time
+
+#%%
+get_u(2,[-34,0,0,0], 0.5, tri, linear = True, lift=True, addedmass=True)
+
+
+#%%
+
+get_u(0,[-88.,0,0,0],0.5,tri)
+# pa.f(0, (0,0,0,0),tri, linear,lift,addedmass)
+
+#%% 
+
+for tol in tols:
+    for solver in methods:
+        solver_args['method'] = solver
+        solver_args['atol'] = tol[0]
+        solver_args['rtol'] = tol[1]
+        get_u.counter = 0
+        start = time.time()
+        pa.sti = pa.lag_sti(ribs, t_span, solver_args, wraparound=True)
+        end = time.time()
+        stiar.append(pa.sti)
+        print("Ferdig med ", pa.init_position)
+        print("Den som har diameter ", pa.diameter)
+        print("get_u.counter er ", get_u.counter)
+        print("tida brukt ", end-start)
+        print("solver er", solver)
+        print("atol er", solver_args['atol'])
+        print("rtol er", solver_args['rtol'])
+        ax.plot(pa.sti[:,1],pa.sti[:,2])
+        
+
 
 
 # particle_pool = multiprocessing.Pool()
@@ -64,7 +103,7 @@ for pa in particle_list:
 # particle_result = particle_pool.map(pool_helper, particle_list)
 
 
-sti_animasjon(particle_list,t_span=t_span)
+# sti_animasjon(particle_list,t_span=t_span)
 
 # #%%
 # get_u.counter = 0
@@ -73,7 +112,7 @@ sti_animasjon(particle_list,t_span=t_span)
 #     # methods = ['RK45', 'RK23', 'DOP853', 'Radau', 'BDF', 'LSODA']
 #     # sizes = [0.07,0.06,0.05,0.04,0.03,0.02]
 #     # atol=1e-6, rtol=1e-3
-#     tols = [(1e-6,1e-3), (1e-5,1e-3), (1e-5,1e-2), (1e-4,1e-2)]
+#     tols = [(1e-6,1e-3), (1e-5,1e-3), (1e-5,1e-2), (1e-4,1e-2), (1e-3,1e-1)]
 #     steinar = []
 #     import time
     

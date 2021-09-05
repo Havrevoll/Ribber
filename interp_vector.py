@@ -16,6 +16,8 @@ import h5py
 import re
 import scipy.stats as stats
 
+from hjelpefunksjonar import ranges
+
 # from IPython.display import clear_output
 
 
@@ -27,7 +29,7 @@ from math import ceil, floor, log, sqrt
 
 
 discharges = [20,40,60,80,100,120,140]
-
+data = "../Q40.hdf5"
 
 class MidpointNormalize(mpl.colors.Normalize):
     '''https://stackoverflow.com/questions/7404116/defining-the-midpoint-of-a-colormap-in-matplotlib 
@@ -124,13 +126,13 @@ def draw_rect(axes,color='red',new_setup=True):
 def draw_shade(axes, x0=0, x=430, color='red'):
     axes.add_patch(Rectangle((x0,-9.8),x,10.8,linewidth=2,edgecolor='none',facecolor='lightcoral'))
 
-def ranges():
-    y_range = np.s_[0:114]
-    x_range = np.s_[40:108]
+# def ranges():
+#     y_range = np.s_[0:114]
+#     x_range = np.s_[40:108]
     
-    piv_range = np.index_exp[y_range,x_range]
+#     piv_range = np.index_exp[y_range,x_range]
     
-    return piv_range
+#     return piv_range
 
 def hentdata(flow_case):
     
