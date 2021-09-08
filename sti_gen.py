@@ -12,7 +12,7 @@ import numpy as np
 # from scipy import interpolate
 from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#r179348322575-1
 
-
+from copy import deepcopy
 import h5py
 
 # from numba import jit
@@ -671,6 +671,8 @@ class Rib:
                         norm(self.vertices[2]-self.vertices[3]),
                         norm(self.vertices[3]-self.vertices[0]),
                         norm(self.vertices[0]-self.vertices[1])]
+                        # Må sjekka om punkta skal gå mot eller med klokka. 
+                        # Nett no går dei MED klokka, og vertices peikar med klokka. Normals då?
         
         
     # def __init__(self, origin, width, height):
@@ -697,18 +699,11 @@ class Rib:
     
     # normals = property(get_face_normal)
        
-# p_x,p_y = np.meshgrid([-90,-200],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
-    
-# p_x = p_x.T.reshape(-1)
-# p_y= p_y.T.reshape(-1)
-            
-# def cw_sort(punkt):
-    
 def sortClockwise(A):
     centerPoint = np.sum(A, axis=0)/len(A)
     
     for j in range(1,len(A)):
-        key = A[j]
+        key = deepcopy(A[j])
         i = j-1
         while i >= 0 and getIsLess(key , A[i], centerPoint):
             A[i+1] = A[i]
@@ -740,10 +735,8 @@ def getIsLess(a, b, center):
 
 
 #Typisk ribbe:
-pkt = np.array([[897,1011], [895,926  ], [353,1014 ], [351,929  ]])
-
-#%%
-pkt_ny = sortClockwise(pkt)   
+# pkt = np.array([[897,1011], [895,926  ], [353,1014 ], [351,929  ]])
+# pkt_ny = sortClockwise(pkt)   
 
 #%%
 # Her er ein funksjon for fritt fall av ein 1 mm partikkel i vatn.
