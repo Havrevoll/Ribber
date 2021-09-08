@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 tre_fil = "../tre_0_20_mednullribbe.pickle"
 #tre_fil = finn_fil(["C:/Users/havrevol/Q40_60s.pickle", "D:/Tonstad/Q40_60s.pickle", "../Q40_60s.pickle"])
 
-t_span = (0,30)
+t_span = (0,19)
 
 # %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
 
@@ -59,7 +59,13 @@ tols = [(1e-3,1e-1), (1e-2,1e-1), (1e-1,1e-1) ]
 
 pa = particle_list[0]
 
-methods = ['RK45', 'RK23', 'DOP853', 'Radau', 'BDF', 'LSODA']
+methods = ['RK45', 'RK23',  'Radau', 'BDF', 'LSODA'] # tok ut DOP853, for den tok for lang tid.
+
+kombinasjon = []
+
+for tol in tols:
+    for sol in methods:
+        kombinasjon.append((tol,sol))
 
 stiar = []
 
@@ -72,28 +78,28 @@ get_u(2,[-34,0,0,0], 0.5, tri, linear = True, lift=True, addedmass=True)
 #%%
 
 get_u(0,[-88.,0,0,0],0.5,tri)
-# pa.f(0, (0,0,0,0),tri, linear,lift,addedmass)
+
+pa.f(0,(-88,-0.6,0,0),tri,linear,lift,addedmass)
 
 #%% 
 
-for tol in tols:
-    for solver in methods:
-        solver_args['method'] = solver
-        solver_args['atol'] = tol[0]
-        solver_args['rtol'] = tol[1]
-        get_u.counter = 0
-        start = time.time()
-        pa.sti = pa.lag_sti(ribs, t_span, solver_args, wraparound=True)
-        end = time.time()
-        stiar.append(pa.sti)
-        print("Ferdig med ", pa.init_position)
-        print("Den som har diameter ", pa.diameter)
-        print("get_u.counter er ", get_u.counter)
-        print("tida brukt ", end-start)
-        print("solver er", solver)
-        print("atol er", solver_args['atol'])
-        print("rtol er", solver_args['rtol'])
-        ax.plot(pa.sti[:,1],pa.sti[:,2])
+for k in kombinasjon:
+    solver_args['method'] = k[1]
+    solver_args['atol'] = k[0][0]
+    solver_args['rtol'] = k[0][1]
+    get_u.counter = 0
+    start = time.time()
+    pa.sti = pa.lag_sti(ribs, t_span, solver_args, wraparound=True)
+    end = time.time()
+    stiar.append(pa.sti)
+    print("Ferdig med ", pa.init_position)
+    print("Den som har diameter ", pa.diameter)
+    print("get_u.counter er ", get_u.counter)
+    print("tida brukt ", end-start)
+    print("solver er", k[1])
+    print("atol er", solver_args['atol'])
+    print("rtol er", solver_args['rtol'])
+    ax.plot(pa.sti[:,1],pa.sti[:,2])
         
 
 

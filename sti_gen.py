@@ -18,7 +18,7 @@ import h5py
 # from numba import jit
 
 from math import pi, hypot, atan2
-
+from functools import cmp_to_key
 
 # fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
 # x = np.array(h5py.File(filnamn, 'r')['x']).reshape(127,126)[ranges()]
@@ -431,7 +431,7 @@ class Particle:
         
         lift_component = 3/4 * 0.5 / self.diameter * rho_self_density * (U_top_bottom[:,0]*U_top_bottom[:,0] - U_top_bottom[:,1]*U_top_bottom[:,1])
         
-        divisor = 1 + 0.5 * rho_self_density 
+        divisor = 1 + 0.5 * rho_self_density * addedmass
         # divisoren trengst for akselerasjonen av partikkel kjem fram i added 
         # mass på høgre sida, så den må bli flytta over til venstre og delt på resten.
         
@@ -656,40 +656,96 @@ class Particle:
             sti = sti[0:t_max*fps]
             
         return np.array(sti)
-    
+
+
 class Rib:
-    def __init__(self, origin, width, height):
-        # Bør kanskje ha informasjon om elastisiteten ved kollisjonar òg?
-        self.origin = np.array(origin)
-        self.width = width
-        self.height = height
+    def __init__(self, coords):
+        self.coords = sortClockwise(coords)
         
-    def get_vertices(self): # Går mot klokka
-        return [self.origin,
-                self.origin + np.array([self.width,0]),
-                self.origin + np.array([self.width, self.height]),
-                self.origin + np.array([0, self.height])]
+        self.vertices = [self.coords[0]-self.coords[-1], 
+                        self.coords[1]-self.coords[0], 
+                        self.coords[2]-self.coords[1], 
+                        self.coords[3]-self.coords[2] ]
+        
+        self.normals = [norm(self.vertices[1]-self.vertices[2]), 
+                        norm(self.vertices[2]-self.vertices[3]),
+                        norm(self.vertices[3]-self.vertices[0]),
+                        norm(self.vertices[0]-self.vertices[1])]
+        
+        
+    # def __init__(self, origin, width, height):
+    #     # Bør kanskje ha informasjon om elastisiteten ved kollisjonar òg?
+    #     self.origin = np.array(origin)
+    #     self.width = width
+    #     self.height = height
+        
+    # def get_vertices(self): # Går mot klokka
+    #     return [self.origin,
+    #             self.origin + np.array([self.width,0]),
+    #             self.origin + np.array([self.width, self.height]),
+    #             self.origin + np.array([0, self.height])]
     
-    vertices = property(get_vertices)
+    # vertices = property(get_vertices)
     
-    def get_face_normal(self):
-        vertices = self.vertices
-        # 0 - botn, 1 -- høgre, 2 -- topp, 3 -- venstre
-        return [norm(vertices[1]-vertices[2]), 
-                norm(vertices[2]-vertices[3]),
-                norm(vertices[3]-vertices[0]),
-                norm(vertices[0]-vertices[1])]
+    # def get_face_normal(self):
+    #     vertices = self.vertices
+    #     # 0 - botn, 1 -- høgre, 2 -- topp, 3 -- venstre
+    #     return [norm(vertices[1]-vertices[2]), 
+    #             norm(vertices[2]-vertices[3]),
+    #             norm(vertices[3]-vertices[0]),
+    #             norm(vertices[0]-vertices[1])]
     
-    normals = property(get_face_normal)
+    # normals = property(get_face_normal)
        
 # p_x,p_y = np.meshgrid([-90,-200],[85,75,65,55,45,35,25,15,5,0,-20,-30,-40,-50,-60])
     
 # p_x = p_x.T.reshape(-1)
 # p_y= p_y.T.reshape(-1)
             
+# def cw_sort(punkt):
+    
+def sortClockwise(A):
+    centerPoint = np.sum(A, axis=0)/len(A)
+    
+    for j in range(1,len(A)):
+        key = A[j]
+        i = j-1
+        while i >= 0 and getIsLess(key , A[i], centerPoint):
+            A[i+1] = A[i]
+            i = i - 1
+        A[i+1] = key
+
+def getIsLess(a, b, center):
+    if a[0]-center[0] >= 0 and b[0]-center[0] < 0:
+        return True
+    if a[0] - center[0] < 0 and b[0] - center[0] >= 0:
+        return False
+    if a[0] - center[0] == 0 and b[0] - center[0] == 0:
+        if a[1] - center[1] >= 0 or b[1] - center[1] >= 0:
+            return a[1] > b[1]
+        return b[1] > a[1]
+    
+    # compute the cross product of vectors (center -> a) x (center -> b)
+    det = (a[0] - center[0]) * (b[1] - center[1]) - (b[0] - center[0]) * (a[1] - center[1])
+    if det < 0:
+        return True
+    elif det > 0:
+        return False
+
+    # points a and b are on the same line from the center
+    # check which point is closer to the center
+    d1 = (a[0] - center[0]) * (a[0] - center[0]) + (a[1] - center[1]) * (a[1] - center[1])
+    d2 = (b[0] - center[0]) * (b[0] - center[0]) + (b[1] - center[1]) * (b[1] - center[1])
+    return d1 > d2
 
 
+#Typisk ribbe:
+pkt = np.array([[897,1011], [895,926  ], [353,1014 ], [351,929  ]])
 
+#%%
+pkt_ny = sortClockwise(pkt)   
+
+#%%
 # Her er ein funksjon for fritt fall av ein 1 mm partikkel i vatn.
 # d u_p/dt = u_p(t,y) der y er vertikal fart. Altså berre modellert drag og gravitasjon.
 def u_p(t,y):

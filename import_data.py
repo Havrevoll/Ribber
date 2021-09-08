@@ -5,8 +5,10 @@ import csv
 
 # def data_import(path='C:/Users/havrevol/PIV/Three/Q20'):
 
-p = Path('C:/Users/havrevol/PIV/Three/Q20/Analysis')
-
+# p = Path('C:/Users/havrevol/PIV/Three/Q20/Analysis')
+mappa = input("Kor er mappa med *.vec-filene?")
+p= Path(mappa)
+save = input("Kor skal hdf5-fila lagrast?")
 
 def import_data(p):
     x = []
@@ -68,7 +70,7 @@ def import_data(p):
     
     return x,y,u,v,I,J
 
-def save_to_file(path='C:/Users/havrevol/PIV/Three/Q20.hdf5'):
+def save_to_file(path=save):
      with h5py.File(path, 'w') as f:
          f.create_dataset("x", data=x, compression="gzip", compression_opts=9)
          f.create_dataset("y", data=y, compression="gzip", compression_opts=9)
