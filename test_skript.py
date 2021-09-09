@@ -10,15 +10,17 @@ from sti_gen import get_u, Rib, Particle, sti_animasjon
 from datagenerering import hent_tre, lag_tre, tre_objekt, lag_tre_multi
 from hjelpefunksjonar import finn_fil
 import ray
+
 ray.init() 
+
 import random
 
-#%% Førebu
+
 
 tre_fil = "../Q40_60s.pickle"
 #tre_fil = finn_fil(["C:/Users/havrevol/Q40_60s.pickle", "D:/Tonstad/Q40_60s.pickle", "../Q40_60s.pickle"])
 
-t_span = (0,30)
+t_span = (0,10)
 
 # %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
 
@@ -36,7 +38,7 @@ ribs = [Rib((-61.07,-8.816),50.2,7.8),
 # koll = stein2.checkCollision([-63,-1], ribs[0]) #R2
 # koll2 = stein2.checkCollision([-40,-1], ribs[0]) #R3 (midten av flata)
 
-particle_list = [Particle(0.05, [-80,85,0,0]), Particle(0.1, [-80,80,0,0]), Particle(0.2, [-80,75,0,0]) ]
+particle_list = [Particle.remote(0.05, [-80,85,0,0]), Particle.remote(0.1, [-80,80,0,0]), Particle.remote(0.2, [-80,75,0,0]) ]
 
 #%%
 
@@ -44,16 +46,20 @@ particle_list = [Particle(0.05, [-80,85,0,0]), Particle(0.1, [-80,80,0,0]), Part
 # except NameError: tri = None
 # if tri is None:
 tri = tre_objekt(tre_fil, t_span)
-    
+
+tri_remote = ray.put(tri)
+
 linear = True
 lift = True
 addedmass = True
 
-f_args = (tri, linear, lift, addedmass)
+f_args = (tri_remote, linear, lift, addedmass)
 solver_args = {'atol': 1e-4, 'rtol':1e-2, 'method':'RK45', 'args':f_args}
 
-for pa in particle_list:
-    pa.sti = pa.lag_sti(ribs, t_span, solver_args, wraparound=True)
+sti_remotes = ray.get([pa.lag_sti.remote(ribs, t_span, solver_args, wraparound=True) for pa in particle_list])
+
+for sti_remote, pa in zip(sti_remotes, particle_list):
+    pa.sti = sti_remote
     print("Ferdig med ", pa.init_position)
     print("Den som har diameter ", pa.diameter)
     

@@ -11,7 +11,7 @@ import numpy as np
 # from scipy import interpolate
 from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#r179348322575-1
 
-
+import ray
 import h5py
 
 # from numba import jit
@@ -36,7 +36,7 @@ nullfart = np.zeros(2)
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
-def get_u(t, x_inn, radius, tre_samla, linear=True, lift = True, addedmass = True):
+def get_u(t, x_inn, radius, tre_remote, linear=True, lift = True, addedmass = True):
     '''
     https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
 
@@ -57,6 +57,8 @@ def get_u(t, x_inn, radius, tre_samla, linear=True, lift = True, addedmass = Tru
         DESCRIPTION.
 
     '''    
+    tre_samla = ray.get(tre_remote)
+
     tx = np.concatenate(([t], x_inn[:2]))
     U_p = x_inn[2:]
         
@@ -298,7 +300,7 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), fps=20 )
     plt.close()
 
 
-
+@ray.remote
 class Particle:
     #Lag ein tabell med tidspunkt og posisjon for kvar einskild partikkel.
     def __init__(self, diameter, init_position, density=2.65e-6 ):
