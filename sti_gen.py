@@ -700,6 +700,7 @@ class Rib:
     # normals = property(get_face_normal)
        
 def sortClockwise(A):
+    ''' Insertion sort from Introduction to Algorithms '''
     centerPoint = np.sum(A, axis=0)/len(A)
     
     for j in range(1,len(A)):
@@ -710,7 +711,10 @@ def sortClockwise(A):
             i = i - 1
         A[i+1] = key
 
+    return A
+
 def getIsLess(a, b, center):
+    ''' Comparison method from https://stackoverflow.com/questions/6989100/sort-points-in-clockwise-order '''
     if a[0]-center[0] >= 0 and b[0]-center[0] < 0:
         return True
     if a[0] - center[0] < 0 and b[0] - center[0] >= 0:
