@@ -3,7 +3,7 @@
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from cycler import cycler
+# from cycler import cycler
 plt.rcParams["font.family"] = "STIXGeneral"
 plt.rcParams['mathtext.fontset'] = 'stix'
 from matplotlib import animation
@@ -12,20 +12,19 @@ import numpy as np
 # from scipy import interpolate
 from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#r179348322575-1
 
-from copy import deepcopy
 import h5py
 
 # from numba import jit
 
-from math import pi, hypot, atan2
-from functools import cmp_to_key
+from math import pi, hypot #, atan2
+
 
 # fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
 # x = np.array(h5py.File(filnamn, 'r')['x']).reshape(127,126)[ranges()]
 # vass = fil['vassføringar']
 
 
-from hjelpefunksjonar import norm, draw_rect, ranges, finn_fil
+from hjelpefunksjonar import norm, draw_rect, ranges, finn_fil, sortClockwise
 
 
 filnamn = "../Q40.hdf5" #finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
@@ -163,31 +162,7 @@ get_u.counter = 0
 get_u.utanfor = 0
 get_u.simplex_prob = 0
     
-def rk(t0, y0, L, f, h=0.02):
-    ''' Heimelaga Runge-Kutta-metode '''
-    N=int(L/h)
 
-    t=[0]*N # initialize lists
-    y=[0]*N # initialize lists
-    
-    t[0] = t0
-    y[0] = y0
-    
-    for n in range(0, N-1):
-        #print(n,t[n], y[n], f(t[n],y[n]))
-        k1 = h*f(t[n], y[n])
-        k2 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k1)
-        k3 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k2)
-        k4 = h*f(t[n] + h, y[n] + k3)
-        
-        if (np.isnan(k4+k3+k2+k1).any()):
-            #print(k1,k2,k3,k4)
-            return t,y
-        
-        t[n+1] = t[n] + h
-        y[n+1] = y[n] + 1/6 * (k1 + 2*k2 + 2*k3 + k4)
-        
-    return t,y
 
 def rk_2(f, L, y0, h, tri, U):
     ''' Heimelaga Runge-Kutta-metode '''
@@ -660,19 +635,15 @@ class Particle:
 
 class Rib:
     def __init__(self, coords):
-        self.coords = sortClockwise(coords)
+        self.vertices = sortClockwise(np.array(coords))
         
-        self.vertices = [self.coords[0]-self.coords[-1], 
-                        self.coords[1]-self.coords[0], 
-                        self.coords[2]-self.coords[1], 
-                        self.coords[3]-self.coords[2] ]
+        self.normals = [np.cross(self.vertices[1]-self.vertices[0],np.array([0,0,-1]))[:2],
+                        np.cross(self.vertices[2]-self.vertices[1],np.array([0,0,-1]))[:2], 
+                        np.cross(self.vertices[3]-self.vertices[2], np.array([0,0,-1]))[:2],
+                        np.cross(self.vertices[0]-self.vertices[3],np.array([0,0,-1]))[:2] ]
         
-        self.normals = [norm(self.vertices[1]-self.vertices[2]), 
-                        norm(self.vertices[2]-self.vertices[3]),
-                        norm(self.vertices[3]-self.vertices[0]),
-                        norm(self.vertices[0]-self.vertices[1])]
                         # Må sjekka om punkta skal gå mot eller med klokka. 
-                        # Nett no går dei MED klokka, og vertices peikar med klokka. Normals då?
+                        # Nett no går dei MED klokka. Normals skal peika UT.
         
         
     # def __init__(self, origin, width, height):
@@ -680,66 +651,10 @@ class Rib:
     #     self.origin = np.array(origin)
     #     self.width = width
     #     self.height = height
-        
-    # def get_vertices(self): # Går mot klokka
-    #     return [self.origin,
-    #             self.origin + np.array([self.width,0]),
-    #             self.origin + np.array([self.width, self.height]),
-    #             self.origin + np.array([0, self.height])]
-    
-    # vertices = property(get_vertices)
-    
-    # def get_face_normal(self):
-    #     vertices = self.vertices
-    #     # 0 - botn, 1 -- høgre, 2 -- topp, 3 -- venstre
-    #     return [norm(vertices[1]-vertices[2]), 
-    #             norm(vertices[2]-vertices[3]),
-    #             norm(vertices[3]-vertices[0]),
-    #             norm(vertices[0]-vertices[1])]
-    
-    # normals = property(get_face_normal)
-       
-def sortClockwise(A):
-    ''' Insertion sort from Introduction to Algorithms '''
-    centerPoint = np.sum(A, axis=0)/len(A)
-    
-    for j in range(1,len(A)):
-        key = deepcopy(A[j])
-        i = j-1
-        while i >= 0 and getIsLess(key , A[i], centerPoint):
-            A[i+1] = A[i]
-            i = i - 1
-        A[i+1] = key
-
-    return A
-
-def getIsLess(a, b, center):
-    ''' Comparison method from https://stackoverflow.com/questions/6989100/sort-points-in-clockwise-order '''
-    if a[0]-center[0] >= 0 and b[0]-center[0] < 0:
-        return True
-    if a[0] - center[0] < 0 and b[0] - center[0] >= 0:
-        return False
-    if a[0] - center[0] == 0 and b[0] - center[0] == 0:
-        if a[1] - center[1] >= 0 or b[1] - center[1] >= 0:
-            return a[1] > b[1]
-        return b[1] > a[1]
-    
-    # compute the cross product of vectors (center -> a) x (center -> b)
-    det = (a[0] - center[0]) * (b[1] - center[1]) - (b[0] - center[0]) * (a[1] - center[1])
-    if det < 0:
-        return True
-    elif det > 0:
-        return False
-
-    # points a and b are on the same line from the center
-    # check which point is closer to the center
-    d1 = (a[0] - center[0]) * (a[0] - center[0]) + (a[1] - center[1]) * (a[1] - center[1])
-    d2 = (b[0] - center[0]) * (b[0] - center[0]) + (b[1] - center[1]) * (b[1] - center[1])
-    return d1 > d2
 
 
 #Typisk ribbe:
-# pkt = np.array([[897,1011], [895,926  ], [353,1014 ], [351,929  ]])
+# a = [[897,1011], [895,926  ], [353,1014 ], [351,929  ]]
 # pkt_ny = sortClockwise(pkt)   
 
 #%%

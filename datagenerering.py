@@ -44,7 +44,7 @@ def lag_tre_multi(t_span, filnamn=None):
         lagra_tre(trees, filnamn)
 
     
-def lag_tre(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest=False):
+def lag_tre(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest=False, kutt=False):
     '''
     Ein metode som tek inn eit datasett og gjer alle reshapings-tinga for x og y, u og v og Re.
 
@@ -53,7 +53,8 @@ def lag_tre(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest=False):
     t_min = t_span[0]
     t_max = t_span[1]
     
-    piv_range = ranges()
+    piv_range = ranges(kutt)
+    
     
     with h5py.File(filnamn, 'r') as f:
         Umx = np.array(f['Umx'])[int(t_min*fps):int(t_max*fps),:]
@@ -61,15 +62,26 @@ def lag_tre(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest=False):
         (I,J) = (int(np.array(f['I'])),int(np.array(f['J'])))
         x = np.array(f['x']).reshape(J,I)[piv_range]
         y = np.array(f['y']).reshape(J,I)[piv_range]
+        ribs = np.array(f['ribs'])
+    
     
     Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
     Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
     
-    y[63,0:54]=-1.01
-    Umx_reshape[:,63:70,0:53]=0
-    Vmx_reshape[:,63:70,0:53]=0
-    Umx_reshape[:,63:69,53] =0
-    Vmx_reshape[:,63:69,53] =0
+    
+    # Legg inn automatisk henting av desse verdiane?
+    x0 = -60.79
+    x1 = -10.84
+    y0 = -.8265
+    y1 = -1.1020
+    
+    # y[64,18:55] = -.8265+ (x[0,18:55] + 60.79)* (-1.1020+0.8265)/(-10.84+60.79)
+    y[64,18:55] = y0 + (x[0,18:55] - x0)* (y1 - y0)/(x1 - x0)
+    
+    # y[63,0:54]=-1.01
+    Umx_reshape[:,64:70,0:55]=0
+    Vmx_reshape[:,64:70,0:55]=0
+    
     
     Umx_reshape[:,62:68,87:]=0
     Vmx_reshape[:,62:68,87:]=0
@@ -137,7 +149,7 @@ def lag_tre(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest=False):
     else:
         tree = qhull.Delaunay(txy)
      
-    return tree, U
+    return tree, U, ribs
 
 
 
