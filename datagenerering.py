@@ -19,10 +19,11 @@ import multiprocessing
 fps = 20
 
 filnamn = "../Q40.hdf5" #finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
+
 pickle_fil = finn_fil(["../Q40_60s.pickle", "D:/Tonstad/Q40_20s.pickle", "C:/Users/havrevol/Q40_20s.pickle", "D:/Tonstad/Q40_2s.pickle"])
 # print("pickle fil er ", pickle_fil) 
 
-def lag_tre_multi(t_span, filnamn=None):
+def lag_tre_multi(t_span, filnamn_ut=None):
     
     a_pool = multiprocessing.Pool()
     
@@ -33,18 +34,17 @@ def lag_tre_multi(t_span, filnamn=None):
     
     result = a_pool.map(lag_tre, i)
     
-    
     i_0 =  range(int(t_min)*10,int(t_max)*10)
     
     trees = dict(zip(i_0, result))
-    
-    if filnamn is None:
+            
+    if filnamn_ut is None:
         return trees
     else:
-        lagra_tre(trees, filnamn)
+        lagra_tre(trees, filnamn_ut)
 
-    
-def lag_tre(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest=False, kutt=False):
+
+def lag_tre(t_span=(0,1), nearest=False, kutt=False, inkluder_ribs = False):
     '''
     Ein metode som tek inn eit datasett og gjer alle reshapings-tinga for x og y, u og v og Re.
 
@@ -152,8 +152,11 @@ def lag_tre(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest=False, kutt
         tree = cKDTree(txy)
     else:
         tree = qhull.Delaunay(txy)
-     
-    return tree, U, ribs
+    
+    if (inkluder_ribs):
+        return tree, U, ribs
+    else:
+        return tree, U
 
 
 
@@ -181,7 +184,7 @@ class tre_objekt:
     def __init__(self, picklenamn, t_span):
         with open(picklenamn, 'rb') as f:
             self.tre = pickle.load(f)
-            self.kdtre, self.U_kd = lag_tre(t_span=t_span, nearest=True)
+            self.kdtre, self.U_kd, self.ribs = lag_tre(t_span=t_span, nearest=True, inkluder_ribs=True)
     
     
     # def find_simplex(self, x):
