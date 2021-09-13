@@ -64,13 +64,17 @@ def lag_tre(t_span=(0,1), nearest=False, kutt=False, inkluder_ribs = False):
         y = np.array(f['y']).reshape(J,I)[piv_range]
         ribs = np.array(f['ribs'])
     
+    Umx_reshape = np.zeros((len(Umx), J+1,I))
+    Vmx_reshape = np.zeros((len(Vmx), J+1,I))
+    x = np.vstack((x,x[0,:]))
+    y = np.vstack((y,np.full((1,I), -98.81)))
     
-    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
-    Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
+    Umx_reshape[:,:J,:] = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
+    Vmx_reshape[:,:J,:] = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
     
-    axis0 = np.take_along_axis(ribs[:,:,0], np.argpartition(ribs[:,:,1],-2),1)[:,-2:].T
-    axis1= np.take_along_axis(ribs[:,:,1], np.argpartition(ribs[:,:,1],-2),1)[:,-2:].T
-    for rib in np.stack((axis0,axis1),axis=0).swapaxes(0,2):
+    # axis0 = np.take_along_axis(ribs[:,:,0], np.argpartition(ribs[:,:,1],-2),1)[:,-2:].T
+    # axis1= np.take_along_axis(ribs[:,:,1], np.argpartition(ribs[:,:,1],-2),1)[:,-2:].T
+    # for rib in np.stack((axis0,axis1),axis=0).swapaxes(0,2):
         
 
     # Legg inn automatisk henting av desse verdiane?
@@ -86,12 +90,30 @@ def lag_tre(t_span=(0,1), nearest=False, kutt=False, inkluder_ribs = False):
     Umx_reshape[:,64:70,0:55]=0
     Vmx_reshape[:,64:70,0:55]=0
     
+    x0 = 39.028
+    x1 = 89.075
+    y0 = 0.0918
+    y1 = 0.0918
     
-    Umx_reshape[:,62:68,87:]=0
-    Vmx_reshape[:,62:68,87:]=0
-    Umx_reshape[:,68:70,89:]=0
-    Vmx_reshape[:,68:70,89:]=0
+    x[63:69,88] = x0
+    y[63,88:] = y0  + (x[0,88:] - x0)* (y1 - y0)/(x1 - x0)
+    Umx_reshape[:,63:69,88:]=0
+    Vmx_reshape[:,63:69,88:]=0
     
+    
+    x0 = -93.2075
+    x1 = 93.3
+    y0 = -72.6375
+    y1 = -74.8415
+    
+    y [113,0:54] = y0  + (x[0,0:54] - x0)* (y1 - y0)/(x1 - x0)
+    y [114,54:] = y0  + (x[0,54:] - x0)* (y1 - y0)/(x1 - x0)
+    Umx_reshape[:,113,0:54] = 0
+    Vmx_reshape[:,113,0:54] = 0
+    Umx_reshape[:,114,54:] = 0
+    Vmx_reshape[:,114,54:] = 0
+    
+
     
     # if (nearest):
     #     dx = 1.4692770000000053 # eigentleg 91.83 * 16 * 1e-3 = 1.46928
@@ -136,6 +158,8 @@ def lag_tre(t_span=(0,1), nearest=False, kutt=False, inkluder_ribs = False):
     # y = np.array(dataset['y']).reshape(J,I)[piv_range]
     
     t_3d,y_3d,x_3d = np.meshgrid(np.arange(t_min*fps,t_max*fps)/fps, y[:,0], x[0,:], indexing='ij')
+    y_3d[...] = y
+    x_3d[...] = x
     t_lang = t_3d.ravel()[nonan]
     x_lang = x_3d.ravel()[nonan]
     y_lang = y_3d.ravel()[nonan]
