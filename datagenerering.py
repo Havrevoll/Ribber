@@ -68,7 +68,11 @@ def lag_tre(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest=False, kutt
     Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
     Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
     
-    
+    axis0 = np.take_along_axis(ribs[:,:,0], np.argpartition(ribs[:,:,1],-2),1)[:,-2:].T
+    axis1= np.take_along_axis(ribs[:,:,1], np.argpartition(ribs[:,:,1],-2),1)[:,-2:].T
+    for rib in np.stack((axis0,axis1),axis=0).swapaxes(0,2):
+        
+
     # Legg inn automatisk henting av desse verdiane?
     x0 = -60.79
     x1 = -10.84
