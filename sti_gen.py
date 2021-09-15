@@ -36,7 +36,7 @@ nullfart = np.zeros(2)
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
-def get_u(t, x_inn, radius, tre_samla, linear=True, lift = True, addedmass = True):
+def get_u(t, x_inn, radius, tre_plasma, linear=True, lift = True, addedmass = True):
     '''
     https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
 
@@ -62,6 +62,8 @@ def get_u(t, x_inn, radius, tre_samla, linear=True, lift = True, addedmass = Tru
         
     dt, dx, dy = 0.01, 0.1, 0.1
     
+    tre_samla = ray.get(tre_plasma)
+
     U_del = tre_samla.get_U(tx)
     tri = tre_samla.get_tri(tx)
     

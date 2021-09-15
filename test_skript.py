@@ -13,10 +13,11 @@ import ray
 ray.init() 
 import random
 import matplotlib.pyplot as plt
+import pickle
 
 # #%% Førebu
 
-tre_fil = "../tre_0_20_mednullribbe.pickle"
+tre_fil = "../tre_0_60_mednullribbe.pickle"
 #tre_fil = finn_fil(["C:/Users/havrevol/Q40_60s.pickle", "D:/Tonstad/Q40_60s.pickle", "../Q40_60s.pickle"])
 
 t_span = (0,19)
@@ -59,7 +60,7 @@ linear = True
 lift = True
 addedmass = True
 
-f_args = (tre, linear, lift, addedmass)
+f_args = (tre_plasma, linear, lift, addedmass)
 solver_args = {'atol': 1e-3, 'rtol':1e-1, 'method':'RK45', 'args':f_args}
 
 fig, ax = plt.subplots()
@@ -76,7 +77,7 @@ kombinasjon = []
 
 for tol in tols:
     for sol in methods:
-        kombinasjon.append((tol,sol, particle_copy(part0) ) )
+        kombinasjon.append({'tol':tol,'sol':sol, 'pa':particle_copy(part0) } )
   
 
 stiar = []
@@ -86,22 +87,22 @@ import time
 result_ids = []
 
 for k in kombinasjon:
-    result_ids.append(lag_sti.remote(k[2], ribs, t_span, 
-      solver_args={'atol': k[0][0], 'rtol':k[0][1], 'method':k[1], 'args':f_args}, wraparound=True))
+    k['id'] = lag_sti.remote(k['pa'], ribs, t_span, solver_args={'atol': k['tol'][0], 'rtol':k['tol'][1], 'method':k['sol'], 'args':f_args}, wraparound=True)
     
 
-for id in result_ids:
-    ray.
-    stiar.append(k[2].sti)
+for k in kombinasjon:
+    k['pa'].sti = ray.get(k['id'])
+    stiar.append(k['pa'].sti)
     
-    print("Ferdig med ", pa.init_position)
-    print("Den som har diameter ", pa.diameter)
-    print("solver er", k[1])
-    print("atol er", solver_args['atol'])
-    print("rtol er", solver_args['rtol'])
-    ax.plot(pa.sti[:,1],pa.sti[:,2])
+    # print("Ferdig med ", pa.init_position)
+    # print("Den som har diameter ", pa.diameter)
+    # print("solver er", k[1])
+    # print("atol er", solver_args['atol'])
+    # print("rtol er", solver_args['rtol'])
+    # ax.plot(pa.sti[:,1],pa.sti[:,2])
         
-
+with open("stiar.pickle", 'wb') as f:
+    pickle.dump(k, f)
 
 
 # particle_pool = multiprocessing.Pool()
