@@ -6,11 +6,11 @@ Created on Wed Jul  7 09:22:39 2021
 """
 
 import numpy as np
-from sti_gen import get_u, Rib, Particle, sti_animasjon
+from sti_gen import get_u, Rib, Particle, sti_animasjon, lag_sti, particle_copy
 from datagenerering import hent_tre, lag_tre, tre_objekt, lag_tre_multi
 from hjelpefunksjonar import finn_fil
-# import ray
-# ray.init() 
+import ray
+ray.init() 
 import random
 import matplotlib.pyplot as plt
 
@@ -49,22 +49,26 @@ particle_list = [Particle(0.05, [-80,85,0,0]), Particle(0.1, [-80,80,0,0]), Part
 # try: tri
 # except NameError: tri = None
 # if tri is None:
-tri = tre_objekt(tre_fil, t_span)
+tre = tre_objekt(tre_fil, t_span)
 
-ribs = [Rib(rib) for rib in tri.ribs]
+tre_plasma = ray.put(tre)
+
+ribs = [Rib(rib) for rib in tre.ribs]
     
 linear = True
 lift = True
 addedmass = True
 
-f_args = (tri, linear, lift, addedmass)
+f_args = (tre, linear, lift, addedmass)
 solver_args = {'atol': 1e-3, 'rtol':1e-1, 'method':'RK45', 'args':f_args}
 
 fig, ax = plt.subplots()
 
 tols = [(1e-3,1e-1), (1e-2,1e-1), (1e-1,1e-1) ]
 
-pa = particle_list[0]
+part0 = particle_list[0]
+
+
 
 methods = ['RK45', 'RK23',  'Radau', 'BDF', 'LSODA'] # tok ut DOP853, for den tok for lang tid.
 
@@ -72,37 +76,26 @@ kombinasjon = []
 
 for tol in tols:
     for sol in methods:
-        kombinasjon.append((tol,sol))
+        kombinasjon.append((tol,sol, particle_copy(part0) ) )
+  
 
 stiar = []
 
 import time
 
-#%%
-get_u(2,[-34,0,0,0], 0.5, tri, linear = True, lift=True, addedmass=True)
-
-
-#%%
-
-get_u(0,[-88.,0,0,0],0.5,tri)
-
-pa.f(0,(-88,-0.6,0,0),tri,linear,lift,addedmass)
-
-#%% 
+result_ids = []
 
 for k in kombinasjon:
-    solver_args['method'] = k[1]
-    solver_args['atol'] = k[0][0]
-    solver_args['rtol'] = k[0][1]
-    get_u.counter = 0
-    start = time.time()
-    pa.sti = pa.lag_sti(ribs, t_span, solver_args, wraparound=True)
-    end = time.time()
-    stiar.append(pa.sti)
+    result_ids.append(lag_sti.remote(k[2], ribs, t_span, 
+      solver_args={'atol': k[0][0], 'rtol':k[0][1], 'method':k[1], 'args':f_args}, wraparound=True))
+    
+
+for id in result_ids:
+    ray.
+    stiar.append(k[2].sti)
+    
     print("Ferdig med ", pa.init_position)
     print("Den som har diameter ", pa.diameter)
-    print("get_u.counter er ", get_u.counter)
-    print("tida brukt ", end-start)
     print("solver er", k[1])
     print("atol er", solver_args['atol'])
     print("rtol er", solver_args['rtol'])

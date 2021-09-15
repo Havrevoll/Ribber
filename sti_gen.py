@@ -13,7 +13,7 @@ import numpy as np
 from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#r179348322575-1
 
 import h5py
-
+import ray
 # from numba import jit
 
 from math import pi, hypot #, atan2
@@ -310,7 +310,11 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnam
     ani.save(utfilnamn)
     plt.close()
 
-
+# def createParticle(diameter, init_position, density=2.65e-6):
+#     volume = diameter**3 * pi * 1/6
+#     mass = volume*density
+#     radius = diameter/2
+#     return {'diameter': diameter, 'init_position':init_position}
 
 class Particle:
     #Lag ein tabell med tidspunkt og posisjon for kvar einskild partikkel.
@@ -318,319 +322,304 @@ class Particle:
         self.diameter= diameter
         self.init_position = init_position
         self.density = density
-    
-    def get_mass(self):
-        return self.volume * self.density
-    
-    mass = property(get_mass)
-        
-    def get_volume(self):
-        # V = 4/3 πr³
-        return self.diameter**3 * pi * 1/6
-    
-    volume = property(get_volume)
-    
-    def get_radius(self):
-        return self.diameter/2
-    
-    radius = property(get_radius)
-        
-    def f(self, t, x, tri, linear=True, lift=False, addedmass=True):
-        """
-        Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
-        Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
-        Men for at solve_ivp skal fungera, må x vera 1-dimensjonal. Altså. 
-        x= [x,y,u,v], ikkje x = [[x,y], [u,v]].
-        f (t, x, y) = [dx/dt, du/dt]
+        self.volume = self.diameter**3 * pi * 1/6
+        self.mass = self.volume * self.density
+        self.radius = self.diameter/2
 
-        Parameters
-        ----------
-        t : double
-            Tidspunktet for funksjonen.
-        x : tuple
-            Ein tuple med koordinatane og farten, altså (x0, y0, u0, v0).
-        tri : spatial.qhull.Delaunay
-            Samling av triangulerte data.
-        U : Tuple
-            Ein tuple av dei to fartsvektor-arrayane.
+def particle_copy(pa):
+    return Particle(pa.diameter, pa.init_position, pa.density)
+        
+def f(t, x, particle, tri, linear=True, lift=False, addedmass=True):
+    """
+    Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
+    Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
+    Men for at solve_ivp skal fungera, må x vera 1-dimensjonal. Altså. 
+    x= [x,y,u,v], ikkje x = [[x,y], [u,v]].
+    f (t, x, y) = [dx/dt, du/dt]
 
-        Returns
-        -------
-        tuple
-             Ein tuple med [dx/dt, du/dt]
+    Parameters
+    ----------
+    t : double
+        Tidspunktet for funksjonen.
+    x : tuple
+        Ein tuple med koordinatane og farten, altså (x0, y0, u0, v0).
+    tri : spatial.qhull.Delaunay
+        Samling av triangulerte data.
+    U : Tuple
+        Ein tuple av dei to fartsvektor-arrayane.
 
-        """
+    Returns
+    -------
+    tuple
+            Ein tuple med [dx/dt, du/dt]
+
+    """
+    
+    g = np.array([0, 9.81e3]) # mm/s^2 = 9.81 m/s^2
+    nu = 1 # 1 mm^2/s = 1e-6 m^2/s
+    rho = 1e-6  # kg/mm^3 = 1000 kg/m^3 
+    
+    dx_dt = x[2:]
+    # vel = np.array([100,0]) - dx_dt # relativ snøggleik
+    # U_f = np.array(get_u(t,np.array([x[0],x[1]]),tri, linear))
+    
+    U_f, dudt_material, U_top_bottom = get_u(t, x, particle.radius, tri, linear=linear, lift=lift, addedmass=addedmass)
+    
+    # if (np.isnan(U_f[2])):
+    #     U_f[2] = 0
+    #     # U_f[2] = dudt_mean[0][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
+    # if (np.isnan(U_f[3])):
+    #     U_f[3] = 0
+    #     # U_f[3] = dudt_mean[1][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
         
-        g = np.array([0, 9.81e3]) # mm/s^2 = 9.81 m/s^2
-        nu = 1 # 1 mm^2/s = 1e-6 m^2/s
-        rho = 1e-6  # kg/mm^3 = 1000 kg/m^3 
         
-        dx_dt = x[2:]
-        # vel = np.array([100,0]) - dx_dt # relativ snøggleik
-        # U_f = np.array(get_u(t,np.array([x[0],x[1]]),tri, linear))
+    vel = U_f - dx_dt # relativ snøggleik
+    # vel_ang = atan2(vel[1], vel[0])
+    
+    
+    Re = hypot(vel[0],vel[1]) * particle.diameter / nu 
+    
+    if (Re<1000):
+        try:
+            cd = 24 / Re * (1+0.15*Re**0.687)
+            # Cheng (1997) skildrar Cd for kantete og runde steinar. Dette 
+            # er kanskje den viktigaste grunnen til at eg bør gjera dette?
+            # Ferguson og Church (2004) gjev nokre liknande bidrag, men viser til Cheng.
+        except ZeroDivisionError:
+            cd = 2e4
+    else:
+        cd = 0.44
+    
+    # print("Re = ", Re," cd= ", cd)
+    rho_self_density = rho / particle.density
+    
+    drag_component =  3/4 * cd / particle.diameter * rho_self_density * abs(vel)*vel
+    gravity_component = (rho_self_density - 1) * g
+
+    added_mass_component = 0.5 * rho_self_density * dudt_material
+    
+    lift_component = 3/4 * 0.5 / particle.diameter * rho_self_density * (U_top_bottom[:,0]*U_top_bottom[:,0] - U_top_bottom[:,1]*U_top_bottom[:,1])
+    
+    divisor = 1 + 0.5 * rho_self_density * addedmass
+    # divisoren trengst for akselerasjonen av partikkel kjem fram i added 
+    # mass på høgre sida, så den må bli flytta over til venstre og delt på resten.
+    
+    # print("drag_component =",drag_component,", gravity_component = ",gravity_component)        
+
+    du_dt = (drag_component + gravity_component + added_mass_component + lift_component ) / divisor
+    
+    # if (np.any(np.isnan(du_dt))):
+    #     print("her er nan! og t, x og dudt er dette:", t,x, du_dt)
+    
+    return np.concatenate((dx_dt,du_dt))
+    
+def checkCollision(particle, data, rib):
+    """
+    Sjekkar kollisjonar mellom ein partikkel med ein posisjon og ei ribbe.
+
+    Parameters
+    ----------
+    data : tuple
+        Ein tuple (x,y,u,v) som gjev koordinatane og farten til senter av partikkelen.
+    rib : Rib
+        Den aktuelle ribba, altså eit rektangel.
+
+    Returns
+    -------
+    tuple
+        Ein tuple med fylgjande data: (boolean, collisionInfo, rib). 
+        CollisionInfo er ein tuple med (collision depth, rib normal, punkt 
+                                        på partikkelen som kolliderer, relativ fart).
+
+    """
+    
+    position = data[0:2]        
+    inside = True
+    bestDistance = -99999
+    nearestEdge = 0
+    
+    collisionInfo = (-1,np.array([-1,-1]), np.array([-1,-1]), -1)
+    
+    #Step A - compute nearest edge
+    vertices = rib.vertices
+    normals = rib.normals
+    
+    for i in range(len(vertices)):
+        v = position - vertices[i]
+        projection = np.dot(v, normals[i])
+        if (projection > 0):
+            # if the center of circle is outside of rectangle
+            bestDistance = projection
+            nearestEdge = i
+            inside = False
+            break
         
-        U_f, dudt_material, U_top_bottom = get_u(t, x, self.radius, tri, linear=linear, lift=lift, addedmass=addedmass)
-        
-        # if (np.isnan(U_f[2])):
-        #     U_f[2] = 0
-        #     # U_f[2] = dudt_mean[0][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
-        # if (np.isnan(U_f[3])):
-        #     U_f[3] = 0
-        #     # U_f[3] = dudt_mean[1][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
+        if (projection > bestDistance):
+            # If the center of the circle is inside the rectangle
+            bestDistance = projection
+            nearestEdge = i
             
+    
+    if (not inside):            
+        #  Step B1: If center is in Region R1
+        # the center of circle is in corner region of mVertex[nearestEdge]
+
+        # //v1 is from left vertex of face to center of circle
+        # //v2 is from left vertex of face to right vertex of face
+        v1 = position - vertices[nearestEdge]
+        v2 = vertices[(nearestEdge + 1) % 4] - vertices[nearestEdge]
+        
+        dot = np.dot(v1, v2)
+        
+        if (dot < 0): #region R1
+            dis = np.sqrt(v1.dot(v1))
             
-        vel = U_f - dx_dt # relativ snøggleik
-        # vel_ang = atan2(vel[1], vel[0])
-        
-        
-        Re = hypot(vel[0],vel[1]) * self.diameter / nu 
-        
-        if (Re<1000):
-            try:
-                cd = 24 / Re * (1+0.15*Re**0.687)
-                # Cheng (1997) skildrar Cd for kantete og runde steinar. Dette 
-                # er kanskje den viktigaste grunnen til at eg bør gjera dette?
-                # Ferguson og Church (2004) gjev nokre liknande bidrag, men viser til Cheng.
-            except ZeroDivisionError:
-                cd = 2e4
+            if (dis > particle.radius):
+                return (False, collisionInfo, rib) # må vel endra til (bool, depth, normal, start)
+            
+            normal = norm(v1)
+            
+            radiusVec = normal*particle.radius*(-1)
+            
+            # sender informasjon til collisioninfo:                    
+            collisionInfo = (particle.radius - dis, normal, position + radiusVec)
+            
         else:
-            cd = 0.44
-        
-        # print("Re = ", Re," cd= ", cd)
-        rho_self_density = rho / self.density
-        
-        drag_component =  3/4 * cd / self.diameter * rho_self_density * abs(vel)*vel
-        gravity_component = (rho_self_density - 1) * g
-
-        added_mass_component = 0.5 * rho_self_density * dudt_material
-        
-        lift_component = 3/4 * 0.5 / self.diameter * rho_self_density * (U_top_bottom[:,0]*U_top_bottom[:,0] - U_top_bottom[:,1]*U_top_bottom[:,1])
-        
-        divisor = 1 + 0.5 * rho_self_density * addedmass
-        # divisoren trengst for akselerasjonen av partikkel kjem fram i added 
-        # mass på høgre sida, så den må bli flytta over til venstre og delt på resten.
-        
-        # print("drag_component =",drag_component,", gravity_component = ",gravity_component)        
-
-        du_dt = (drag_component + gravity_component + added_mass_component + lift_component ) / divisor
-        
-        # if (np.any(np.isnan(du_dt))):
-        #     print("her er nan! og t, x og dudt er dette:", t,x, du_dt)
-        
-        return np.concatenate((dx_dt,du_dt))
+            # //the center of circle is in corner region of mVertex[nearestEdge+1]
     
-    def checkCollision(self, data, rib):
-        """
-        Sjekkar kollisjonar mellom ein partikkel med ein posisjon og ei ribbe.
-
-        Parameters
-        ----------
-        data : tuple
-            Ein tuple (x,y,u,v) som gjev koordinatane og farten til senter av partikkelen.
-        rib : Rib
-            Den aktuelle ribba, altså eit rektangel.
-
-        Returns
-        -------
-        tuple
-            Ein tuple med fylgjande data: (boolean, collisionInfo, rib). 
-            CollisionInfo er ein tuple med (collision depth, rib normal, punkt 
-                                            på partikkelen som kolliderer, relativ fart).
-
-        """
-        
-        position = data[0:2]        
-        inside = True
-        bestDistance = -99999
-        nearestEdge = 0
-        
-        collisionInfo = (-1,np.array([-1,-1]), np.array([-1,-1]), -1)
-        
-        #Step A - compute nearest edge
-        vertices = rib.vertices
-        normals = rib.normals
-        
-        for i in range(len(vertices)):
-            v = position - vertices[i]
-            projection = np.dot(v, normals[i])
-            if (projection > 0):
-                # if the center of circle is outside of rectangle
-                bestDistance = projection
-                nearestEdge = i
-                inside = False
-                break
+            #         //v1 is from right vertex of face to center of circle 
+            #         //v2 is from right vertex of face to left vertex of face
+            v1 = position - vertices[(nearestEdge +1) % 4]
+            v2 = (-1) * v2
+            dot = v1.dot(v2)
             
-            if (projection > bestDistance):
-                # If the center of the circle is inside the rectangle
-                bestDistance = projection
-                nearestEdge = i
-                
-        
-        if (not inside):            
-            #  Step B1: If center is in Region R1
-            # the center of circle is in corner region of mVertex[nearestEdge]
-
-            # //v1 is from left vertex of face to center of circle
-            # //v2 is from left vertex of face to right vertex of face
-            v1 = position - vertices[nearestEdge]
-            v2 = vertices[(nearestEdge + 1) % 4] - vertices[nearestEdge]
-            
-            dot = np.dot(v1, v2)
-            
-            if (dot < 0): #region R1
+            if (dot < 0):
                 dis = np.sqrt(v1.dot(v1))
-                
-                if (dis > self.radius):
-                    return (False, collisionInfo, rib) # må vel endra til (bool, depth, normal, start)
+                                    
+                # //compare the distance with radium to decide collision
+        
+                if (dis > particle.radius):
+                    return (False, collisionInfo, rib)
                 
                 normal = norm(v1)
+                radiusVec = normal * particle.radius*(-1)
                 
-                radiusVec = normal*self.radius*(-1)
-                
-                # sender informasjon til collisioninfo:                    
-                collisionInfo = (self.radius - dis, normal, position + radiusVec)
-                
+                collisionInfo = (particle.radius - dis, normal, position + radiusVec)
             else:
-                # //the center of circle is in corner region of mVertex[nearestEdge+1]
-        
-                #         //v1 is from right vertex of face to center of circle 
-                #         //v2 is from right vertex of face to left vertex of face
-                v1 = position - vertices[(nearestEdge +1) % 4]
-                v2 = (-1) * v2
-                dot = v1.dot(v2)
-                
-                if (dot < 0):
-                    dis = np.sqrt(v1.dot(v1))
-                                        
-                    # //compare the distance with radium to decide collision
-            
-                    if (dis > self.radius):
-                        return (False, collisionInfo, rib)
-                    
-                    normal = norm(v1)
-                    radiusVec = normal * self.radius*(-1)
-                    
-                    collisionInfo = (self.radius - dis, normal, position + radiusVec)
+                #//the center of circle is in face region of face[nearestEdge]
+                if (bestDistance < particle.radius):
+                    radiusVec = normals[nearestEdge] * particle.radius
+                    collisionInfo = (particle.radius - bestDistance, normals[nearestEdge], position - radiusVec)
                 else:
-                    #//the center of circle is in face region of face[nearestEdge]
-                    if (bestDistance < self.radius):
-                        radiusVec = normals[nearestEdge] * self.radius
-                        collisionInfo = (self.radius - bestDistance, normals[nearestEdge], position - radiusVec)
-                    else:
-                        return (False, collisionInfo, rib)
-        else:
-            #     //the center of circle is inside of rectangle
-            radiusVec = normals[nearestEdge] * self.radius
-            collisionInfo = (self.radius - bestDistance, normals[nearestEdge], position - radiusVec, -1)
-            
-            return (True, collisionInfo, rib) 
-            # Måtte laga denne returen så han ikkje byrja å rekna ut relativ fart når partikkelen uansett er midt inne i ribba.
- 
-        # Rekna ut relativ fart, jamfør Baraff (2001) formel 8-3.
-        n = collisionInfo[1]
-        v = np.array(data[2:])
-        v_rel = np.dot(n,v)
-        collisionInfo = (collisionInfo[0], collisionInfo[1],collisionInfo[2], v_rel)
-                
-        if (v_rel < 0): # Sjekk om partikkelen er på veg vekk frå veggen.
-            is_collision = True
-        else:
-            is_collision = False
+                    return (False, collisionInfo, rib)
+    else:
+        #     //the center of circle is inside of rectangle
+        radiusVec = normals[nearestEdge] * particle.radius
+        collisionInfo = (particle.radius - bestDistance, normals[nearestEdge], position - radiusVec, -1)
         
-        return (is_collision, collisionInfo, rib)
-    
-    def lag_sti(self, ribs, t_span, solver_args, fps=20, wraparound = False):
-    
-        # stien må innehalda posisjon, fart og tid.
-        sti = []
-        sti_komplett = []
-        
-        step_old = np.concatenate(([t_span[0]], self.init_position))
-        # Step_old og step_new er ein array med [t, x, y, u, v]. 
-        
-        sti.append(step_old)
-        sti_komplett.append(step_old)
-        
-        # finn neste steg med rk_2 og standard tidssteg.
-        # sjekk kollisjon. Dersom ikkje kollisjon, bruk resultat frå rk_2 og gå til neste steg
-        # Dersom kollisjon: halver tidssteget, sjekk kollisjon. Dersom ikkje kollisjon
-    
-        t = t_span[0]
-        t_max = t_span[1]
-        t_main = t
-        dt_main = 1/fps
-        dt = dt_main
-        eps = 0.001
-        rest = 1
-        
-        while (t < t_span[1]):
-            # step_new = rk_2(part.f, step_old, (t, t+dt), 0.01, tri, U)
-            # try:
-            #     step_new = rk_3(self.f, (t,t+dt), step_old[1:], linear, method=ode_method,  atol=atol, rtol=rtol)
-            # except:
-            #     print("fekk feil.", t, dt)
-            #     break
-            
-            step_new = rk_3(self.f, (t,t+dt), step_old[1:], solver_args)
+        return (True, collisionInfo, rib) 
+        # Måtte laga denne returen så han ikkje byrja å rekna ut relativ fart når partikkelen uansett er midt inne i ribba.
 
+    # Rekna ut relativ fart, jamfør Baraff (2001) formel 8-3.
+    n = collisionInfo[1]
+    v = np.array(data[2:])
+    v_rel = np.dot(n,v)
+    collisionInfo = (collisionInfo[0], collisionInfo[1],collisionInfo[2], v_rel)
             
-            if (step_new[1] > 67 and wraparound):
-                step_new[1] -= 100
-            elif(step_new[1] > 95):
-                break
-                
-            
-            for rib in ribs:
-                collision_info = self.checkCollision(step_new[1:], rib)
-                if (collision_info[0]):
-                    break
-               
-            if (collision_info[0]):
-                if (collision_info[1][0] < eps):
-                    #Gjer alt som skal til for å endra retningen på partikkelen
-                    n = collision_info[1][1]
-                    v = step_new[3:]
-                    v_rel = collision_info[1][3]
-                    v_new = v - (rest + 1) * v_rel * n
-                    step_old = np.copy(step_new)
-                    step_old[3:] = v_new
-                    
-                    #Fullfør rørsla fram til hovud-steget, vonleg med rett retning 
-                    # og fart, så ein kjem inn i rett framerate igjen.
-                    dt = t_main + dt_main - t
-                                    
-                    # step_new = rk_3(part.f, (t, t_main+dt_main), step_old[1:])
-                    
-                    if (abs(v_rel) < 0.1):
-                        sti_komplett.append(step_new)
-                        # sti.append(step_new)
-                        break
-                    
-                    # t = t_main + dt_main
-                    
-                else:
-                    dt = dt/2
-                    continue
-            else:
-                sti_komplett.append(step_new)
-                step_old = step_new
-                
-                t = t + dt
-                
-                if (round(step_new[0]*10000) % round(dt_main*10000) == 0):
-                    sti.append(step_new)
-                    t_main = step_new[0]
-                    t = t_main
-                    dt = dt_main
-                
-        if (len(sti) < t_max*fps):
-            sti = np.pad(sti, ((0,t_max*fps - len(sti)),(0,0)),'edge')
-            sti[int(t_main*fps):,0] = np.arange(t_main, t_max, 1/fps)
+    if (v_rel < 0): # Sjekk om partikkelen er på veg vekk frå veggen.
+        is_collision = True
+    else:
+        is_collision = False
+    
+    return (is_collision, collisionInfo, rib)
+
+@ray.remote
+def lag_sti(particle, ribs, t_span, solver_args, fps=20, wraparound = False):
+
+    # stien må innehalda posisjon, fart og tid.
+    sti = []
+    sti_komplett = []
+    
+    step_old = np.concatenate(([t_span[0]], particle.init_position))
+    # Step_old og step_new er ein array med [t, x, y, u, v]. 
+    
+    sti.append(step_old)
+    sti_komplett.append(step_old)
+    
+    # finn neste steg med rk_2 og standard tidssteg.
+    # sjekk kollisjon. Dersom ikkje kollisjon, bruk resultat frå rk_2 og gå til neste steg
+    # Dersom kollisjon: halver tidssteget, sjekk kollisjon. Dersom ikkje kollisjon
+
+    t = t_span[0]
+    t_max = t_span[1]
+    t_main = t
+    dt_main = 1/fps
+    dt = dt_main
+    eps = 0.001
+    rest = 1
+    
+    while (t < t_span[1]):
         
-        if (len(sti) > t_max*fps):
-            sti = sti[0:t_max*fps]
+        step_new = rk_3(f, (t,t+dt), step_old[1:], solver_args)
+
+        
+        if (step_new[1] > 67 and wraparound):
+            step_new[1] -= 100
+        elif(step_new[1] > 95):
+            break
             
-        return np.array(sti)
+        
+        for rib in ribs:
+            collision_info = checkCollision(particle, step_new[1:], rib)
+            if (collision_info[0]):
+                break
+            
+        if (collision_info[0]):
+            if (collision_info[1][0] < eps):
+                #Gjer alt som skal til for å endra retningen på partikkelen
+                n = collision_info[1][1]
+                v = step_new[3:]
+                v_rel = collision_info[1][3]
+                v_new = v - (rest + 1) * v_rel * n
+                step_old = np.copy(step_new)
+                step_old[3:] = v_new
+                
+                #Fullfør rørsla fram til hovud-steget, vonleg med rett retning 
+                # og fart, så ein kjem inn i rett framerate igjen.
+                dt = t_main + dt_main - t
+                                
+                # step_new = rk_3(part.f, (t, t_main+dt_main), step_old[1:])
+                
+                if (abs(v_rel) < 0.1):
+                    sti_komplett.append(step_new)
+                    # sti.append(step_new)
+                    break
+                
+                # t = t_main + dt_main
+                
+            else:
+                dt = dt/2
+                continue
+        else:
+            sti_komplett.append(step_new)
+            step_old = step_new
+            
+            t = t + dt
+            
+            if (round(step_new[0]*10000) % round(dt_main*10000) == 0):
+                sti.append(step_new)
+                t_main = step_new[0]
+                t = t_main
+                dt = dt_main
+            
+    if (len(sti) < t_max*fps):
+        sti = np.pad(sti, ((0,t_max*fps - len(sti)),(0,0)),'edge')
+        sti[int(t_main*fps):,0] = np.arange(t_main, t_max, 1/fps)
+    
+    if (len(sti) > t_max*fps):
+        sti = sti[0:t_max*fps]
+        
+    return np.array(sti)
 
 
 class Rib:
