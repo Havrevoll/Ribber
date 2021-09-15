@@ -87,7 +87,9 @@ import time
 result_ids = []
 
 for k in kombinasjon:
-    k['id'] = lag_sti.remote(k['pa'], ribs, t_span, solver_args={'atol': k['tol'][0], 'rtol':k['tol'][1], 'method':k['sol'], 'args':f_args}, wraparound=True)
+    f_args = (k['pa'], tre_plasma, linear, lift, addedmass)
+    solver_args = {'atol': k['tol'][0], 'rtol':k['tol'][1], 'method':k['sol'], 'args':f_args}
+    k['id'] = lag_sti.remote(ribs, t_span, solver_args=solver_args, wraparound=True)
     
 
 for k in kombinasjon:

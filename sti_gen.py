@@ -194,7 +194,6 @@ def rk_2(f, L, y0, h, tri, U):
     return t, y
 
 def rk_3 (f, t, y0, solver_args):
-    
     resultat = solve_ivp(f, t, y0,   t_eval = [t[1]], **solver_args)
     # har teke ut max_ste=0.02, for det vart aldri aktuelt, ser det ut til.  method=solver_args['method'], args=solver_args['args'],
     
@@ -536,11 +535,13 @@ def checkCollision(particle, data, rib):
     return (is_collision, collisionInfo, rib)
 
 @ray.remote
-def lag_sti(particle, ribs, t_span, solver_args, fps=20, wraparound = False):
+def lag_sti(ribs, t_span, solver_args, fps=20, wraparound = False):
 
     # stien må innehalda posisjon, fart og tid.
     sti = []
     sti_komplett = []
+
+    particle = solver_args['args'][0]
     
     step_old = np.concatenate(([t_span[0]], particle.init_position))
     # Step_old og step_new er ein array med [t, x, y, u, v]. 
