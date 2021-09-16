@@ -60,41 +60,40 @@ linear = True
 lift = True
 addedmass = True
 
-f_args = (tre_plasma, linear, lift, addedmass)
-solver_args = {'atol': 1e-3, 'rtol':1e-1, 'method':'RK45', 'args':f_args}
-
-fig, ax = plt.subplots()
-
-tols = [(1e-3,1e-1), (1e-2,1e-1), (1e-1,1e-1) ]
-
 part0 = particle_list[0]
 
+f_args = (part0, tre_plasma, linear, lift, addedmass)
+# solver_args = {'atol': 1e-3, 'rtol':1e-1, 'method':'RK45', 'args':f_args}
+
+# fig, ax = plt.subplots()
+
+# tols = [(1e-3,1e-1), (1e-2,1e-1), (1e-1,1e-1) ]
 
 
-methods = ['RK45', 'RK23',  'Radau', 'BDF', 'LSODA'] # tok ut DOP853, for den tok for lang tid.
+# methods = ['RK45', 'RK23',  'Radau', 'BDF', 'LSODA'] # tok ut DOP853, for den tok for lang tid.
 
-kombinasjon = []
+# kombinasjon = []
 
-for tol in tols:
-    for sol in methods:
-        kombinasjon.append({'tol':tol,'sol':sol, 'pa':particle_copy(part0) } )
-  
+# for tol in tols:
+#     for sol in methods:
+#         kombinasjon.append({'tol':tol,'sol':sol, 'pa':particle_copy(part0) } )
 
-stiar = []
+jobb = lag_sti.remote(ribs, t_span, solver_args={'args':f_args})  
 
-import time
+sti = ray.get(jobb)
+# stiar = []
 
-result_ids = []
+# result_ids = []
 
-for k in kombinasjon:
-    f_args = (k['pa'], tre_plasma, linear, lift, addedmass)
-    solver_args = {'atol': k['tol'][0], 'rtol':k['tol'][1], 'method':k['sol'], 'args':f_args}
-    k['id'] = lag_sti.remote(ribs, t_span, solver_args=solver_args, wraparound=True)
+# for k in kombinasjon:
+#     f_args = (k['pa'], tre_plasma, linear, lift, addedmass)
+#     solver_args = {'atol': k['tol'][0], 'rtol':k['tol'][1], 'method':k['sol'], 'args':f_args}
+#     k['id'] = lag_sti.remote(ribs, t_span, solver_args=solver_args, wraparound=True)
     
 
-for k in kombinasjon:
-    k['pa'].sti = ray.get(k['id'])
-    stiar.append(k['pa'].sti)
+# for k in kombinasjon:
+#     k['pa'].sti = ray.get(k['id'])
+#     stiar.append(k['pa'].sti)
     
     # print("Ferdig med ", pa.init_position)
     # print("Den som har diameter ", pa.diameter)
@@ -103,8 +102,8 @@ for k in kombinasjon:
     # print("rtol er", solver_args['rtol'])
     # ax.plot(pa.sti[:,1],pa.sti[:,2])
         
-with open("stiar.pickle", 'wb') as f:
-    pickle.dump(k, f)
+with open("sti.pickle", 'wb') as f:
+    pickle.dump(sti, f)
 
 
 # particle_pool = multiprocessing.Pool()
