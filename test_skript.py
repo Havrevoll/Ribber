@@ -51,8 +51,9 @@ particle_list = [Particle(0.05, [-80,85,0,0]), Particle(0.1, [-80,80,0,0]), Part
 # except NameError: tri = None
 # if tri is None:
 tre = tre_objekt(tre_fil, t_span)
-
+print("Har laga tre_objekt, skal putta")
 tre_plasma = ray.put(tre)
+print("Har putta")
 
 ribs = [Rib(rib) for rib in tre.ribs]
     
@@ -60,16 +61,7 @@ linear = True
 lift = True
 addedmass = True
 
-part0 = particle_list[0]
-
-f_args = (part0, tre_plasma, linear, lift, addedmass)
-# solver_args = {'atol': 1e-3, 'rtol':1e-1, 'method':'RK45', 'args':f_args}
-
-# fig, ax = plt.subplots()
-
 # tols = [(1e-3,1e-1), (1e-2,1e-1), (1e-1,1e-1) ]
-
-
 # methods = ['RK45', 'RK23',  'Radau', 'BDF', 'LSODA'] # tok ut DOP853, for den tok for lang tid.
 
 # kombinasjon = []
@@ -78,9 +70,16 @@ f_args = (part0, tre_plasma, linear, lift, addedmass)
 #     for sol in methods:
 #         kombinasjon.append({'tol':tol,'sol':sol, 'pa':particle_copy(part0) } )
 
-jobb = lag_sti.remote(ribs, t_span, solver_args={'args':f_args})  
+jobbar = []
 
-sti = ray.get(jobb)
+for pa in particle_list:
+    solver_args = {'atol': 1e-5, 'rtol':1e-2, 'method':'RK45', 'linear':linear, 'lift':lift, 'addedmass':addedmass, 'pa':pa, 'tre_plasma':tre_plasma}
+    jobbar.append(lag_sti.remote(ribs, t_span, solver_args=solver_args, wraparound=False))
+
+
+stiar = []
+for jobb in jobbar:
+    stiar.append(ray.get(jobb))
 # stiar = []
 
 # result_ids = []
@@ -103,7 +102,7 @@ sti = ray.get(jobb)
     # ax.plot(pa.sti[:,1],pa.sti[:,2])
         
 with open("sti.pickle", 'wb') as f:
-    pickle.dump(sti, f)
+    pickle.dump(stiar, f)
 
 
 # particle_pool = multiprocessing.Pool()

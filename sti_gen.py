@@ -36,7 +36,7 @@ nullfart = np.zeros(2)
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
-def get_u(t, x_inn, radius, tre_plasma, linear=True, lift = True, addedmass = True):
+def get_u(t, x_inn, radius, tre_samla, linear=True, lift = True, addedmass = True):
     '''
     https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
 
@@ -62,7 +62,7 @@ def get_u(t, x_inn, radius, tre_plasma, linear=True, lift = True, addedmass = Tr
         
     dt, dx, dy = 0.01, 0.1, 0.1
     
-    tre_samla = ray.get(tre_plasma)
+    # tre_samla = ray.get(tre_plasma)
 
     U_del = tre_samla.get_U(tx)
     tri = tre_samla.get_tri(tx)
@@ -536,12 +536,16 @@ def checkCollision(particle, data, rib):
 
 @ray.remote
 def lag_sti(ribs, t_span, solver_args, fps=20, wraparound = False):
-
     # stien må innehalda posisjon, fart og tid.
     sti = []
     sti_komplett = []
-
-    particle = solver_args['args'][0]
+    
+    particle = solver_args['pa']
+    tre = ray.get(solver_args['tre_plasma'])
+    print("byrja på lagsti, og partikkelen starta på ", particle.init_position)
+    
+    args = {'atol': solver_args['atol'], 'rtol':solver_args['rtol'], 'method':solver_args['method'], 
+      'args':(solver_args['pa'], tre, solver_args['linear'], solver_args['lift'], solver_args['addedmass'])}
     
     step_old = np.concatenate(([t_span[0]], particle.init_position))
     # Step_old og step_new er ein array med [t, x, y, u, v]. 
@@ -561,10 +565,11 @@ def lag_sti(ribs, t_span, solver_args, fps=20, wraparound = False):
     eps = 0.001
     rest = 1
     
+
     while (t < t_span[1]):
         
-        step_new = rk_3(f, (t,t+dt), step_old[1:], solver_args)
-
+        step_new = rk_3(f, (t,t+dt), step_old[1:], args)
+        print("ferdig med t = ", t)
         
         if (step_new[1] > 67 and wraparound):
             step_new[1] -= 100
