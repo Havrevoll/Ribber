@@ -6,8 +6,10 @@ Created on Wed Jul  7 09:22:39 2021
 """
 
 import numpy as np
+from scipy.sparse import dia
 from sti_gen import get_u, Rib, Particle, sti_animasjon, lag_sti, particle_copy
 from datagenerering import hent_tre, lag_tre, tre_objekt, lag_tre_multi
+from kornfordeling import get_PSD_part
 from hjelpefunksjonar import finn_fil
 import ray
 ray.init() 
@@ -17,10 +19,10 @@ import pickle
 
 # #%% Førebu
 
-tre_fil = "../tre_0_60_mednullribbe.pickle"
+tre_fil = "../tre_0_10.pickle"
 #tre_fil = finn_fil(["C:/Users/havrevol/Q40_60s.pickle", "D:/Tonstad/Q40_60s.pickle", "../Q40_60s.pickle"])
 
-t_span = (0,19)
+t_span = (0,9)
 
 # %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
 
@@ -43,7 +45,12 @@ t_span = (0,19)
 # koll = stein2.checkCollision([-63,-1], ribs[0]) #R2
 # koll2 = stein2.checkCollision([-40,-1], ribs[0]) #R3 (midten av flata)
 
-particle_list = [Particle(0.05, [-80,85,0,0]), Particle(0.1, [-80,80,0,0]), Particle(0.2, [-80,75,0,0]) ]
+diameters = get_PSD_part(6)
+particle_list = []
+for d in diameters:
+    particle_list.append(Particle(d, [-80, random.uniform(0,88),0,0]))
+
+# particle_list = [Particle(0.05, [-80, 85,0,0]), Particle(0.1, [-80,80,0,0]), Particle(0.2, [-80,75,0,0]) ]
 
 # #%%
 
@@ -73,44 +80,26 @@ addedmass = True
 jobbar = []
 
 for pa in particle_list:
-    solver_args = {'atol': 1e-5, 'rtol':1e-2, 'method':'RK45', 'linear':linear, 'lift':lift, 'addedmass':addedmass, 'pa':pa, 'tre_plasma':tre_plasma}
-    jobbar.append(lag_sti.remote(ribs, t_span, solver_args=solver_args, wraparound=False))
+    solver_args = {'atol': 1e-4, 'rtol':1e-2, 'method':'RK45', 'linear':linear, 'lift':lift, 'addedmass':addedmass, 'pa':pa, 'tre_plasma':tre_plasma}
+    jobbar.append((lag_sti.remote(ribs, t_span, solver_args=solver_args, wraparound=True), pa))
 
 
 stiar = []
 for jobb in jobbar:
-    stiar.append(ray.get(jobb))
-# stiar = []
+    jobb[1].sti = ray.get(jobb[0])
+    stiar.append(jobb[1].sti)
 
-# result_ids = []
 
 # for k in kombinasjon:
 #     f_args = (k['pa'], tre_plasma, linear, lift, addedmass)
 #     solver_args = {'atol': k['tol'][0], 'rtol':k['tol'][1], 'method':k['sol'], 'args':f_args}
 #     k['id'] = lag_sti.remote(ribs, t_span, solver_args=solver_args, wraparound=True)
     
-
-# for k in kombinasjon:
-#     k['pa'].sti = ray.get(k['id'])
-#     stiar.append(k['pa'].sti)
-    
-    # print("Ferdig med ", pa.init_position)
-    # print("Den som har diameter ", pa.diameter)
-    # print("solver er", k[1])
-    # print("atol er", solver_args['atol'])
-    # print("rtol er", solver_args['rtol'])
-    # ax.plot(pa.sti[:,1],pa.sti[:,2])
-        
+   
 with open("sti.pickle", 'wb') as f:
     pickle.dump(stiar, f)
 
-
-# particle_pool = multiprocessing.Pool()
-
-# particle_result = particle_pool.map(pool_helper, particle_list)
-
-
-# sti_animasjon(particle_list,t_span=t_span)
+sti_animasjon(particle_list,t_span=t_span)
 
 # #%%
 # get_u.counter = 0

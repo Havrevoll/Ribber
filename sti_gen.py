@@ -15,6 +15,7 @@ from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/refere
 import h5py
 import ray
 # from numba import jit
+import datetime
 
 from math import pi, hypot #, atan2
 
@@ -569,7 +570,7 @@ def lag_sti(ribs, t_span, solver_args, fps=20, wraparound = False):
     while (t < t_span[1]):
         
         step_new = rk_3(f, (t,t+dt), step_old[1:], args)
-        print("ferdig med t = ", t)
+        print(datetime.datetime.now(), "pa", particle.diameter, "mm stor og startpos." , particle.init_position, "er ferdig med t=", t)
         
         if (step_new[1] > 67 and wraparound):
             step_new[1] -= 100
