@@ -22,7 +22,7 @@ import pickle
 tre_fil = "../tre_0_10.pickle"
 #tre_fil = finn_fil(["C:/Users/havrevol/Q40_60s.pickle", "D:/Tonstad/Q40_60s.pickle", "../Q40_60s.pickle"])
 
-t_span = (0,9)
+t_span = (0,2)
 
 # %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
 
@@ -45,7 +45,7 @@ t_span = (0,9)
 # koll = stein2.checkCollision([-63,-1], ribs[0]) #R2
 # koll2 = stein2.checkCollision([-40,-1], ribs[0]) #R3 (midten av flata)
 
-diameters = get_PSD_part(6)
+diameters = get_PSD_part(2)
 particle_list = []
 for d in diameters:
     particle_list.append(Particle(d, [-80, random.uniform(0,88),0,0]))

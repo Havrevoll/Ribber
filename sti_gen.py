@@ -570,7 +570,7 @@ def lag_sti(ribs, t_span, solver_args, fps=20, wraparound = False):
     while (t < t_span[1]):
         
         step_new = rk_3(f, (t,t+dt), step_old[1:], args)
-        print(datetime.datetime.now(), "pa", particle.diameter, "mm stor og startpos." , particle.init_position, "er ferdig med t=", t)
+        print(datetime.datetime.now().strftime('%X.%f'), "pa {d.2f} mm stor og startpos. {pos} er ferdig med t= {t.2f}".format(d=particle.diameter, pos=particle.init_position, t=t))
         
         if (step_new[1] > 67 and wraparound):
             step_new[1] -= 100
