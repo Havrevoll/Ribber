@@ -280,10 +280,10 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnam
     
     
     for part,color in zip(partiklar, colors[:len(partiklar)]):
-        circle = plt.Circle((part.sti[0,1], part.sti[0,2]), part.radius, color=color)
+        circle = plt.Circle((part.sti[0,1], part.sti[0,2]), part.radius*3, color=color)
         ax.add_patch(circle)
         part.circle = circle
-        part.annotation  = ax.annotate("Partikkel", xy=(np.interp(0,part.sti[:,0],part.sti[:,1]), np.interp(0,part.sti[:,0],part.sti[:,2])), xycoords="data",
+        part.annotation  = ax.annotate("{} {} {}".format(part.atol,part.rtol,part.sol), xy=(np.interp(0,part.sti[:,0],part.sti[:,1]), np.interp(0,part.sti[:,0],part.sti[:,2])), #xycoords="data",
                         xytext=(-50, 20), fontsize=10, #textcoords="offset points",
                         arrowprops=dict(arrowstyle="->", connectionstyle="arc3, rad=.5", facecolor=color))
         
@@ -570,8 +570,8 @@ def lag_sti(ribs, t_span, solver_args, fps=20, wraparound = False):
     while (t < t_span[1]):
         
         step_new = rk_3(f, (t,t+dt), step_old[1:], args)
-        print(datetime.datetime.now().strftime('%X.%f'), "pa {d:.2f} mm stor og startpos. {pos} er ferdig med t= {t:.2f}".format(d=particle.diameter, pos=particle.init_position, t=t))
-        
+        print((datetime.datetime.now()-starttid), "pa {d:.2f} mm stor og startpos. {pos} er ferdig med t= {t:.2f}".format(d=particle.diameter, pos=particle.init_position, t=t))
+        #.strftime('%X.%f')
         if (step_new[1] > 67 and wraparound):
             step_new[1] -= 100
         elif(step_new[1] > 95):

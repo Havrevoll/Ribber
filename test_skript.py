@@ -22,15 +22,21 @@ import pickle
 tre_fil = "../tre_0_10.pickle"
 #tre_fil = finn_fil(["C:/Users/havrevol/Q40_60s.pickle", "D:/Tonstad/Q40_60s.pickle", "../Q40_60s.pickle"])
 
-t_span = (0,9)
+t_span = (0,5)
+tal = 2
 
 # %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
 
 
-diameters = get_PSD_part(2)
+diameters = get_PSD_part(tal)
+
+diameters = [0.08]
 particle_list = []
 for d in diameters:
-    particle_list.append(Particle(d, [-80, random.uniform(0,88),0,0]))
+    particle_list.append(Particle(d, [-80, 50,0,0]))
+
+part = Particle(d, [-80, 50,0,0])
+    # random.uniform(0,88)
 
 # particle_list = [Particle(0.05, [-80, 85,0,0]), Particle(0.1, [-80,80,0,0]), Particle(0.2, [-80,75,0,0]) ]
 
@@ -45,26 +51,36 @@ linear = True
 lift = True
 addedmass = True
 
-# tols = [(1e-3,1e-1), (1e-2,1e-1), (1e-1,1e-1) ]
-# methods = ['RK45', 'RK23',  'Radau', 'BDF', 'LSODA'] # tok ut DOP853, for den tok for lang tid.
+atols = [1e-3, 1e-2, 1e-1 ]
+rtols = [1e-1, 1e-2] 
+methods = ['RK45', 'RK23'] # ,  'Radau', 'BDF', 'LSODA'] # tok ut DOP853, for den tok for lang tid.
 
-# kombinasjon = []
+kombinasjon = []
 
-# for tol in tols:
-#     for sol in methods:
-#         kombinasjon.append({'tol':tol,'sol':sol, 'pa':particle_copy(part0) } )
+for atol in atols:
+    for rtol in rtols:
+        for sol in methods:
+            kombinasjon.append({'atol':atol,'rtol':rtol, 'sol':sol, 'pa':particle_copy(part)} )
+            
 
 jobbar = []
 
-for pa in particle_list:
-    solver_args = {'atol': 1e-4, 'rtol':1e-2, 'method':'RK45', 'linear':linear, 'lift':lift, 'addedmass':addedmass, 'pa':pa, 'tre_plasma':tre_plasma}
-    jobbar.append((lag_sti.remote(ribs, t_span, solver_args=solver_args, wraparound=True), pa))
+# for pa in particle_list:
+for ko in kombinasjon:
+        solver_args = {'atol': ko['atol'], 'rtol':ko['rtol'], 'method':ko['sol'], 'linear':linear, 'lift':lift, 'addedmass':addedmass, 'pa':ko['pa'], 'tre_plasma':tre_plasma}
+        jobbar.append(lag_sti.remote(ribs, t_span, solver_args=solver_args, wraparound=True))
+        ko['pa'].atol = ko['atol']
+        ko['pa'].rtol = ko['rtol']
+        ko['pa'].sol = ko['sol']
+        particle_list.append(ko['pa'])
+        
+        
 
 
 stiar = []
-for jobb in jobbar:
-    jobb[1].sti = ray.get(jobb[0])
-    stiar.append(jobb[1].sti)
+for jobb, part in zip(jobbar, particle_list):
+    part.sti = ray.get(jobb)
+    stiar.append(part.sti)
 
 
 # for k in kombinasjon:
@@ -76,7 +92,7 @@ for jobb in jobbar:
 with open("sti.pickle", 'wb') as f:
     pickle.dump(stiar, f)
 
-sti_animasjon(particle_list,t_span=t_span)
+sti_animasjon(particle_list,t_span=t_span, utfilnamn="sti_RK23_atol-3_rtol-1.mp4")
 
 # #%%
 # get_u.counter = 0
