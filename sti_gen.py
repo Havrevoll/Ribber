@@ -566,11 +566,11 @@ def lag_sti(ribs, t_span, solver_args, fps=20, wraparound = False):
     eps = 0.001
     rest = 1
     
-
+    starttid = datetime.datetime.now()
     while (t < t_span[1]):
         
         step_new = rk_3(f, (t,t+dt), step_old[1:], args)
-        print(datetime.datetime.now().strftime('%X.%f'), "pa {d.2f} mm stor og startpos. {pos} er ferdig med t= {t.2f}".format(d=particle.diameter, pos=particle.init_position, t=t))
+        print(datetime.datetime.now().strftime('%X.%f'), "pa {d:.2f} mm stor og startpos. {pos} er ferdig med t= {t:.2f}".format(d=particle.diameter, pos=particle.init_position, t=t))
         
         if (step_new[1] > 67 and wraparound):
             step_new[1] -= 100
@@ -585,6 +585,7 @@ def lag_sti(ribs, t_span, solver_args, fps=20, wraparound = False):
             
         if (collision_info[0]):
             if (collision_info[1][0] < eps):
+                print("kolliderte")
                 #Gjer alt som skal til for å endra retningen på partikkelen
                 n = collision_info[1][1]
                 v = step_new[3:]
@@ -608,6 +609,7 @@ def lag_sti(ribs, t_span, solver_args, fps=20, wraparound = False):
                 
             else:
                 dt = dt/2
+                print("må finjustera kollisjon")
                 continue
         else:
             sti_komplett.append(step_new)
@@ -627,7 +629,8 @@ def lag_sti(ribs, t_span, solver_args, fps=20, wraparound = False):
     
     if (len(sti) > t_max*fps):
         sti = sti[0:t_max*fps]
-        
+
+    print("brukte ", datetime.datetime.now()-starttid)    
     return np.array(sti)
 
 

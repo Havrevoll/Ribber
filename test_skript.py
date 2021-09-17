@@ -22,28 +22,10 @@ import pickle
 tre_fil = "../tre_0_10.pickle"
 #tre_fil = finn_fil(["C:/Users/havrevol/Q40_60s.pickle", "D:/Tonstad/Q40_60s.pickle", "../Q40_60s.pickle"])
 
-t_span = (0,2)
+t_span = (0,9)
 
 # %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
 
-# ribs = [Rib((-61.07,-8.816),50.2,7.8), Rib((39.03,-7.53), 50, 7.8), Rib((-100,-74.3), 200, -10)]
-# ribs = [Rib([ [-10.83594, -1.1020], [-11.0196, -8.9075], [-60.79146, -0.8265], [-60.97512, -8.6320] ]), 
-#         Rib([ [89.0751, 0.09183], [89.0751, -7.71372], [39.02775, 0.09183], [39.02775, -7.71372] ]),
-#         Rib([[93.29928, -74.84145], [-93.20745, -72.63753], [-93.20745, -98.80908], [93.29928,- 98.80908]])]
-
-
-
-#%%
-
-# #%% Test løysing av difflikning
-# svar_profft = solve_ivp(stein.f,(0.375,0.4), np.array([-88.5,87,0,0]), args=(tri, U))
-# svar_profft2 = rk_3(stein.f, (0.375,0.4), np.array([-88.5,87,0,0]))
-# svar = rk_2(stein.f, np.array([-88.5,87,0,0]), (0,0.4), 0.01, tri, U)
-
-# #%% Test kollisjon
-# stein2 = Particle([-80,50],3)
-# koll = stein2.checkCollision([-63,-1], ribs[0]) #R2
-# koll2 = stein2.checkCollision([-40,-1], ribs[0]) #R3 (midten av flata)
 
 diameters = get_PSD_part(2)
 particle_list = []
@@ -52,11 +34,6 @@ for d in diameters:
 
 # particle_list = [Particle(0.05, [-80, 85,0,0]), Particle(0.1, [-80,80,0,0]), Particle(0.2, [-80,75,0,0]) ]
 
-# #%%
-
-# try: tri
-# except NameError: tri = None
-# if tri is None:
 tre = tre_objekt(tre_fil, t_span)
 print("Har laga tre_objekt, skal putta")
 tre_plasma = ray.put(tre)
