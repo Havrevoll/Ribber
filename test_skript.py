@@ -32,10 +32,10 @@ diameters = get_PSD_part(tal)
 
 diameters = [0.08]
 particle_list = []
-for d in diameters:
-    particle_list.append(Particle(d, [-80, 50,0,0]))
+# for d in diameters:
+#     particle_list.append(Particle(d, [-80, 50,0,0]))
 
-part = Particle(d, [-80, 50,0,0])
+part = Particle(0.08, [-80, 50,0,0])
     # random.uniform(0,88)
 
 # particle_list = [Particle(0.05, [-80, 85,0,0]), Particle(0.1, [-80,80,0,0]), Particle(0.2, [-80,75,0,0]) ]
@@ -92,7 +92,7 @@ for jobb, part in zip(jobbar, particle_list):
 with open("sti.pickle", 'wb') as f:
     pickle.dump(stiar, f)
 
-sti_animasjon(particle_list,t_span=t_span, utfilnamn="sti_RK23_atol-3_rtol-1.mp4")
+sti_animasjon(particle_list,t_span=t_span, utfilnamn="sti_RK45_og_23.mp4")
 
 # #%%
 # get_u.counter = 0
