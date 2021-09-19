@@ -16,6 +16,7 @@ import h5py
 import ray
 # from numba import jit
 import datetime
+import random
 
 from math import pi, hypot #, atan2
 
@@ -37,7 +38,7 @@ nullfart = np.zeros(2)
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
-def get_u(t, x_inn, radius, tre_samla, linear=True, lift = True, addedmass = True):
+def get_u(t, x_inn, particle, tre_samla):
     '''
     https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
 
@@ -58,6 +59,10 @@ def get_u(t, x_inn, radius, tre_samla, linear=True, lift = True, addedmass = Tru
         DESCRIPTION.
 
     '''    
+    radius = particle.radius
+    lift, addedmass, linear = particle.lift, particle.addedmass, particle.linear
+
+
     tx = np.concatenate(([t], x_inn[:2]))
     U_p = x_inn[2:]
         
@@ -280,12 +285,13 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnam
     
     
     for part,color in zip(partiklar, colors[:len(partiklar)]):
-        circle = plt.Circle((part.sti[0,1], part.sti[0,2]), part.radius*3, color=color)
+        circle = plt.Circle((part.sti[0,1], part.sti[0,2]), part.radius*5, color=color)
         ax.add_patch(circle)
         part.circle = circle
-        part.annotation  = ax.annotate("{} {} {}".format(part.atol,part.rtol,part.sol), xy=(np.interp(0,part.sti[:,0],part.sti[:,1]), np.interp(0,part.sti[:,0],part.sti[:,2])), #xycoords="data",
-                        xytext=(-50, 20), fontsize=10, #textcoords="offset points",
-                        arrowprops=dict(arrowstyle="->", connectionstyle="arc3, rad=.5", facecolor=color))
+        part.annotation  = ax.annotate("{} {} {}".format(part.atol,part.rtol,part.sol), xy=(np.interp(0,part.sti[:,0],part.sti[:,1]), np.interp(0,part.sti[:,0],part.sti[:,2])), xycoords="data",
+                        xytext=(random.uniform(-20,20), random.uniform(-20,20)), fontsize=5, textcoords="offset points",
+                        arrowprops=dict(arrowstyle="->", connectionstyle="arc3, rad=0", color=color))
+        print("{} {} {} {}".format(part.atol,part.rtol,part.sol, color))
         
     ax.set_xlim([x_reshape[0,0],x_reshape[0,-1]])
     draw_rect(ax)
@@ -320,9 +326,10 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnam
 
 class Particle:
     #Lag ein tabell med tidspunkt og posisjon for kvar einskild partikkel.
-    def __init__(self, diameter, init_position, density=2.65e-6 ):
+    def __init__(self, diameter, init_position, init_time=0, density=2.65e-6 ):
         self.diameter= diameter
         self.init_position = init_position
+        self.init_time = init_time
         self.density = density
         self.volume = self.diameter**3 * pi * 1/6
         self.mass = self.volume * self.density
@@ -357,6 +364,15 @@ def f(t, x, particle, tri, linear=True, lift=False, addedmass=True):
 
     """
     
+    if not hasattr(particle, 'linear'):
+        particle.linear = True
+    if not hasattr(particle, 'lift'):
+            particle.lift = False
+    if not hasattr(particle, 'linear'):
+            particle.addedmass = True
+
+    
+
     g = np.array([0, 9.81e3]) # mm/s^2 = 9.81 m/s^2
     nu = 1 # 1 mm^2/s = 1e-6 m^2/s
     rho = 1e-6  # kg/mm^3 = 1000 kg/m^3 
@@ -365,7 +381,7 @@ def f(t, x, particle, tri, linear=True, lift=False, addedmass=True):
     # vel = np.array([100,0]) - dx_dt # relativ snøggleik
     # U_f = np.array(get_u(t,np.array([x[0],x[1]]),tri, linear))
     
-    U_f, dudt_material, U_top_bottom = get_u(t, x, particle.radius, tri, linear=linear, lift=lift, addedmass=addedmass)
+    U_f, dudt_material, U_top_bottom = get_u(t, x, particle, tri)
     
     # if (np.isnan(U_f[2])):
     #     U_f[2] = 0
@@ -536,18 +552,19 @@ def checkCollision(particle, data, rib):
     return (is_collision, collisionInfo, rib)
 
 @ray.remote
-def lag_sti(ribs, t_span, solver_args, fps=20, wraparound = False):
+def lag_sti(ribs, t_span, particle, tre_plasma, fps=20, wraparound = False):
     # stien må innehalda posisjon, fart og tid.
     sti = []
     sti_komplett = []
     
-    particle = solver_args['pa']
-    tre = ray.get(solver_args['tre_plasma'])
+    tre = ray.get(tre_plasma)
     print("byrja på lagsti, og partikkelen starta på ", particle.init_position)
     
     args = {'atol': solver_args['atol'], 'rtol':solver_args['rtol'], 'method':solver_args['method'], 
       'args':(solver_args['pa'], tre, solver_args['linear'], solver_args['lift'], solver_args['addedmass'])}
     
+    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre)
+
     step_old = np.concatenate(([t_span[0]], particle.init_position))
     # Step_old og step_new er ein array med [t, x, y, u, v]. 
     

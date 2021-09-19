@@ -27,7 +27,7 @@ def norm(v):
     return v / (v**2).sum()**0.5
 
 def draw_rect(axes,color='red'):
-    axes.add_patch(Rectangle((-61.07,-8.816),50.2,7.8,linewidth=2,edgecolor=color,facecolor='none'))
+    axes.add_patch(Rectangle((-61.07,-8.816),50.2,7.8,linewidth=2,edgecolor='none',facecolor=color))
     axes.add_patch(Rectangle((37.6,-8.5),50,7.8,linewidth=2,edgecolor=color,facecolor='none'))
 
 def ranges(kutt=False):

@@ -7,6 +7,7 @@ Created on Wed Jul  7 09:22:39 2021
 
 import numpy as np
 from scipy.sparse import dia
+from scipy.sparse.construct import rand
 from sti_gen import get_u, Rib, Particle, sti_animasjon, lag_sti, particle_copy
 from datagenerering import hent_tre, lag_tre, tre_objekt, lag_tre_multi
 from kornfordeling import get_PSD_part
@@ -19,23 +20,28 @@ import pickle
 
 # #%% Førebu
 
-tre_fil = "../tre_0_10.pickle"
+tre_fil = "../tre_0_60.pickle"
 #tre_fil = finn_fil(["C:/Users/havrevol/Q40_60s.pickle", "D:/Tonstad/Q40_60s.pickle", "../Q40_60s.pickle"])
 
-t_span = (0,5)
-tal = 2
+t_span = (0,59)
+tal = 15
+linear, lift, addedmass = True, True, True
+wraparound = False
+atol, rtol = 1e-1, 1e-1
+method = 'RK23'
 
 # %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
 
-
 diameters = get_PSD_part(tal)
 
-diameters = [0.08]
-particle_list = []
-# for d in diameters:
-#     particle_list.append(Particle(d, [-80, 50,0,0]))
+# diameters = [0.08]
+particle_list = [Particle(d, [-90,random.uniform(0,90)], random.uniform(0,50)) for d in diameters]
 
-part = Particle(0.08, [-80, 50,0,0])
+for p in particle_list:
+    p.atol , p.rtol = atol, rtol
+    p.method = method
+    p.linear, p.lift, p.addedmass = linear, lift, addedmass
+# part = Particle(0.08, [-80, 50,0,0])
     # random.uniform(0,88)
 
 # particle_list = [Particle(0.05, [-80, 85,0,0]), Particle(0.1, [-80,80,0,0]), Particle(0.2, [-80,75,0,0]) ]
@@ -47,32 +53,26 @@ print("Har putta")
 
 ribs = [Rib(rib) for rib in tre.ribs]
     
-linear = True
-lift = True
-addedmass = True
 
-atols = [1e-3, 1e-2, 1e-1 ]
-rtols = [1e-1, 1e-2] 
-methods = ['RK45', 'RK23'] # ,  'Radau', 'BDF', 'LSODA'] # tok ut DOP853, for den tok for lang tid.
+# atols = [1e-3, 1e-2, 1e-1 ]
+# rtols = [1e-1, 1e-2] 
+# methods = ['RK45', 'RK23'] # ,  'Radau', 'BDF', 'LSODA'] # tok ut DOP853, for den tok for lang tid.
 
-kombinasjon = []
+# kombinasjon = []
 
-for atol in atols:
-    for rtol in rtols:
-        for sol in methods:
-            kombinasjon.append({'atol':atol,'rtol':rtol, 'sol':sol, 'pa':particle_copy(part)} )
+# for atol in atols:
+#     for rtol in rtols:
+#         for sol in methods:
+#             kombinasjon.append({'atol':atol,'rtol':rtol, 'sol':sol, 'pa':particle_copy(part)} )
             
 
+# kombinasjon.append({'atol':1e-6,'rtol':1e-3, 'sol':'RK45', 'pa':particle_copy(part)} )
 jobbar = []
 
-# for pa in particle_list:
-for ko in kombinasjon:
-        solver_args = {'atol': ko['atol'], 'rtol':ko['rtol'], 'method':ko['sol'], 'linear':linear, 'lift':lift, 'addedmass':addedmass, 'pa':ko['pa'], 'tre_plasma':tre_plasma}
-        jobbar.append(lag_sti.remote(ribs, t_span, solver_args=solver_args, wraparound=True))
-        ko['pa'].atol = ko['atol']
-        ko['pa'].rtol = ko['rtol']
-        ko['pa'].sol = ko['sol']
-        particle_list.append(ko['pa'])
+for pa in particle_list:
+# for ko in kombinasjon:
+        solver_args = dict(atol=1e-1, rtol=1e-1, method='RK23', linear=linear, lift=lift, addedmass=addedmass, pa=pa, tre_plasma=tre_plasma)
+        pa.job_id(lag_sti.remote(ribs, t_span, pa=pa, tre_plasma=tre_plasma, wraparound=True))
         
         
 
