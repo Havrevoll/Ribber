@@ -552,20 +552,20 @@ def checkCollision(particle, data, rib):
     return (is_collision, collisionInfo, rib)
 
 @ray.remote
-def lag_sti(ribs, t_span, particle, tre_plasma, fps=20, wraparound = False):
+def lag_sti(ribs, t_span, particle, tri, fps=20, wraparound = False):
     # stien må innehalda posisjon, fart og tid.
     sti = []
     sti_komplett = []
-    
-    tre = ray.get(tre_plasma)
+    print(type(tri))
+    tre = ray.get(tri)
     print("byrja på lagsti, og partikkelen starta på ", particle.init_position)
     
-    args = {'atol': solver_args['atol'], 'rtol':solver_args['rtol'], 'method':solver_args['method'], 
-      'args':(solver_args['pa'], tre, solver_args['linear'], solver_args['lift'], solver_args['addedmass'])}
+    # args = {'atol': solver_args['atol'], 'rtol':solver_args['rtol'], 'method':solver_args['method'], 
+    #   'args':(solver_args['pa'], tre, solver_args['linear'], solver_args['lift'], solver_args['addedmass'])}
     
-    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre)
+    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre))
 
-    step_old = np.concatenate(([t_span[0]], particle.init_position))
+    step_old = np.concatenate(([particle.init_time], particle.init_position))
     # Step_old og step_new er ein array med [t, x, y, u, v]. 
     
     sti.append(step_old)
@@ -575,7 +575,7 @@ def lag_sti(ribs, t_span, particle, tre_plasma, fps=20, wraparound = False):
     # sjekk kollisjon. Dersom ikkje kollisjon, bruk resultat frå rk_2 og gå til neste steg
     # Dersom kollisjon: halver tidssteget, sjekk kollisjon. Dersom ikkje kollisjon
 
-    t = t_span[0]
+    t = particle.init_time
     t_max = t_span[1]
     t_main = t
     dt_main = 1/fps
@@ -586,7 +586,7 @@ def lag_sti(ribs, t_span, particle, tre_plasma, fps=20, wraparound = False):
     starttid = datetime.datetime.now()
     while (t < t_span[1]):
         
-        step_new = rk_3(f, (t,t+dt), step_old[1:], args)
+        step_new = rk_3(f, (t,t+dt), step_old[1:], solver_args)
         print((datetime.datetime.now()-starttid), "pa {d:.2f} mm stor og startpos. {pos} er ferdig med t= {t:.2f}".format(d=particle.diameter, pos=particle.init_position, t=t))
         #.strftime('%X.%f')
         if (step_new[1] > 67 and wraparound):

@@ -4,7 +4,7 @@ Created on Wed Jul  7 09:22:39 2021
 
 @author: havrevol
 """
-
+#%%
 import numpy as np
 from scipy.sparse import dia
 from scipy.sparse.construct import rand
@@ -24,7 +24,7 @@ tre_fil = "../tre_0_60.pickle"
 #tre_fil = finn_fil(["C:/Users/havrevol/Q40_60s.pickle", "D:/Tonstad/Q40_60s.pickle", "../Q40_60s.pickle"])
 
 t_span = (0,59)
-tal = 15
+tal = 1
 linear, lift, addedmass = True, True, True
 wraparound = False
 atol, rtol = 1e-1, 1e-1
@@ -50,9 +50,11 @@ tre = tre_objekt(tre_fil, t_span)
 print("Har laga tre_objekt, skal putta")
 tre_plasma = ray.put(tre)
 print("Har putta")
+print(type(tre_plasma))
 
 ribs = [Rib(rib) for rib in tre.ribs]
     
+#%%
 
 # atols = [1e-3, 1e-2, 1e-1 ]
 # rtols = [1e-1, 1e-2] 
@@ -71,16 +73,14 @@ jobbar = []
 
 for pa in particle_list:
 # for ko in kombinasjon:
-        solver_args = dict(atol=1e-1, rtol=1e-1, method='RK23', linear=linear, lift=lift, addedmass=addedmass, pa=pa, tre_plasma=tre_plasma)
-        pa.job_id(lag_sti.remote(ribs, t_span, pa=pa, tre_plasma=tre_plasma, wraparound=True))
+        # solver_args = dict(atol=1e-1, rtol=1e-1, method='RK23', linear=linear, lift=lift, addedmass=addedmass, pa=pa, tre_plasma=tre_plasma)
+        jobbar.append(lag_sti.remote(ribs, t_span, particle=pa, tri=tre_plasma, wraparound=False))
         
-        
-
 
 stiar = []
-for jobb, part in zip(jobbar, particle_list):
-    part.sti = ray.get(jobb)
-    stiar.append(part.sti)
+for jobb, pa in zip(jobbar, particle_list):
+    pa.sti = ray.get(jobb)
+    stiar.append(pa.sti)
 
 
 # for k in kombinasjon:
