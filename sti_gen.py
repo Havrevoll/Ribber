@@ -288,10 +288,10 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnam
         circle = plt.Circle((part.sti[0,1], part.sti[0,2]), part.radius*5, color=color)
         ax.add_patch(circle)
         part.circle = circle
-        part.annotation  = ax.annotate("{} {} {}".format(part.atol,part.rtol,part.sol), xy=(np.interp(0,part.sti[:,0],part.sti[:,1]), np.interp(0,part.sti[:,0],part.sti[:,2])), xycoords="data",
+        part.annotation  = ax.annotate("{} {} {}".format(part.atol,part.rtol,part.method), xy=(np.interp(0,part.sti[:,0],part.sti[:,1]), np.interp(0,part.sti[:,0],part.sti[:,2])), xycoords="data",
                         xytext=(random.uniform(-20,20), random.uniform(-20,20)), fontsize=5, textcoords="offset points",
                         arrowprops=dict(arrowstyle="->", connectionstyle="arc3, rad=0", color=color))
-        print("{} {} {} {}".format(part.atol,part.rtol,part.sol, color))
+        print("{} {} {} {}".format(part.atol,part.rtol,part.method, color))
         
     ax.set_xlim([x_reshape[0,0],x_reshape[0,-1]])
     draw_rect(ax)
@@ -300,6 +300,8 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnam
         field.set_data(V_mag_reshape[i,:,:])
         # particle.set_data(sti[:,i,1], sti[:,i,2])
         t = t_list[i]
+
+        
         # https://stackoverflow.com/questions/16527930/matplotlib-update-position-of-patches-or-set-xy-for-circles
         for part in partiklar:
             part.circle.center = np.interp(t,part.sti[:,0],part.sti[:,1]), np.interp(t,part.sti[:,0],part.sti[:,2])
@@ -551,13 +553,13 @@ def checkCollision(particle, data, rib):
     
     return (is_collision, collisionInfo, rib)
 
-@ray.remote
-def lag_sti(ribs, t_span, particle, tri, fps=20, wraparound = False):
+# @ray.remote
+def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False):
     # stien må innehalda posisjon, fart og tid.
     sti = []
     sti_komplett = []
-    print(type(tri))
-    tre = ray.get(tri)
+    # print(type(tre))
+    # tre = ray.get(tre)
     print("byrja på lagsti, og partikkelen starta på ", particle.init_position)
     
     # args = {'atol': solver_args['atol'], 'rtol':solver_args['rtol'], 'method':solver_args['method'], 

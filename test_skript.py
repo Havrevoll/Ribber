@@ -12,8 +12,8 @@ from sti_gen import get_u, Rib, Particle, sti_animasjon, lag_sti, particle_copy
 from datagenerering import hent_tre, lag_tre, tre_objekt, lag_tre_multi
 from kornfordeling import get_PSD_part
 from hjelpefunksjonar import finn_fil
-import ray
-ray.init() 
+# import ray
+# ray.init() 
 import random
 import matplotlib.pyplot as plt
 import pickle
@@ -28,14 +28,16 @@ tal = 1
 linear, lift, addedmass = True, True, True
 wraparound = False
 atol, rtol = 1e-1, 1e-1
-method = 'RK23'
+method = 'RK45'
 
 # %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
 
 diameters = get_PSD_part(tal)
+diameters[0]=0.19
 
 # diameters = [0.08]
-particle_list = [Particle(d, [-90,random.uniform(0,90)], random.uniform(0,50)) for d in diameters]
+# particle_list = [Particle(d, [-90,random.uniform(0,90), 0, 0], random.uniform(0,50)) for d in diameters]
+particle_list = [Particle(d, [-90,29.2626, 0, 0], 45.41) for d in diameters]
 
 for p in particle_list:
     p.atol , p.rtol = atol, rtol
@@ -46,11 +48,11 @@ for p in particle_list:
 
 # particle_list = [Particle(0.05, [-80, 85,0,0]), Particle(0.1, [-80,80,0,0]), Particle(0.2, [-80,75,0,0]) ]
 
+print("Skal byrja å byggja tre_objekt")
 tre = tre_objekt(tre_fil, t_span)
 print("Har laga tre_objekt, skal putta")
-tre_plasma = ray.put(tre)
-print("Har putta")
-print(type(tre_plasma))
+# tre_plasma = ray.put(tre)
+
 
 ribs = [Rib(rib) for rib in tre.ribs]
     
@@ -74,12 +76,12 @@ jobbar = []
 for pa in particle_list:
 # for ko in kombinasjon:
         # solver_args = dict(atol=1e-1, rtol=1e-1, method='RK23', linear=linear, lift=lift, addedmass=addedmass, pa=pa, tre_plasma=tre_plasma)
-        jobbar.append(lag_sti.remote(ribs, t_span, particle=pa, tri=tre_plasma, wraparound=False))
+        pa.sti = lag_sti(ribs, t_span, particle=pa, tre=tre, wraparound=False)
         
 
 stiar = []
-for jobb, pa in zip(jobbar, particle_list):
-    pa.sti = ray.get(jobb)
+for pa in particle_list:
+    # pa.sti = ray.get(pa.job_id)
     stiar.append(pa.sti)
 
 
@@ -92,7 +94,7 @@ for jobb, pa in zip(jobbar, particle_list):
 with open("sti.pickle", 'wb') as f:
     pickle.dump(stiar, f)
 
-sti_animasjon(particle_list,t_span=t_span, utfilnamn="sti_RK45_og_23.mp4")
+sti_animasjon(particle_list,t_span=t_span, utfilnamn="sti_RK23_ein_part.mp4")
 
 # #%%
 # get_u.counter = 0
