@@ -335,7 +335,7 @@ class Particle:
     
     radius = property(get_radius)
         
-    def f(self, t, x, tri, linear=True, lift=False, addedmass=True):
+    def f(self, t, x, tri, linear=True, lift=True, addedmass=True):
         """
         Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
         Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.

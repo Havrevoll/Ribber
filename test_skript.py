@@ -16,10 +16,10 @@ import matplotlib.pyplot as plt
 
 # #%% Førebu
 
-tre_fil = "../tre_0_20_mednullribbe.pickle"
+tre_fil = "../tre_0_60_mednullribbe.pickle"
 #tre_fil = finn_fil(["C:/Users/havrevol/Q40_60s.pickle", "D:/Tonstad/Q40_60s.pickle", "../Q40_60s.pickle"])
 
-t_span = (0,19)
+t_span = (0,1)
 
 # %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
 
@@ -28,9 +28,6 @@ t_span = (0,19)
 #         Rib([ [89.0751, 0.09183], [89.0751, -7.71372], [39.02775, 0.09183], [39.02775, -7.71372] ]),
 #         Rib([[93.29928, -74.84145], [-93.20745, -72.63753], [-93.20745, -98.80908], [93.29928,- 98.80908]])]
 
-
-
-#%%
 
 # #%% Test løysing av difflikning
 # svar_profft = solve_ivp(stein.f,(0.375,0.4), np.array([-88.5,87,0,0]), args=(tri, U))
@@ -78,15 +75,17 @@ stiar = []
 
 import time
 
-#%%
-get_u(2,[-34,0,0,0], 0.5, tri, linear = True, lift=True, addedmass=True)
+# #%%
+# get_u(2,[-34,0,0,0], 0.5, tri, linear = True, lift=True, addedmass=True)
 
 
-#%%
+# #%%
 
-get_u(0,[-88.,0,0,0],0.5,tri)
+# get_u(0,[-88.,0,0,0],0.5,tri)
 
-pa.f(0,(-88,-0.6,0,0),tri,linear,lift,addedmass)
+# pa.f(0,(-88,-0.6,0,0),tri,linear,lift,addedmass)
+
+pa.sti= pa.lag_sti(ribs, t_span, solver_args={'args':f_args},wraparound=(True))
 
 #%% 
 
@@ -106,7 +105,7 @@ for k in kombinasjon:
     print("solver er", k[1])
     print("atol er", solver_args['atol'])
     print("rtol er", solver_args['rtol'])
-    ax.plot(pa.sti[:,1],pa.sti[:,2])
+    # ax.plot(pa.sti[:,1],pa.sti[:,2])
         
 
 
