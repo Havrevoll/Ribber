@@ -7,15 +7,16 @@ Created on Wed Jul  7 09:22:39 2021
 #%%
 import numpy as np
 from scipy.sparse import dia
-from scipy.sparse.construct import rand
-from sti_gen import get_u, Rib, Particle, sti_animasjon, lag_sti, particle_copy
+# from scipy.sparse.construct import rand
+from sti_gen import Rib, Particle, lag_sti, particle_copy
+from lag_video import sti_animasjon
 from datagenerering import hent_tre, lag_tre, tre_objekt, lag_tre_multi
 from kornfordeling import get_PSD_part
 from hjelpefunksjonar import finn_fil
 # import ray
 # ray.init() 
 import random
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import pickle
 
 # #%% Førebu

@@ -1,40 +1,235 @@
 # -*- coding: utf-8 -*-
 '''køyr funksjonar som plottingar(fil['vassføringar'])'''
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-# from cycler import cycler
-plt.rcParams["font.family"] = "STIXGeneral"
-plt.rcParams['mathtext.fontset'] = 'stix'
-from matplotlib import animation
 
 import numpy as np
 # from scipy import interpolate
 from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#r179348322575-1
 
-import h5py
-import ray
+# import ray
 # from numba import jit
 import datetime
-import random
 
-from math import pi, hypot #, atan2
-
+from math import pi, hypot, floor #, atan2
 
 # fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
 # x = np.array(h5py.File(filnamn, 'r')['x']).reshape(127,126)[ranges()]
 # vass = fil['vassføringar']
 
-
-from hjelpefunksjonar import norm, draw_rect, ranges, finn_fil, sortClockwise
-
-
-filnamn = "../Q40.hdf5" #finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
+from hjelpefunksjonar import norm, sortClockwise
 
 t_max_global = 20
 t_min_global = 0
 
 nullfart = np.zeros(2)
+
+
+# @ray.remote
+def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False):
+    # stien må innehalda posisjon, fart og tid.
+    sti = []
+    sti_komplett = []
+    # print(type(tre))
+    # tre = ray.get(tre)
+    print("byrja på lagsti, og partikkelen starta på ", particle.init_position)
+    
+    # args = {'atol': solver_args['atol'], 'rtol':solver_args['rtol'], 'method':solver_args['method'], 
+    #   'args':(solver_args['pa'], tre, solver_args['linear'], solver_args['lift'], solver_args['addedmass'])}
+    
+    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre))
+
+    particle.init_time = floor(particle.init_time *fps)/fps #rettar opp init_tid slik at det blir eit tal som finst i datasettet.
+
+    step_old = np.concatenate(([particle.init_time], particle.init_position))
+    # Step_old og step_new er ein array med [t, x, y, u, v]. 
+    
+    sti.append(step_old)
+    sti_komplett.append(step_old)
+    
+    # finn neste steg med rk_2 og standard tidssteg.
+    # sjekk kollisjon. Dersom ikkje kollisjon, bruk resultat frå rk_2 og gå til neste steg
+    # Dersom kollisjon: halver tidssteget, sjekk kollisjon. Dersom ikkje kollisjon
+
+    t = particle.init_time
+    t_max = t_span[1]
+    t_main = t
+    dt_main = 1/fps
+    dt = dt_main
+    eps = 0.01
+    rest = 0.5
+    
+    starttid = datetime.datetime.now()
+    while (t < t_max):
+        
+        step_new = rk_3(f, (t,t+dt), step_old[1:], solver_args)
+        print((datetime.datetime.now()-starttid), "pa {d:.2f} mm stor og startpos. {pos} er ferdig med t= {t}".format(d=particle.diameter, pos=particle.init_position[:2], t=step_new))
+        #.strftime('%X.%f')
+        if (step_new[1] > 67 and wraparound):
+            step_new[1] -= 100
+        elif(step_new[1] > 95):
+            break
+            
+        
+        for rib in ribs:
+            collision_info = checkCollision(particle, step_new[1:], rib)
+            if (collision_info[0]):
+                break
+            
+        if (collision_info[0]):
+            if (collision_info[1][0] < eps):
+                print("kolliderte")
+                #Gjer alt som skal til for å endra retningen på partikkelen
+                n = collision_info[1][1]
+                v = step_new[3:]
+                v_rel = collision_info[1][3]
+                v_new = v - (rest + 1) * v_rel * n
+                step_old = np.copy(step_new)
+                step_old[3:] = v_new
+                
+                #Fullfør rørsla fram til hovud-steget, vonleg med rett retning 
+                # og fart, så ein kjem inn i rett framerate igjen.
+                dt = t_main + dt_main - t
+                                
+                # step_new = rk_3(part.f, (t, t_main+dt_main), step_old[1:])
+                
+                if (abs(v_rel) < 0.1):
+                    sti_komplett.append(step_new)
+                    # sti.append(step_new)
+                    break
+                
+                # t = t_main + dt_main
+                
+            else:
+                dt = dt/2
+                print("må finjustera kollisjon")
+                continue
+        else:
+            sti_komplett.append(step_new)
+            step_old = step_new
+            
+            t = t + dt
+            
+            if (round(step_new[0]*10000) % round(dt_main*10000) == 0):
+                sti.append(step_new)
+                t_main = step_new[0]
+                t = t_main
+                dt = dt_main
+            
+    if (len(sti) < t_max*fps):
+        sti = np.pad(sti, ((0,t_max*fps - len(sti)),(0,0)),'edge')
+        sti[int(t_main*fps):,0] = np.arange(t_main, t_max, 1/fps)
+    
+    if (len(sti) > t_max*fps):
+        sti = sti[0:t_max*fps]
+
+    print("brukte ", datetime.datetime.now()-starttid)    
+    return np.array(sti)
+
+
+def rk_3 (f, t, y0, solver_args):
+    resultat = solve_ivp(f, t, y0,   t_eval = [t[1]], **solver_args)
+    # har teke ut max_ste=0.02, for det vart aldri aktuelt, ser det ut til.  method=solver_args['method'], args=solver_args['args'],
+    
+    return np.concatenate((resultat.t, resultat.y[:,0]))
+
+
+# def createParticle(diameter, init_position, density=2.65e-6):
+#     volume = diameter**3 * pi * 1/6
+#     mass = volume*density
+#     radius = diameter/2
+#     return {'diameter': diameter, 'init_position':init_position}
+
+def f(t, x, particle, tri, linear=True, lift=False, addedmass=True):
+    """
+    Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
+    Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
+    Men for at solve_ivp skal fungera, må x vera 1-dimensjonal. Altså. 
+    x= [x,y,u,v], ikkje x = [[x,y], [u,v]].
+    f (t, x, y) = [dx/dt, du/dt]
+
+    Parameters
+    ----------
+    t : double
+        Tidspunktet for funksjonen.
+    x : tuple
+        Ein tuple med koordinatane og farten, altså (x0, y0, u0, v0).
+    tri : spatial.qhull.Delaunay
+        Samling av triangulerte data.
+    U : Tuple
+        Ein tuple av dei to fartsvektor-arrayane.
+
+    Returns
+    -------
+    tuple
+            Ein tuple med [dx/dt, du/dt]
+
+    """
+    
+    if not hasattr(particle, 'linear'):
+        particle.linear = True
+    if not hasattr(particle, 'lift'):
+            particle.lift = False
+    if not hasattr(particle, 'linear'):
+            particle.addedmass = True
+
+    
+
+    g = np.array([0, 9.81e3]) # mm/s^2 = 9.81 m/s^2
+    nu = 1 # 1 mm^2/s = 1e-6 m^2/s
+    rho = 1e-6  # kg/mm^3 = 1000 kg/m^3 
+    
+    dx_dt = x[2:]
+    # vel = np.array([100,0]) - dx_dt # relativ snøggleik
+    # U_f = np.array(get_u(t,np.array([x[0],x[1]]),tri, linear))
+    
+    U_f, dudt_material, U_top_bottom = get_u(t, x, particle, tri)
+    
+    # if (np.isnan(U_f[2])):
+    #     U_f[2] = 0
+    #     # U_f[2] = dudt_mean[0][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
+    # if (np.isnan(U_f[3])):
+    #     U_f[3] = 0
+    #     # U_f[3] = dudt_mean[1][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
+        
+        
+    vel = U_f - dx_dt # relativ snøggleik
+    # vel_ang = atan2(vel[1], vel[0])
+    
+    
+    Re = hypot(vel[0],vel[1]) * particle.diameter / nu 
+    
+    if (Re<1000):
+        try:
+            cd = 24 / Re * (1+0.15*Re**0.687)
+            # Cheng (1997) skildrar Cd for kantete og runde steinar. Dette 
+            # er kanskje den viktigaste grunnen til at eg bør gjera dette?
+            # Ferguson og Church (2004) gjev nokre liknande bidrag, men viser til Cheng.
+        except ZeroDivisionError:
+            cd = 2e4
+    else:
+        cd = 0.44
+    
+    # print("Re = ", Re," cd= ", cd)
+    rho_self_density = rho / particle.density
+    
+    drag_component =  3/4 * cd / particle.diameter * rho_self_density * abs(vel)*vel
+    gravity_component = (rho_self_density - 1) * g
+
+    added_mass_component = 0.5 * rho_self_density * dudt_material
+    
+    lift_component = 3/4 * 0.5 / particle.diameter * rho_self_density * (U_top_bottom[:,0]*U_top_bottom[:,0] - U_top_bottom[:,1]*U_top_bottom[:,1])
+    
+    divisor = 1 + 0.5 * rho_self_density * addedmass
+    # divisoren trengst for akselerasjonen av partikkel kjem fram i added 
+    # mass på høgre sida, så den må bli flytta over til venstre og delt på resten.
+    
+    # print("drag_component =",drag_component,", gravity_component = ",gravity_component)        
+
+    du_dt = (drag_component + gravity_component + added_mass_component + lift_component ) / divisor
+    
+    # if (np.any(np.isnan(du_dt))):
+    #     print("her er nan! og t, x og dudt er dette:", t,x, du_dt)
+    
+    return np.concatenate((dx_dt,du_dt))
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
@@ -142,15 +337,20 @@ def get_u(t, x_inn, particle, tre_samla):
                 part_delta = part - part_temp[:,d] #avstanden til referansepunktet i simpleksen.
                 part_bary = np.einsum('njk,nk->nj', part_temp[:,:d, :], part_delta) 
                 part_wts = np.hstack((part_bary, 1 - part_bary.sum(axis=1, keepdims=True)))
+                break
             
-                if (np.any(part_wts < -0.02)):
-                    part_simplex = tri.find_simplex(part)
-                    part_vertices = np.take(tri.simplices, part_simplex, axis=0)
-                    part_temp = np.take(tri.transform, part_simplex, axis=0)
-                    get_u.simplex_prob += 1
-                else:
-                    get_u.simplex_prob = 0
-                    break
+                # if (np.any(part_wts < -0.02)):
+                #     part_simplex = tri.find_simplex(part)
+                #     if np.any(part.simplex == -1):
+                #         break
+                #     part_vertices = np.take(tri.simplices, part_simplex, axis=0)
+                #     part_temp = np.take(tri.transform, part_simplex, axis=0)
+                #     get_u.simplex_prob += 1
+                #     if get_u.simplex_prob > 20:
+                #         print("Går i loop i part_simplex og der!")
+                # else:
+                #     get_u.simplex_prob = 0
+                #     break
                     
             U_top_bottom = np.einsum('jni,ni->jn', np.take(U_del, part_vertices, axis=1), part_wts)
         else:
@@ -199,133 +399,6 @@ def rk_2(f, L, y0, h, tri, U):
         
     return t, y
 
-def rk_3 (f, t, y0, solver_args):
-    resultat = solve_ivp(f, t, y0,   t_eval = [t[1]], **solver_args)
-    # har teke ut max_ste=0.02, for det vart aldri aktuelt, ser det ut til.  method=solver_args['method'], args=solver_args['args'],
-    
-    return np.concatenate((resultat.t, resultat.y[:,0]))
-
-
-def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnamn="stiQ40.mp4",  fps=20 ):
-    
-    # piv_range = ranges()
-    
-    # with h5py.File(filnamn, mode='r') as f:
-    #     x, y = np.array(f['x']), np.array(f['y'])
-        
-    #     I, J = int(np.array(f['I'])),int(np.array(f['J']))
-               
-    #     x_reshape = x.reshape((127,126))[piv_range]
-    #     y_reshape = y.reshape((127,126))[piv_range]
-    
-    (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
-
-    t_min = t_span[0]
-    t_max = t_span[1]
-
-    steps = (t_max-t_min) * fps
-    
-    t_list = np.arange(t_min*fps,t_max*fps)/fps
-    
-    piv_range = ranges()
-    
-    Umx = np.array(dataset['Umx'])[t_min*fps:t_max*fps,:]
-    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
-    Vmx = np.array(dataset['Vmx'])[t_min*fps:t_max*fps,:]
-    Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
-    
-    x = np.array(dataset['x'])
-    y = np.array(dataset['y'])
-    x_reshape = x.reshape(J,I)[piv_range]
-    y_reshape = y.reshape(J,I)[piv_range]
-            
-    V_mag_reshape = np.hypot(Umx_reshape, Vmx_reshape)        
-    # V_mag_reshape = np.hypot(U[2], U[3])
-       
-    myDPI = 300
-    fig, ax = plt.subplots(figsize=(1190/myDPI,1080/myDPI),dpi=myDPI)
-    
-    field = ax.imshow(V_mag_reshape[0,:,:], extent=[x_reshape[0,0],x_reshape[0,-1], y_reshape[-1,0], y_reshape[0,0]], interpolation='none')
-    # particle, =ax.plot(sti[:,0,1], sti[:,0,2], color='black', marker='o', linestyle=' ', markersize=1)
-    
-    # https://stackoverflow.com/questions/9215658/plot-a-circle-with-pyplot
-    # particle = 
-    
-    # sti = np.array([part.sti for part in partiklar])    
-    
-    # prop_cycle = plt.rcParams['axes.prop_cycle']
-    # colors = prop_cycle.by_key()['color']
-    
-    # F8B195   F67280   C06C84   6C5B7B   355C7D 
-    # A7226E   EC2049   F26B38   F7DB4F   2F9599
-    # A8A7A7   CC527A   E8175D   474747   363636 
-    # E5FCC2   9DE0AD   45ADA8   547980   594F4F
-    # Palettar kan finnast her: https://digitalsynopsis.com/design/minimal-web-color-palettes-combination-hex-code/
-    # https://digitalsynopsis.com/design/how-to-make-color-palettes-from-one-color/
-
-    #Denne oppskrifta lagar eit nytt fargesett: 
-    # https://matplotlib.org/stable/gallery/lines_bars_and_markers/markevery_prop_cycle.html#sphx-glr-gallery-lines-bars-and-markers-markevery-prop-cycle-py
-    
-    
-    colors = ['#1f77b4',
-          '#ff7f0e',
-          '#2ca02c',
-          '#d62728',
-          '#9467bd',
-          '#8c564b',
-          '#e377c2',
-          '#7f7f7f',
-          '#bcbd22',
-          '#17becf',
-          '#1a55FF']
-    
-    colors = [ '#F8B195', '#F67280', '#C06C84', '#6C5B7B', '#355C7D', '#A7226E', '#EC2049', '#F26B38', '#F7DB4F', '#2F9599', '#A8A7A7', '#CC527A', '#E8175D', '#474747', '#363636', '#E5FCC2', '#9DE0AD', '#44AA57', '#547980', '#594F4F']
-    # matplotlib.rcParams['axes.prop_cycle'] = cycler(color=colors)
-
-    
-    
-    for part,color in zip(partiklar, colors[:len(partiklar)]):
-        circle = plt.Circle((part.sti[0,1], part.sti[0,2]), part.radius*5, color=color)
-        ax.add_patch(circle)
-        part.circle = circle
-        part.annotation  = ax.annotate("{} {} {}".format(part.atol,part.rtol,part.method), xy=(np.interp(0,part.sti[:,0],part.sti[:,1]), np.interp(0,part.sti[:,0],part.sti[:,2])), xycoords="data",
-                        xytext=(random.uniform(-20,20), random.uniform(-20,20)), fontsize=5, textcoords="offset points",
-                        arrowprops=dict(arrowstyle="->", connectionstyle="arc3, rad=0", color=color))
-        print("{} {} {} {}".format(part.atol,part.rtol,part.method, color))
-        
-    ax.set_xlim([x_reshape[0,0],x_reshape[0,-1]])
-    draw_rect(ax)
-    
-    def nypkt(i):
-        field.set_data(V_mag_reshape[i,:,:])
-        # particle.set_data(sti[:,i,1], sti[:,i,2])
-        t = t_list[i]
-
-        
-        # https://stackoverflow.com/questions/16527930/matplotlib-update-position-of-patches-or-set-xy-for-circles
-        for part in partiklar:
-            part.circle.center = np.interp(t,part.sti[:,0],part.sti[:,1]), np.interp(t,part.sti[:,0],part.sti[:,2])
-            # part.circle.center = part.sti[i,1], part.sti[i,2]
-            part.annotation.xy = (np.interp(t,part.sti[:,0],part.sti[:,1]), np.interp(t,part.sti[:,0],part.sti[:,2]))
-        
-        return 1 #field,particle
-    
-    print("Skal byrja på filmen")
-    #ax.axis('equal')
-    # ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,steps),interval=50)
-    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps),interval=int(1000/fps))
-    plt.show()
-    print("ferdig med animasjon, skal lagra")
-    
-    ani.save(utfilnamn)
-    plt.close()
-
-# def createParticle(diameter, init_position, density=2.65e-6):
-#     volume = diameter**3 * pi * 1/6
-#     mass = volume*density
-#     radius = diameter/2
-#     return {'diameter': diameter, 'init_position':init_position}
-
 class Particle:
     #Lag ein tabell med tidspunkt og posisjon for kvar einskild partikkel.
     def __init__(self, diameter, init_position, init_time=0, density=2.65e-6 ):
@@ -339,99 +412,8 @@ class Particle:
 
 def particle_copy(pa):
     return Particle(pa.diameter, pa.init_position, pa.density)
-        
-def f(t, x, particle, tri, linear=True, lift=False, addedmass=True):
-    """
-    Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
-    Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
-    Men for at solve_ivp skal fungera, må x vera 1-dimensjonal. Altså. 
-    x= [x,y,u,v], ikkje x = [[x,y], [u,v]].
-    f (t, x, y) = [dx/dt, du/dt]
 
-    Parameters
-    ----------
-    t : double
-        Tidspunktet for funksjonen.
-    x : tuple
-        Ein tuple med koordinatane og farten, altså (x0, y0, u0, v0).
-    tri : spatial.qhull.Delaunay
-        Samling av triangulerte data.
-    U : Tuple
-        Ein tuple av dei to fartsvektor-arrayane.
 
-    Returns
-    -------
-    tuple
-            Ein tuple med [dx/dt, du/dt]
-
-    """
-    
-    if not hasattr(particle, 'linear'):
-        particle.linear = True
-    if not hasattr(particle, 'lift'):
-            particle.lift = False
-    if not hasattr(particle, 'linear'):
-            particle.addedmass = True
-
-    
-
-    g = np.array([0, 9.81e3]) # mm/s^2 = 9.81 m/s^2
-    nu = 1 # 1 mm^2/s = 1e-6 m^2/s
-    rho = 1e-6  # kg/mm^3 = 1000 kg/m^3 
-    
-    dx_dt = x[2:]
-    # vel = np.array([100,0]) - dx_dt # relativ snøggleik
-    # U_f = np.array(get_u(t,np.array([x[0],x[1]]),tri, linear))
-    
-    U_f, dudt_material, U_top_bottom = get_u(t, x, particle, tri)
-    
-    # if (np.isnan(U_f[2])):
-    #     U_f[2] = 0
-    #     # U_f[2] = dudt_mean[0][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
-    # if (np.isnan(U_f[3])):
-    #     U_f[3] = 0
-    #     # U_f[3] = dudt_mean[1][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
-        
-        
-    vel = U_f - dx_dt # relativ snøggleik
-    # vel_ang = atan2(vel[1], vel[0])
-    
-    
-    Re = hypot(vel[0],vel[1]) * particle.diameter / nu 
-    
-    if (Re<1000):
-        try:
-            cd = 24 / Re * (1+0.15*Re**0.687)
-            # Cheng (1997) skildrar Cd for kantete og runde steinar. Dette 
-            # er kanskje den viktigaste grunnen til at eg bør gjera dette?
-            # Ferguson og Church (2004) gjev nokre liknande bidrag, men viser til Cheng.
-        except ZeroDivisionError:
-            cd = 2e4
-    else:
-        cd = 0.44
-    
-    # print("Re = ", Re," cd= ", cd)
-    rho_self_density = rho / particle.density
-    
-    drag_component =  3/4 * cd / particle.diameter * rho_self_density * abs(vel)*vel
-    gravity_component = (rho_self_density - 1) * g
-
-    added_mass_component = 0.5 * rho_self_density * dudt_material
-    
-    lift_component = 3/4 * 0.5 / particle.diameter * rho_self_density * (U_top_bottom[:,0]*U_top_bottom[:,0] - U_top_bottom[:,1]*U_top_bottom[:,1])
-    
-    divisor = 1 + 0.5 * rho_self_density * addedmass
-    # divisoren trengst for akselerasjonen av partikkel kjem fram i added 
-    # mass på høgre sida, så den må bli flytta over til venstre og delt på resten.
-    
-    # print("drag_component =",drag_component,", gravity_component = ",gravity_component)        
-
-    du_dt = (drag_component + gravity_component + added_mass_component + lift_component ) / divisor
-    
-    # if (np.any(np.isnan(du_dt))):
-    #     print("her er nan! og t, x og dudt er dette:", t,x, du_dt)
-    
-    return np.concatenate((dx_dt,du_dt))
     
 def checkCollision(particle, data, rib):
     """
@@ -553,114 +535,15 @@ def checkCollision(particle, data, rib):
     
     return (is_collision, collisionInfo, rib)
 
-# @ray.remote
-def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False):
-    # stien må innehalda posisjon, fart og tid.
-    sti = []
-    sti_komplett = []
-    # print(type(tre))
-    # tre = ray.get(tre)
-    print("byrja på lagsti, og partikkelen starta på ", particle.init_position)
-    
-    # args = {'atol': solver_args['atol'], 'rtol':solver_args['rtol'], 'method':solver_args['method'], 
-    #   'args':(solver_args['pa'], tre, solver_args['linear'], solver_args['lift'], solver_args['addedmass'])}
-    
-    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre))
-
-    step_old = np.concatenate(([particle.init_time], particle.init_position))
-    # Step_old og step_new er ein array med [t, x, y, u, v]. 
-    
-    sti.append(step_old)
-    sti_komplett.append(step_old)
-    
-    # finn neste steg med rk_2 og standard tidssteg.
-    # sjekk kollisjon. Dersom ikkje kollisjon, bruk resultat frå rk_2 og gå til neste steg
-    # Dersom kollisjon: halver tidssteget, sjekk kollisjon. Dersom ikkje kollisjon
-
-    t = particle.init_time
-    t_max = t_span[1]
-    t_main = t
-    dt_main = 1/fps
-    dt = dt_main
-    eps = 0.001
-    rest = 1
-    
-    starttid = datetime.datetime.now()
-    while (t < t_span[1]):
-        
-        step_new = rk_3(f, (t,t+dt), step_old[1:], solver_args)
-        print((datetime.datetime.now()-starttid), "pa {d:.2f} mm stor og startpos. {pos} er ferdig med t= {t:.2f}".format(d=particle.diameter, pos=particle.init_position, t=t))
-        #.strftime('%X.%f')
-        if (step_new[1] > 67 and wraparound):
-            step_new[1] -= 100
-        elif(step_new[1] > 95):
-            break
-            
-        
-        for rib in ribs:
-            collision_info = checkCollision(particle, step_new[1:], rib)
-            if (collision_info[0]):
-                break
-            
-        if (collision_info[0]):
-            if (collision_info[1][0] < eps):
-                print("kolliderte")
-                #Gjer alt som skal til for å endra retningen på partikkelen
-                n = collision_info[1][1]
-                v = step_new[3:]
-                v_rel = collision_info[1][3]
-                v_new = v - (rest + 1) * v_rel * n
-                step_old = np.copy(step_new)
-                step_old[3:] = v_new
-                
-                #Fullfør rørsla fram til hovud-steget, vonleg med rett retning 
-                # og fart, så ein kjem inn i rett framerate igjen.
-                dt = t_main + dt_main - t
-                                
-                # step_new = rk_3(part.f, (t, t_main+dt_main), step_old[1:])
-                
-                if (abs(v_rel) < 0.1):
-                    sti_komplett.append(step_new)
-                    # sti.append(step_new)
-                    break
-                
-                # t = t_main + dt_main
-                
-            else:
-                dt = dt/2
-                print("må finjustera kollisjon")
-                continue
-        else:
-            sti_komplett.append(step_new)
-            step_old = step_new
-            
-            t = t + dt
-            
-            if (round(step_new[0]*10000) % round(dt_main*10000) == 0):
-                sti.append(step_new)
-                t_main = step_new[0]
-                t = t_main
-                dt = dt_main
-            
-    if (len(sti) < t_max*fps):
-        sti = np.pad(sti, ((0,t_max*fps - len(sti)),(0,0)),'edge')
-        sti[int(t_main*fps):,0] = np.arange(t_main, t_max, 1/fps)
-    
-    if (len(sti) > t_max*fps):
-        sti = sti[0:t_max*fps]
-
-    print("brukte ", datetime.datetime.now()-starttid)    
-    return np.array(sti)
-
 
 class Rib:
     def __init__(self, coords):
         self.vertices = sortClockwise(np.array(coords))
         
-        self.normals = [np.cross(self.vertices[1]-self.vertices[0],np.array([0,0,-1]))[:2],
-                        np.cross(self.vertices[2]-self.vertices[1],np.array([0,0,-1]))[:2], 
-                        np.cross(self.vertices[3]-self.vertices[2], np.array([0,0,-1]))[:2],
-                        np.cross(self.vertices[0]-self.vertices[3],np.array([0,0,-1]))[:2] ]
+        self.normals = [norm(np.cross(self.vertices[1]-self.vertices[0],np.array([0,0,-1]))[:2]),
+                        norm(np.cross(self.vertices[2]-self.vertices[1],np.array([0,0,-1]))[:2]), 
+                        norm(np.cross(self.vertices[3]-self.vertices[2], np.array([0,0,-1]))[:2]),
+                        norm(np.cross(self.vertices[0]-self.vertices[3],np.array([0,0,-1]))[:2]) ]
         
                         # Må sjekka om punkta skal gå mot eller med klokka. 
                         # Nett no går dei MED klokka. Normals skal peika UT.
