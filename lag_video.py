@@ -75,17 +75,7 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnam
     # https://matplotlib.org/stable/gallery/lines_bars_and_markers/markevery_prop_cycle.html#sphx-glr-gallery-lines-bars-and-markers-markevery-prop-cycle-py
     
     
-    colors = ['#1f77b4',
-          '#ff7f0e',
-          '#2ca02c',
-          '#d62728',
-          '#9467bd',
-          '#8c564b',
-          '#e377c2',
-          '#7f7f7f',
-          '#bcbd22',
-          '#17becf',
-          '#1a55FF']
+#    colors = ['#1f77b4',          '#ff7f0e',          '#2ca02c',          '#d62728',          '#9467bd',          '#8c564b',          '#e377c2',          '#7f7f7f',          '#bcbd22',          '#17becf',          '#1a55FF']
     
     colors = [ '#F8B195', '#F67280', '#C06C84', '#6C5B7B', '#355C7D', '#A7226E', '#EC2049', '#F26B38', '#F7DB4F', '#2F9599', '#A8A7A7', '#CC527A', '#E8175D', '#474747', '#363636', '#E5FCC2', '#9DE0AD', '#44AA57', '#547980', '#594F4F']
     # matplotlib.rcParams['axes.prop_cycle'] = cycler(color=colors)
@@ -93,7 +83,7 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnam
     
     
     for part,color in zip(partiklar, colors[:len(partiklar)]):
-        circle = plt.Circle((part.sti[0,1], part.sti[0,2]), part.radius*5, color=color)
+        circle = plt.Circle((-100, -100), part.radius*5, color=color)
         ax.add_patch(circle)
         part.circle = circle
         part.annotation  = ax.annotate("{} {} {}".format(part.atol,part.rtol,part.method), xy=(np.interp(0,part.sti[:,0],part.sti[:,1]), np.interp(0,part.sti[:,0],part.sti[:,2])), xycoords="data",
@@ -112,9 +102,9 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnam
         
         # https://stackoverflow.com/questions/16527930/matplotlib-update-position-of-patches-or-set-xy-for-circles
         for part in partiklar:
-            part.circle.center = np.interp(t,part.sti[:,0],part.sti[:,1]), np.interp(t,part.sti[:,0],part.sti[:,2])
+            part.circle.center = np.interp(t,part.sti[:,0],part.sti[:,1], left=-100, right=-100), np.interp(t,part.sti[:,0],part.sti[:,2], left=-100, right=-100)
             # part.circle.center = part.sti[i,1], part.sti[i,2]
-            part.annotation.xy = (np.interp(t,part.sti[:,0],part.sti[:,1]), np.interp(t,part.sti[:,0],part.sti[:,2]))
+            part.annotation.xy = (np.interp(t,part.sti[:,0],part.sti[:,1], left=-100, right=-100), np.interp(t,part.sti[:,0],part.sti[:,2], left=-100, right=-100) )
         
         return 1 #field,particle
     

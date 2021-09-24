@@ -18,14 +18,16 @@ from hjelpefunksjonar import finn_fil
 import random
 # import matplotlib.pyplot as plt
 import pickle
+from math import floor
 
 # #%% Førebu
 
 tre_fil = "../tre_0_60.pickle"
+fps = 20
 #tre_fil = finn_fil(["C:/Users/havrevol/Q40_60s.pickle", "D:/Tonstad/Q40_60s.pickle", "../Q40_60s.pickle"])
 
 t_span = (0,59)
-tal = 1
+tal = 100
 linear, lift, addedmass = True, True, True
 wraparound = False
 atol, rtol = 1e-1, 1e-1
@@ -34,16 +36,18 @@ method = 'RK45'
 # %timeit get_u(random.uniform(0,20), [random.uniform(-88,88), random.uniform(-70,88)], tri, ckdtre, U, linear=True)
 
 diameters = get_PSD_part(tal)
-diameters[0]=0.19
+# diameters[0]=0.34
 
 # diameters = [0.08]
-# particle_list = [Particle(d, [-90,random.uniform(0,90), 0, 0], random.uniform(0,50)) for d in diameters]
-particle_list = [Particle(d, [-90,29.2626, 0, 0], 45.41) for d in diameters]
+particle_list = [Particle(d, [-90,random.uniform(0,90), 0, 0], random.uniform(0,50)) for d in diameters]
+# particle_list = [Particle(d, [-90,43.43268, 0, 0], 3.65) for d in diameters]
 
 for p in particle_list:
     p.atol , p.rtol = atol, rtol
     p.method = method
     p.linear, p.lift, p.addedmass = linear, lift, addedmass
+    p.init_time = floor(p.init_time *fps)/fps #rettar opp init_tid slik at det blir eit tal som finst i datasettet.
+
 # part = Particle(0.08, [-80, 50,0,0])
     # random.uniform(0,88)
 
@@ -77,7 +81,7 @@ jobbar = []
 for pa in particle_list:
 # for ko in kombinasjon:
         # solver_args = dict(atol=1e-1, rtol=1e-1, method='RK23', linear=linear, lift=lift, addedmass=addedmass, pa=pa, tre_plasma=tre_plasma)
-        pa.sti = lag_sti(ribs, t_span, particle=pa, tre=tre, wraparound=False)
+        pa.sti = lag_sti(ribs, t_span, particle=pa, tre=tre, fps = fps, wraparound=False)
         
 
 stiar = []
@@ -95,7 +99,7 @@ for pa in particle_list:
 with open("sti.pickle", 'wb') as f:
     pickle.dump(stiar, f)
 
-sti_animasjon(particle_list,t_span=t_span, utfilnamn="sti_RK23_ein_part.mp4")
+sti_animasjon(particle_list,t_span=t_span, utfilnamn="sti_RK23_ein_part.mp4", fps=fps)
 
 # #%%
 # get_u.counter = 0

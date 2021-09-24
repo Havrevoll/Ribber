@@ -9,7 +9,7 @@ from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/refere
 # from numba import jit
 import datetime
 
-from math import pi, hypot, floor #, atan2
+from math import pi, hypot #, atan2
 
 # fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
 # x = np.array(h5py.File(filnamn, 'r')['x']).reshape(127,126)[ranges()]
@@ -30,15 +30,14 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False):
     sti_komplett = []
     # print(type(tre))
     # tre = ray.get(tre)
-    print("byrja på lagsti, og partikkelen starta på ", particle.init_position)
+    print("byrja på lagsti, og partikkelen starta på ", particle.init_position, " og ", particle.init_time)
     
     # args = {'atol': solver_args['atol'], 'rtol':solver_args['rtol'], 'method':solver_args['method'], 
     #   'args':(solver_args['pa'], tre, solver_args['linear'], solver_args['lift'], solver_args['addedmass'])}
     
     solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre))
 
-    particle.init_time = floor(particle.init_time *fps)/fps #rettar opp init_tid slik at det blir eit tal som finst i datasettet.
-
+    
     step_old = np.concatenate(([particle.init_time], particle.init_position))
     # Step_old og step_new er ein array med [t, x, y, u, v]. 
     
@@ -114,12 +113,12 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False):
                 t = t_main
                 dt = dt_main
             
-    if (len(sti) < t_max*fps):
-        sti = np.pad(sti, ((0,t_max*fps - len(sti)),(0,0)),'edge')
-        sti[int(t_main*fps):,0] = np.arange(t_main, t_max, 1/fps)
+    # if (len(sti) < t_max*fps):
+    #     sti = np.pad(sti, ((0,t_max*fps - len(sti)),(0,0)),'edge')
+    #     sti[int(t_main*fps):,0] = np.arange(t_main, t_max, 1/fps)
     
-    if (len(sti) > t_max*fps):
-        sti = sti[0:t_max*fps]
+    # if (len(sti) > t_max*fps):
+    #     sti = sti[0:t_max*fps]
 
     print("brukte ", datetime.datetime.now()-starttid)    
     return np.array(sti)
