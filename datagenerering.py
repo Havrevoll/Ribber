@@ -37,7 +37,7 @@ def lag_tre_multi(t_span, filnamn_ut=None):
     i_0 =  range(int(t_min)*10,int(t_max)*10)
     
     trees = dict(zip(i_0, result))
-            
+         
     if filnamn_ut is None:
         return trees
     else:

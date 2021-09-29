@@ -22,12 +22,12 @@ from math import floor
 
 # #%% Førebu
 
-tre_fil = "../tre_0_60.pickle"
+# tre_fil = "../tre_0_60.pickle"
 fps = 20
-#tre_fil = finn_fil(["C:/Users/havrevol/Q40_60s.pickle", "D:/Tonstad/Q40_60s.pickle", "../Q40_60s.pickle"])
+tre_fil = finn_fil(["../Q40_0_60.pickle", "../Q40_010.pickle"])
 
 t_span = (0,59)
-tal = 100
+tal = 50
 linear, lift, addedmass = True, True, True
 wraparound = False
 atol, rtol = 1e-1, 1e-1

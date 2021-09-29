@@ -41,6 +41,8 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnam
     Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
     Vmx = np.array(dataset['Vmx'])[t_min*fps:t_max*fps,:]
     Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
+
+    ribs = np.array(dataset['ribs'])
     
     x = np.array(dataset['x'])
     y = np.array(dataset['y'])
@@ -86,13 +88,13 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnam
         circle = plt.Circle((-100, -100), part.radius*5, color=color)
         ax.add_patch(circle)
         part.circle = circle
-        part.annotation  = ax.annotate("{} {} {}".format(part.atol,part.rtol,part.method), xy=(np.interp(0,part.sti[:,0],part.sti[:,1]), np.interp(0,part.sti[:,0],part.sti[:,2])), xycoords="data",
+        part.annotation  = ax.annotate("{} mm".format(part.diameter), xy=(np.interp(0,part.sti[:,0],part.sti[:,1]), np.interp(0,part.sti[:,0],part.sti[:,2])), xycoords="data",
                         xytext=(random.uniform(-20,20), random.uniform(-20,20)), fontsize=5, textcoords="offset points",
                         arrowprops=dict(arrowstyle="->", connectionstyle="arc3, rad=0", color=color))
         print("{} {} {} {}".format(part.atol,part.rtol,part.method, color))
         
     ax.set_xlim([x_reshape[0,0],x_reshape[0,-1]])
-    draw_rect(ax)
+    draw_rect(ax, ribs)
     
     def nypkt(i):
         field.set_data(V_mag_reshape[i,:,:])
