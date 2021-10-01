@@ -1,3 +1,5 @@
+import datetime
+import pickle
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
@@ -7,12 +9,20 @@ plt.rcParams["font.family"] = "STIXGeneral"
 plt.rcParams['mathtext.fontset'] = 'stix'
 from matplotlib import animation
 
+
 import random
 import h5py
 from hjelpefunksjonar import ranges, draw_rect
 
 filnamn = "../Q40.hdf5" #finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
 
+def lag_video(partikkelfil, filmfil, t_span, fps=20):
+    with open(partikkelfil, 'rb') as f:
+        particle_list = pickle.load(f)
+
+    start = datetime.datetime.now()
+    sti_animasjon(particle_list, t_span, utfilnamn=filmfil, fps=fps)
+    print(f"Brukte {datetime.datetime.now() - start} på å lagra filmen")
 
 def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnamn="stiQ40.mp4",  fps=20 ):
     
@@ -53,7 +63,7 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnam
     # V_mag_reshape = np.hypot(U[2], U[3])
        
     myDPI = 300
-    fig, ax = plt.subplots(figsize=(1190/myDPI,1080/myDPI),dpi=myDPI)
+    fig, ax = plt.subplots(figsize=(800/myDPI,700/myDPI),dpi=myDPI)
     
     field = ax.imshow(V_mag_reshape[0,:,:], extent=[x_reshape[0,0],x_reshape[0,-1], y_reshape[-1,0], y_reshape[0,0]], interpolation='none')
     # particle, =ax.plot(sti[:,0,1], sti[:,0,2], color='black', marker='o', linestyle=' ', markersize=1)
@@ -79,19 +89,21 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnam
     
 #    colors = ['#1f77b4',          '#ff7f0e',          '#2ca02c',          '#d62728',          '#9467bd',          '#8c564b',          '#e377c2',          '#7f7f7f',          '#bcbd22',          '#17becf',          '#1a55FF']
     
-    colors = [ '#F8B195', '#F67280', '#C06C84', '#6C5B7B', '#355C7D', '#A7226E', '#EC2049', '#F26B38', '#F7DB4F', '#2F9599', '#A8A7A7', '#CC527A', '#E8175D', '#474747', '#363636', '#E5FCC2', '#9DE0AD', '#44AA57', '#547980', '#594F4F']
+    # colors = [ '#F8B195', '#F67280', '#C06C84', '#6C5B7B', '#355C7D', '#A7226E', '#EC2049', '#F26B38', '#F7DB4F', '#2F9599', '#A8A7A7', '#CC527A', '#E8175D', '#474747', '#363636', '#E5FCC2', '#9DE0AD', '#44AA57', '#547980', '#594F4F']
     # matplotlib.rcParams['axes.prop_cycle'] = cycler(color=colors)
 
+
+    colors = [f"#{random.randint(0,16**6-1):0{6}X}" for _ in range(len(partiklar))]
     
-    
-    for part,color in zip(partiklar, colors[:len(partiklar)]):
+    for part,color in zip(partiklar, colors):
         circle = plt.Circle((-100, -100), part.radius*5, color=color)
         ax.add_patch(circle)
         part.circle = circle
-        part.annotation  = ax.annotate("{} mm".format(part.diameter), xy=(np.interp(0,part.sti[:,0],part.sti[:,1]), np.interp(0,part.sti[:,0],part.sti[:,2])), xycoords="data",
-                        xytext=(random.uniform(-20,20), random.uniform(-20,20)), fontsize=5, textcoords="offset points",
+        part.annotation  = ax.annotate("{:.2f} mm".format(part.diameter), xy=(np.interp(0,part.sti[:,0],part.sti[:,1]), np.interp(0,part.sti[:,0],part.sti[:,2])), xycoords="data",
+                        xytext=(5,5), fontsize=5, textcoords="offset points",
                         arrowprops=dict(arrowstyle="->", connectionstyle="arc3, rad=0", color=color))
-        print("{} {} {} {}".format(part.atol,part.rtol,part.method, color))
+        # print("{} {} {} {}".format(part.atol,part.rtol,part.method, color))
+        # gamal xytext: random.uniform(-20,20), random.uniform(-20,20)
         
     ax.set_xlim([x_reshape[0,0],x_reshape[0,-1]])
     draw_rect(ax, ribs)
@@ -104,9 +116,9 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnam
         
         # https://stackoverflow.com/questions/16527930/matplotlib-update-position-of-patches-or-set-xy-for-circles
         for part in partiklar:
-            part.circle.center = np.interp(t,part.sti[:,0],part.sti[:,1], left=-100, right=-100), np.interp(t,part.sti[:,0],part.sti[:,2], left=-100, right=-100)
+            part.circle.center = np.interp(t,part.sti[:,0],part.sti[:,1], left=-100), np.interp(t,part.sti[:,0],part.sti[:,2], left=-100)
             # part.circle.center = part.sti[i,1], part.sti[i,2]
-            part.annotation.xy = (np.interp(t,part.sti[:,0],part.sti[:,1], left=-100, right=-100), np.interp(t,part.sti[:,0],part.sti[:,2], left=-100, right=-100) )
+            part.annotation.xy = (np.interp(t,part.sti[:,0],part.sti[:,1], left=-100), np.interp(t,part.sti[:,0],part.sti[:,2], left=-100) )
         
         return 1 #field,particle
     

@@ -1,43 +1,106 @@
 # -*- coding: utf-8 -*-
 '''køyr funksjonar som plottingar(fil['vassføringar'])'''
 
+import matplotlib
+matplotlib.use("Agg")
+from lag_video import sti_animasjon
+from kornfordeling import get_PSD_part
 import numpy as np
 # from scipy import interpolate
 from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#r179348322575-1
+from hjelpefunksjonar import norm, sortClockwise, finn_fil
 
-# import ray
-# from numba import jit
+
+import ray
+
 import datetime
-
-from math import pi, hypot #, atan2
+from math import floor, pi, hypot
+import random
+from scipy.sparse.construct import rand #, atan2
 
 # fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
 # x = np.array(h5py.File(filnamn, 'r')['x']).reshape(127,126)[ranges()]
 # vass = fil['vassføringar']
 
-from hjelpefunksjonar import norm, sortClockwise
 
 t_max_global = 20
 t_min_global = 0
 
 nullfart = np.zeros(2)
 
+def simulering(tal, rnd_seed, tre,  fps = 20, t_span = (0,59), linear = True,  lift = True, addedmass = True, wraparound = False, 
+      atol = 1e-1, rtol = 1e-1, method = 'RK23', tre_fil = finn_fil(["../Q40_0_60.pickle", "../Q40_0_10.pickle"]), laga_film = False, verbose=True, collision_correction=True):
 
-# @ray.remote
-def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False):
+    start = datetime.datetime.now()
+
+
+    ray.init() 
+    tre_plasma = ray.put(tre)
+    
+    
+    random.seed(rnd_seed)
+    diameters = get_PSD_part(tal, rnd_seed=rnd_seed)
+    # diameters[0]=0.34
+
+    # diameters = [0.08]
+    particle_list = [Particle(d, [-35.81,random.uniform(0,90), 0, 0], random.uniform(0,50)) for d in diameters]
+    # particle_list = [Particle(d, [-90,43.43268, 0, 0], 3.65) for d in diameters]
+
+    for i, p in enumerate(particle_list):
+        p.atol , p.rtol = atol, rtol
+        p.method = method
+        p.linear, p.lift, p.addedmass = linear, lift, addedmass
+        p.init_time = floor(p.init_time *fps)/fps #rettar opp init_tid slik at det blir eit tal som finst i datasettet.
+        p.index = i
+
+    print("Har laga tre_objekt, skal putta")
+
+    ribs = [Rib(rib) for rib in tre.ribs]
+        
+    for pa in particle_list:
+        pa.job_id = lag_sti.remote(ribs, t_span, particle=pa, tre=tre_plasma, fps = fps, wraparound=wraparound, verbose=verbose, collision_correction=collision_correction)
+
+    fanga = 0
+
+    for pa in particle_list:
+        pa.sti = ray.get(pa.job_id)
+        if pa.sti[-1][2] < -10:
+            fanga += 1
+
+    
+
+
+    print("Brukte {} s fram til filmlaging.".format(datetime.datetime.now()-start))
+    print(f"Av {len(particle_list)} partiklar vart {fanga} fanga, altså {100* fanga/len(particle_list)}%")
+
+    # while (True):
+    #     ready_refs, remaining_refs = ray.wait(object_refs, num_returns=1, timeout=None)
+    #     if remaining_refs == 0:
+    #         break
+
+    if laga_film:
+        start_film = datetime.datetime.now()
+        film_fil = f"sti_{method}_{len(particle_list)}_{atol:.0e}_ray.mp4"
+        sti_animasjon(particle_list,t_span=t_span, utfilnamn=film_fil, fps=fps)
+        print("Brukte  {} s på å laga film".format(datetime.datetime.now() - start_film))
+
+    ray.shutdown()
+    print("Brukte totalt {} s på heile operasjonen".format(datetime.datetime.now() - start))
+
+    return particle_list
+
+
+@ray.remote
+def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False, verbose=True, collision_correction=True):
     # stien må innehalda posisjon, fart og tid.
     sti = []
     sti_komplett = []
     # print(type(tre))
     # tre = ray.get(tre)
-    print("byrja på lagsti, og partikkelen starta på ", particle.init_position, " og ", particle.init_time)
-    
-    # args = {'atol': solver_args['atol'], 'rtol':solver_args['rtol'], 'method':solver_args['method'], 
-    #   'args':(solver_args['pa'], tre, solver_args['linear'], solver_args['lift'], solver_args['addedmass'])}
+    print(f"Partikkel nr. {particle.index} byrja, starta på {particle.init_position}, og {particle.init_time}")
     
     solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre))
-
-    
+ 
     step_old = np.concatenate(([particle.init_time], particle.init_position))
     # Step_old og step_new er ein array med [t, x, y, u, v]. 
     
@@ -57,14 +120,22 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False):
     rest = 0.5
     
     starttid = datetime.datetime.now()
+
+    status_col = f"{str(random.randint(0,8))};{str(random.randint(30,38))};{str(random.randint(40,48))}"
+
     while (t < t_max):
         
         step_new = rk_3(f, (t,t+dt), step_old[1:], solver_args)
-        print((datetime.datetime.now()-starttid), "pa {d:.2f} mm stor og startpos. {pos} er ferdig med t= {t}".format(d=particle.diameter, pos=particle.init_position[:2], t=step_new))
+
+        if verbose:
+            status_msg = "{tid} pa nr {i}, {d:.2f} mm startpos. [{pos[0]:.3f}, {pos[1]:.3f}] ferdig med t={t:.4f}, pos=[{x:.2f},{y:.2f}] U=[{u:.2f},{v:.2f}]".format(tid=(datetime.datetime.now()-starttid), i=particle.index, d=particle.diameter, pos=particle.init_position[:2], t=step_new[0], x=step_new[1], y=step_new[2], u=step_new[3], v=step_new[4])
+            status_wrap = f"\x1b[{status_col}m {status_msg} \x1b[0m"
+            print(status_wrap)
+
         #.strftime('%X.%f')
         if (step_new[1] > 67 and wraparound):
             step_new[1] -= 100
-        elif(step_new[1] > 95):
+        elif(step_new[1] > 64):
             break
             
         
@@ -74,8 +145,12 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False):
                 break
             
         if (collision_info[0]):
+            if not collision_correction:
+                break
+
             if (collision_info[1][0] < eps):
-                print("kolliderte")
+                if verbose:
+                    print("kolliderte")
                 #Gjer alt som skal til for å endra retningen på partikkelen
                 n = collision_info[1][1]
                 v = step_new[3:]
@@ -99,7 +174,8 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False):
                 
             else:
                 dt = dt/2
-                print("må finjustera kollisjon")
+                if verbose:
+                    print("må finjustera kollisjon")
                 continue
         else:
             sti_komplett.append(step_new)
@@ -120,7 +196,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False):
     # if (len(sti) > t_max*fps):
     #     sti = sti[0:t_max*fps]
 
-    print("brukte ", datetime.datetime.now()-starttid)    
+    print(f"Partikkel nr. {particle.index} brukte {datetime.datetime.now()-starttid}")    
     return np.array(sti)
 
 
@@ -249,13 +325,15 @@ def get_u(t, x_inn, particle, tre_samla):
 
     Returns
     -------
-    TYPE
+    Tuple
         DESCRIPTION.
 
     '''    
     radius = particle.radius
     lift, addedmass, linear = particle.lift, particle.addedmass, particle.linear
 
+    if (x_inn[1] > 20): # Ein snarveg for å seia at oppe i dei frie vassmassar treng me ikkje interpolera lineært, det held med nearest neighbor.
+        linear = False
 
     tx = np.concatenate(([t], x_inn[:2]))
     U_p = x_inn[2:]
@@ -292,8 +370,8 @@ def get_u(t, x_inn, particle, tre_samla):
                     x[np.abs(x)>1e100] /= 1e10
                     
                 
-            return U_kd[:,kdtre.query(x[0])[1]], nullfart, np.vstack((nullfart,nullfart))
-            # Gjer added mass og lyftekrafta lik null, sidan den 
+            return U_kd[:,kdtre.query(x[0])[1]], nullfart, np.zeros((2,2))
+            # Gjer added mass og lyftekrafta lik null, sidan den ikkje er viktig her.
           
         vertices = np.take(tri.simplices, simplex, axis=0)
         temp = np.take(tri.transform, simplex, axis=0)
@@ -353,14 +431,12 @@ def get_u(t, x_inn, particle, tre_samla):
                     
             U_top_bottom = np.einsum('jni,ni->jn', np.take(U_del, part_vertices, axis=1), part_wts)
         else:
-            U_top_bottom = np.vstack((nullfart,nullfart))
+            U_top_bottom = np.zeros((2,2))
                     
         return (U_f[:,0], dudt_material, U_top_bottom)
         # return np.einsum('j,j->', np.take(U_del[0], vertices), wts), np.einsum('j,j->', np.take(U_del[1], vertices), wts),  np.einsum('j,j->', np.take(U_del[2], vertices), wts),  np.einsum('j,j->', np.take(U_del[3], vertices), wts)
     else:
-        kd_index = kdtre.query(x)[1]
-        
-        return U_kd[:,kd_index], nullfart, nullfart
+        return U_kd[:,kdtre.query(x[0])[1]], nullfart, np.zeros((2,2))
         # return U[0][kd_index], U[1][kd_index], U[2][kd_index], U[3][kd_index]
   
 # cd = interpolate.interp1d(np.array([0.001,0.01,0.1,1,10,20,40,60,80,100,200,400,600,800,1000,2000,4000,6000,8000,10000,100000]), np.array([2.70E+04,2.40E+03,2.50E+02,2.70E+01,4.40E+00,2.80E+00,1.80E+00,1.45E+00,1.25E+00,1.12E+00,8.00E-01,6.20E-01,5.50E-01,5.00E-01,4.70E-01,4.20E-01,4.10E-01,4.15E-01,4.30E-01,4.38E-01,5.40E-01,]))

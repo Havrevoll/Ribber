@@ -17,7 +17,7 @@ plt.rcParams['mathtext.fontset'] = 'stix'
 
 
 # Skal laga kode for å utvida tabellen med 1000 element mellom kvar verdi.
-def get_PSD_part(tal=1, PSD=None):
+def get_PSD_part(tal=1, PSD=None, rnd_seed=1):
 
     if PSD is None:
         PSD = np.array([[0.05,  0.00], #Det er ukjend kor 0 % er, altså kva som er minste storleik. Må anta at det er ganske lite.
@@ -56,7 +56,7 @@ def get_PSD_part(tal=1, PSD=None):
 
     f = interpolate.interp1d(PSD_full[3], PSD_full[0])
 
-    # np.random.seed()
+    np.random.seed(rnd_seed)
     a = np.random.uniform(0.0, 1.0, size = tal)
 
     korndiameter = f(a)
