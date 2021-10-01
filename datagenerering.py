@@ -10,7 +10,7 @@ import pickle
 import numpy as np
 
 from hjelpefunksjonar import ranges, finn_fil
-
+import datetime
 import scipy.spatial.qhull as qhull
 from scipy.spatial import cKDTree
 
@@ -175,7 +175,11 @@ def lag_tre(t_span=(0,1), nearest=False, kutt=False, inkluder_ribs = False):
     if (nearest):
         tree = cKDTree(txy)
     else:
+        print(f"Byrjar på delaunay for ({t_min}, {t_max})")
+        start = datetime.datetime.now()
         tree = qhull.Delaunay(txy)
+        print(f"Ferdig med delaunay for ({t_min}, {t_max}, brukte {datetime.datetime.now()-start}")
+        del start
     
     if (inkluder_ribs):
         return tree, U, ribs
