@@ -3,13 +3,37 @@ from pathlib import Path
 import h5py
 import csv
 import re
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("vec_folder")
+parser.add_argument("savepath")
+
+args = parser.parse_args()
+p = Path(args.vec_folder)
+save = Path(args.savepath)
+
+if not p.is_dir():
+    raise Exception("Denne vec-mappa finst ikkje.")
+
+if not save.parent.resolve().exists():
+    raise Exception("Mappa for hdf5-fila finst visst ikkje.")
 
 # def data_import(path='C:/Users/havrevol/PIV/Three/Q20'):
 
 # p = Path('C:/Users/havrevol/PIV/Three/Q20/Analysis')
-mappa = input("Kor er mappa med *.vec-filene?")
-p= Path(mappa)
-save = input("Kor skal hdf5-fila lagrast?")
+# while True:
+#     mappa = input("Kor er mappa med *.vec-filene?")
+#     if os.path.isdir(mappa):
+#         break
+#     print("Mappa finst ikkje.")
+
+# while True:
+#     save = input("Skriv fullstendig bane til hdf5-fila:")
+#     sti, fil = os.path.split(save)
+#     if os.path.isdir(sti):
+#         break
+#     print("Mappa finst ikkje.")
 
 def import_data(p):
     x = []
@@ -78,6 +102,7 @@ def save_to_file(path=save):
          f.create_dataset('I', data=I)
          f.create_dataset('J', data=J)
          f.create_dataset('ribs', data=ribs)
+
 
 x,y,u,v, I,J = import_data(p)
 
