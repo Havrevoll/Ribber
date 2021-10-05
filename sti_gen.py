@@ -80,7 +80,7 @@ def simulering(tal, rnd_seed, tre,  fps = 20, t_span = (0,59), linear = True,  l
 
     if laga_film:
         start_film = datetime.datetime.now()
-        film_fil = f"sti_{method}_{len(particle_list)}_{atol:.0e}_ray.mp4"
+        film_fil = f"sti_{method}_{len(particle_list)}_{atol:.0e}_noaddedmass_nolift_ray.mp4"
         sti_animasjon(particle_list,t_span=t_span, utfilnamn=film_fil, fps=fps)
         print("Brukte  {} s på å laga film".format(datetime.datetime.now() - start_film))
 
@@ -90,7 +90,7 @@ def simulering(tal, rnd_seed, tre,  fps = 20, t_span = (0,59), linear = True,  l
     return particle_list
 
 
-@ray.remote
+# @ray.remote
 def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False, verbose=True, collision_correction=True):
     # stien må innehalda posisjon, fart og tid.
     sti = []
@@ -165,7 +165,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False, verbose=Tru
                                 
                 # step_new = rk_3(part.f, (t, t_main+dt_main), step_old[1:])
                 
-                if (abs(v_rel) < 0.1):
+                if (abs(v_rel) < 0.01):
                     sti_komplett.append(step_new)
                     # sti.append(step_new)
                     break
@@ -239,15 +239,6 @@ def f(t, x, particle, tri, linear=True, lift=False, addedmass=True):
 
     """
     
-    if not hasattr(particle, 'linear'):
-        particle.linear = True
-    if not hasattr(particle, 'lift'):
-            particle.lift = False
-    if not hasattr(particle, 'linear'):
-            particle.addedmass = True
-
-    
-
     g = np.array([0, 9.81e3]) # mm/s^2 = 9.81 m/s^2
     nu = 1 # 1 mm^2/s = 1e-6 m^2/s
     rho = 1e-6  # kg/mm^3 = 1000 kg/m^3 
@@ -258,7 +249,7 @@ def f(t, x, particle, tri, linear=True, lift=False, addedmass=True):
     
     U_f, dudt_material, U_top_bottom = get_u(t, x, particle, tri)
     
-    # if (np.isnan(U_f[2])):
+        # if (np.isnan(U_f[2])):
     #     U_f[2] = 0
     #     # U_f[2] = dudt_mean[0][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
     # if (np.isnan(U_f[3])):
@@ -289,7 +280,7 @@ def f(t, x, particle, tri, linear=True, lift=False, addedmass=True):
     drag_component =  3/4 * cd / particle.diameter * rho_self_density * abs(vel)*vel
     gravity_component = (rho_self_density - 1) * g
 
-    added_mass_component = 0.5 * rho_self_density * dudt_material
+    added_mass_component = 0.5 * rho_self_density * dudt_material 
     
     lift_component = 3/4 * 0.5 / particle.diameter * rho_self_density * (U_top_bottom[:,0]*U_top_bottom[:,0] - U_top_bottom[:,1]*U_top_bottom[:,1])
     
@@ -484,6 +475,14 @@ class Particle:
         self.volume = self.diameter**3 * pi * 1/6
         self.mass = self.volume * self.density
         self.radius = self.diameter/2
+        self.index = 0
+        self.atol = 1e-6
+        self.rtol = 1e-3
+        self.method = 'RK45'
+        self.linear = True
+        self.lift = True
+        self.addedmass = True
+
 
 def particle_copy(pa):
     return Particle(pa.diameter, pa.init_position, pa.density)
