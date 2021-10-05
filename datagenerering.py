@@ -16,6 +16,9 @@ from scipy.spatial import cKDTree
 
 import multiprocessing
 
+# import ray
+# ray.init()
+
 fps = 20
 
 filnamn = "../Q40.hdf5" #finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
