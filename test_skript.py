@@ -16,16 +16,16 @@ from hjelpefunksjonar import finn_fil
 import ray
 import datetime
 
-talsamling = [1]
+talsamling = [1000]
 rnd_seed=1
 
 tre_fil = finn_fil(["../Q40_0_60.pickle", "../Q40_0_10.pickle"])
 t_span = (0,59)
 
 sim_args = dict(fps = 20, t_span=t_span,
-linear = True, lift = False, addedmass = False, wraparound = False,
+linear = False, lift = False, addedmass = False, wraparound = False,
 method = 'RK23', atol = 1e-1, rtol = 1e-1, 
-laga_film = True, verbose = False, collision_correction = True)
+laga_film = False, verbose = False, collision_correction = False)
 print("Skal byrja å byggja tre_objekt")
 tre = tre_objekt(tre_fil, t_span)
 

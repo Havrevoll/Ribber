@@ -14,7 +14,7 @@ from hjelpefunksjonar import norm, sortClockwise, finn_fil
 import ray
 
 import datetime
-from math import floor, pi, hypot
+from math import comb, floor, pi, hypot
 import random
 from scipy.sparse.construct import rand #, atan2
 
@@ -121,7 +121,17 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False, verbose=Tru
     
     starttid = datetime.datetime.now()
 
-    status_col = f"{str(random.randint(0,8))};{str(random.randint(30,38))};{str(random.randint(40,48))}"
+    while True:
+        style = random.randint(0,4)
+        text_color = random.randint(30,38)
+        background = random.randint(40,48)
+        combined = (text_color, background)
+        bad = [(30,40),(31,41), (32,42), (33,43), (34,44),(35,45),(36,46),(37,47),(35,41),(36,42),(37,43),(31,45),(32,46),(33,47)]
+        if (combined not in bad):
+            break
+
+    status_col = f"{str()};{str(random.randint(30,38))};{str(random.randint(40,48))}"
+     
 
     while (t < t_max):
         
@@ -141,31 +151,34 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False, verbose=Tru
         
         for rib in ribs:
             collision_info = checkCollision(particle, step_new[1:], rib)
-            if (collision_info[0]):
+            if (collision_info['is_collision']):
                 break
             
-        if (collision_info[0]):
+        if (collision_info['is_collision']):
             if not collision_correction:
                 break
 
-            if (collision_info[1][0] < eps):
+            if (collision_info['collision_depth'] < eps):
                 if verbose:
                     print("kolliderte")
                 #Gjer alt som skal til for å endra retningen på partikkelen
-                n = collision_info[1][1]
+                n = collision_info['rib_normal']
                 v = step_new[3:]
-                v_rel = collision_info[1][3]
+                v_rel = collision_info['relative_velocity'] 
+                # v_rel er relativ fart i normalkomponentretning, jf. formel 8-3 i baraff ("notesg.pdf")
                 v_new = v - (rest + 1) * v_rel * n
                 step_old = np.copy(step_new)
                 step_old[3:] = v_new
                 
                 #Fullfør rørsla fram til hovud-steget, vonleg med rett retning 
                 # og fart, så ein kjem inn i rett framerate igjen.
-                dt = t_main + dt_main - t
-                                
+                # dt = t_main + dt_main - t
+                dt = t_main + dt_main - step_old[0]
+                t = step_old[0]
+
                 # step_new = rk_3(part.f, (t, t_main+dt_main), step_old[1:])
                 
-                if (abs(v_rel) < 0.01):
+                if (np.hypot(v[0], v[1]) < 0.01):
                     sti_komplett.append(step_new)
                     # sti.append(step_new)
                     break
@@ -514,7 +527,8 @@ def checkCollision(particle, data, rib):
     bestDistance = -99999
     nearestEdge = 0
     
-    collisionInfo = (-1,np.array([-1,-1]), np.array([-1,-1]), -1)
+    # collisionInfo = (-1,np.array([-1,-1]), np.array([-1,-1]), -1)
+    # collisionInfo = {}
     
     #Step A - compute nearest edge
     vertices = rib.vertices
@@ -551,14 +565,15 @@ def checkCollision(particle, data, rib):
             dis = np.sqrt(v1.dot(v1))
             
             if (dis > particle.radius):
-                return (False, collisionInfo, rib) # må vel endra til (bool, depth, normal, start)
+                return {'is_collision':False}#, 'rib':rib}
+                # (False, collisionInfo, rib) # må vel endra til (bool, depth, normal, start)
             
             normal = norm(v1)
             
             radiusVec = normal*particle.radius*(-1)
             
             # sender informasjon til collisioninfo:                    
-            collisionInfo = (particle.radius - dis, normal, position + radiusVec)
+            collision_info = dict(collision_depth=particle.radius - dis, rib_normal=normal, particle_collision_point = position + radiusVec)
             
         else:
             # //the center of circle is in corner region of mVertex[nearestEdge+1]
@@ -575,39 +590,41 @@ def checkCollision(particle, data, rib):
                 # //compare the distance with radium to decide collision
         
                 if (dis > particle.radius):
-                    return (False, collisionInfo, rib)
+                    return {'is_collision':False}#, 'rib':rib}
+                    # return (False, collisionInfo, rib)
                 
                 normal = norm(v1)
                 radiusVec = normal * particle.radius*(-1)
                 
-                collisionInfo = (particle.radius - dis, normal, position + radiusVec)
+                collision_info = dict(collision_depth=particle.radius - dis, rib_normal = normal, particle_collision_point = position + radiusVec)
             else:
                 #//the center of circle is in face region of face[nearestEdge]
                 if (bestDistance < particle.radius):
                     radiusVec = normals[nearestEdge] * particle.radius
-                    collisionInfo = (particle.radius - bestDistance, normals[nearestEdge], position - radiusVec)
+                    collision_info = dict(collision_depth = particle.radius - bestDistance, rib_normal = normals[nearestEdge], particle_collision_point = position - radiusVec)
                 else:
-                    return (False, collisionInfo, rib)
+                    return dict(is_collision =  False)
     else:
         #     //the center of circle is inside of rectangle
         radiusVec = normals[nearestEdge] * particle.radius
-        collisionInfo = (particle.radius - bestDistance, normals[nearestEdge], position - radiusVec, -1)
-        
-        return (True, collisionInfo, rib) 
+
+        return dict(is_collision = True, rib = rib, collision_depth = particle.radius - bestDistance, rib_normal = normals[nearestEdge], particle_collision_point = position - radiusVec, inside = True)
+        # return (True, collisionInfo, rib) 
         # Måtte laga denne returen så han ikkje byrja å rekna ut relativ fart når partikkelen uansett er midt inne i ribba.
 
-    # Rekna ut relativ fart, jamfør Baraff (2001) formel 8-3.
-    n = collisionInfo[1]
+    # Rekna ut relativ fart i retning av normalkomponenten, jamfør Baraff (2001) formel 8-3.
+    n = collision_info['rib_normal']
     v = np.array(data[2:])
     v_rel = np.dot(n,v)
-    collisionInfo = (collisionInfo[0], collisionInfo[1],collisionInfo[2], v_rel)
-            
+    collision_info['relative_velocity'] = v_rel
+    collision_info['rib'] = rib
+
     if (v_rel < 0): # Sjekk om partikkelen er på veg vekk frå veggen.
-        is_collision = True
+        collision_info['is_collision'] = True
     else:
-        is_collision = False
+        collision_info['is_collision'] = False
     
-    return (is_collision, collisionInfo, rib)
+    return collision_info
 
 
 class Rib:
