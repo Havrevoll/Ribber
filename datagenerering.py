@@ -157,7 +157,29 @@ def lag_tre(t_span=(0,1), nearest=False, kutt=True, inkluder_ribs = False, kutt_
         del start
     
     if (inkluder_ribs):
-        return tree, U, ribs
+        #venstre ribbe,
+        venstre_ribbe = np.zeros((4,2))
+        
+        venstre_ribbe[0] = ribs[2]
+        venstre_ribbe[1] = ribs[3]
+        venstre_ribbe[3] = [ribs[2,0]-50, ribs[2,1] + (-50) * (ribs[1,1] - ribs[2,1])/(ribs[1,0] - ribs[2,0])]
+        venstre_ribbe[2] = venstre_ribbe[1] + venstre_ribbe[3] - venstre_ribbe[0]
+
+        hogre_ribbe = np.zeros((4,2))
+        hogre_ribbe[0] = ribs[15]
+        hogre_ribbe[1] = ribs[16]
+        hogre_ribbe[2] = [ribs[16,0]+50, ribs[16,1] + 50 * (ribs[17,1] - ribs[16,1])/(ribs[17,0] - ribs[16,0])]
+        hogre_ribbe[3] = hogre_ribbe[0] + hogre_ribbe[2] - hogre_ribbe[1]
+
+        golv = np.zeros((4,2))
+        golv[0] = ribs[8]
+        golv[1] = ribs[9]
+        golv[2] = ribs[9] + np.array([0,-20])
+        golv[3] = ribs[8] + np.array([0,-20])
+        
+        
+
+        return tree, U, [venstre_ribbe, hogre_ribbe, golv]
     else:
         return tree, U
 
