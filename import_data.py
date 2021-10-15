@@ -5,9 +5,9 @@ import csv
 import re
 import argparse
 
-parser = argparse.ArgumentParser()
-parser.add_argument("vec_folder")
-parser.add_argument("savepath")
+parser = argparse.ArgumentParser(description="Hent vec-filer og gjer om til hdf5-fil")
+parser.add_argument("vec_folder", help='Mappa med vec-filene i.')
+parser.add_argument("hdf5",  help='hdf5-fila som skal lagrast til')
 
 args = parser.parse_args()
 p = Path(args.vec_folder)
@@ -49,6 +49,8 @@ def import_data(p):
     
         I = int(re.search(' I=(\d{1,3})',rows[0][10]).group(1))
         J = int(re.search(' J=(\d{1,3})',rows[0][11]).group(1))
+        x_resolution = float(re.search('MicrometersPerPixelX="(\d+\.\d+)"',rows[0][9]).group(1))/1000.0
+        origo = np.array([float(re.search('OriginInImageX="(\d+\.\d+)"',rows[0][9]).group(1)), float(re.search('OriginInImageY="(\d+\.\d+)"',rows[0][9]).group(1))])
         for row in rows[1:]:
             x.append(float(row[0]))
             y.append(float(row[1]))
@@ -73,8 +75,8 @@ def import_data(p):
             
         for row in rows[1:]:
             if (0 < int(row[4])): # Check the CHC
-                u_single.append(float(row[2])*1000)
-                v_single.append(float(row[3])*1000)
+                u_single.append(float(row[2])*1000.)
+                v_single.append(float(row[3])*1000.)
             else:
                 u_single.append(np.nan)
                 v_single.append(np.nan)
@@ -90,8 +92,15 @@ def import_data(p):
     x = np.array(x)
     y = np.array(y)
     
+    ribs = []
+
+    with open(p.parents[1].joinpath("ribber.PPL")) as f:
+        for l in f:
+            ribs.append(l.split(","))
     
-    return x,y,u,v,I,J
+    ribs = ( (np.array([0,2047]) - np.array(ribs).astype(float) ) * np.array([-1,1]) - origo ) * x_resolution
+    
+    return x,y,u,v,I,J, ribs
 
 def save_to_file(path=save):
      with h5py.File(path, 'w') as f:
@@ -104,11 +113,11 @@ def save_to_file(path=save):
          f.create_dataset('ribs', data=ribs)
 
 
-x,y,u,v, I,J = import_data(p)
+x,y,u,v, I,J, ribs = import_data(p)
 
-ribs = np.array([[ [-10.83594, -1.1020], [-11.0196, -8.9075], [-60.79146, -0.8265], [-60.97512, -8.6320] ], 
- [ [89.0751, 0.09183], [89.0751, -7.71372], [39.02775, 0.09183], [39.02775, -7.71372] ],
-[[93.29928, -74.84145], [-93.20745, -72.63753], [-93.20745, -98.80908], [93.29928,- 98.80908]]])
+# ribs = np.array([[ [-10.83594, -1.1020], [-11.0196, -8.9075], [-60.79146, -0.8265], [-60.97512, -8.6320] ], 
+#  [ [89.0751, 0.09183], [89.0751, -7.71372], [39.02775, 0.09183], [39.02775, -7.71372] ],
+# [[93.29928, -74.84145], [-93.20745, -72.63753], [-93.20745, -98.80908], [93.29928,- 98.80908]]])
          
 save_to_file()
          
