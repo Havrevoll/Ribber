@@ -40,15 +40,15 @@ maskefiler = {'Q100_FOUR': {'exp': 'TONSTAD_FOUR', 'rib': 'Mask_211020PtsL.10202
  'Q20_THREE': {'exp': 'Tonstad_THREE', 'rib': 'Mask211014PtsL.101421114839.PPL'},
  'Q40_THREE': {'exp': 'Tonstad_THREE', 'rib': 'mask211014_2PtsL.101421114934.PPL'},
  'Q40_THREE_EXTRA': {'exp': 'Tonstad_THREE', 'rib': 'mask211014_2PtsL.101421114934.PPL'},
- 'Q40_THREE_FINAL': {'exp': 'Tonstad_THREE', 'rib': 'Mask211014_4PtsL.101421115020.PPL'},
- 'Q40_THREE_REPEAT': {'exp': 'Tonstad_THREE', 'rib': 'Mask211014_3PtsL.101421114955.PPL'},
- 'Q60_THREE': {'exp': 'Tonstad_THREE', 'rib': 'mask211014_2PtsL.101421114934.PPL'},
+ 'Q40_THREE FINAL': {'exp': 'Tonstad_THREE', 'rib': 'Mask211014_4PtsL.101421115020.PPL'},
+  'Q60_THREE': {'exp': 'Tonstad_THREE', 'rib': 'mask211014_2PtsL.101421114934.PPL'},
  'Q80_THREE': {'exp': 'Tonstad_THREE', 'rib': 'mask211014_2PtsL.101421114934.PPL'},
  'Q80_THREE_EXTRA': {'exp': 'Tonstad_THREE', 'rib': 'Mask211014_3PtsL.101421114955.PPL'},
- 'Q80_THREE_EXTRA2': {'exp': 'Tonstad_THREE', 'rib': 'Mask211014_5PtsL.101421115031.PPL'},
+ 'Q80EXTRA2_THREE': {'exp': 'Tonstad_THREE', 'rib': 'Mask211014_5PtsL.101421115031.PPL'},
  'Q100_THREE': {'exp': 'Tonstad_THREE', 'rib': 'Mask211014_4PtsL.101421115020.PPL'},
  'Q100_THREE_EXTRA': {'exp': 'Tonstad_THREE', 'rib': 'Mask211014_4PtsL.101421115020.PPL'},
- 'Q100_THREE_EXTRA2': {'exp': 'Tonstad_THREE', 'rib': 'Mask211014_5PtsL.101421115031.PPL'},
+ 'Q100_THREE_EXTRA3': {'exp': 'Tonstad_THREE', 'rib': 'Mask211014_4PtsL.101421115020.PPL'},
+ 'Q100_EXTRA2_THREE': {'exp': 'Tonstad_THREE', 'rib': 'Mask211014_5PtsL.101421115031.PPL'},
  'Q20_TWO': {'exp': 'TONSTAD_TWO', 'rib': 'two_211001PtsL.100421111059.PPL'},
  'Q40_TWO': {'exp': 'TONSTAD_TWO', 'rib': 'two_211001PtsL.100421111059.PPL'},
  'Q60_TWO': {'exp': 'TONSTAD_TWO', 'rib': 'two_211001PtsL.100421111059.PPL'},
@@ -72,10 +72,17 @@ def import_data(p):
             csvreader = csv.reader(f)
             rows = [fields for fields in csvreader]
     
-        I = int(re.search(' I=(\d{1,3})',rows[0][10]).group(1))
-        J = int(re.search(' J=(\d{1,3})',rows[0][11]).group(1))
-        x_resolution = float(re.search('MicrometersPerPixelX="(\d+\.\d+)"',rows[0][9]).group(1))/1000.0
-        origo = np.array([float(re.search('OriginInImageX="(\d+\.\d+)"',rows[0][9]).group(1)), float(re.search('OriginInImageY="(\d+\.\d+)"',rows[0][9]).group(1))])
+        if len(rows[0]) ==9:
+            pos = 5
+        elif len(rows[0]) == 11:
+            pos = 7
+        else:
+            pos = 9
+
+        I = int(re.search(' I=(\d{1,3})',rows[0][pos+1]).group(1))
+        J = int(re.search(' J=(\d{1,3})',rows[0][pos+2]).group(1))
+        x_resolution = float(re.search('MicrometersPerPixelX="(\d+\.\d+)"',rows[0][pos]).group(1))/1000.0
+        origo = np.array([float(re.search('OriginInImageX="(\d+\.\d+)"',rows[0][pos]).group(1)), float(re.search('OriginInImageY="(\d+\.\d+)"',rows[0][pos]).group(1))])
         for row in rows[1:]:
             x.append(float(row[0]))
             y.append(float(row[1]))
@@ -98,7 +105,7 @@ def import_data(p):
     
         if (i %100 == 0):
             # print(rows[0][0]) 
-            print("Har lese {} filer i {}".format(i, p.name))
+            print("Har lese {} filer i {}".format(i, str(p)))
             
         for row in rows[1:]:
             if (0 < int(row[4])): # Check the CHC
@@ -142,6 +149,7 @@ def save_to_file(path, x,y,u,v,I,J,ribs):
         f.create_dataset('I', data=I)
         f.create_dataset('J', data=J)
         f.create_dataset('ribs', data=ribs)
+        
     print("Ferdig å lagra {}".format(path))
 
 
@@ -154,21 +162,21 @@ def save_to_file(path, x,y,u,v,I,J,ribs):
 # save_to_file()
 
 
-eks = { "Tonstad_THREE":['Q100_THREE', 'Q100_THREE_EXTRA', 'Q20_THREE', 'Q40_THREE', 'Q40_THREE FINAL', #'Q100_EXTRA2_THREE', 'Q40_THREE REPEAT', 
-                'Q40_THREE_EXTRA', 'Q60_THREE', 'Q80EXTRA2_THREE', 'Q80_THREE', 'Q80_THREE_EXTRA'], 
-        #"TONSTAD_TWO":['Q100_TWO', 'Q120_TWO', 'Q140_TWO', 'Q20_TWO', 'Q40_TWO', 'Q60_TWO', 'Q80_TWO'], 
-    "TONSTAD_FOUR":['Q100 DTCHANGED', 'Q100_FOUR', 'Q100_FOUR DT', 'Q20_FOUR CHECK', 
-        'Q20_FOUR REPEAT', 'Q20_FOUR TRIALONE', 
-        'Q20_FOURDTDECREASE', 'Q40_FOUR']}#, 'Q40_REPEAT', 'Q60_FOUR', 'Q60_FOUR REPEAT', 'Q80_FOUR', 'Q80_FOURDTCHANGED']}
-
-eks = { "TONSTAD_FOUR":['Q100_FOUR', 'Q100_FOUR DT', 'Q20_FOUR CHECK', 'Q20_FOUR REPEAT', 'Q20_FOUR TRIALONE', 'Q40_FOUR', 'Q40_REPEAT', 'Q60_FOUR', 'Q60_FOUR REPEAT', 'Q80_FOUR','Q80_FOURDTCHANGED']}
+eks = { "Tonstad_THREE":['Q100_THREE', 'Q100_THREE_EXTRA', 'Q100_THREE_EXTRA3', 'Q20_THREE', 'Q40_THREE', 'Q40_THREE FINAL', 'Q100_EXTRA2_THREE',
+            'Q40_THREE_EXTRA', 'Q60_THREE', 'Q80EXTRA2_THREE', 'Q80_THREE', 'Q80_THREE_EXTRA'], 
+        "TONSTAD_TWO":['Q100_TWO', 'Q120_TWO', 'Q140_TWO', 'Q20_TWO', 'Q20_TWO2', 'Q20_TWO3', 'Q40_TWO', 'Q60_TWO', 'Q80_TWO'], 
+        "TONSTAD_FOUR":['Q100_FOUR', 'Q100_FOUR DT', 'Q20_FOUR CHECK', 'Q20_FOUR REPEAT', 'Q20_FOUR TRIALONE', 
+            'Q40_FOUR', 'Q40_REPEAT', 'Q60_FOUR', 'Q60_FOUR REPEAT', 'Q80_FOUR', 'Q80_FOURDTCHANGED']}
 
 # def create_hdf5(eks):
-ray.init()
 
 jobs = {}
 
 for e,runs in eks.items():
+    ray.init()
+
+    jobs = {}
+
     for r in runs:
         folder = Path("../vec").joinpath(e).joinpath(r).joinpath("Analysis")
         # folder = Path("/mnt/g/Experiments11/").joinpath(e).joinpath(r).joinpath("Analysis")
@@ -179,12 +187,19 @@ for e,runs in eks.items():
 
         hdf5_file = Path("..").joinpath("{}_{}.hdf5".format(e,r))
         
-        jobs[r] ={'id':import_data.remote(folder), 'hdf5':hdf5_file}
-
+        jobs[import_data.remote(folder)] ={'run':r, 'hdf5':hdf5_file}
     
-for k in jobs:
-    
-    hdf5_file = jobs[k]['hdf5']
-    print("hentar jobben til ",k, hdf5_file)
-    data = ray.get(jobs[k]['id'])
-    save_to_file(hdf5_file, *data)
+    print("Går for å henta jobbane i ",e)
+    # for k in jobs:
+    unready = list(jobs.keys())
+    while True:
+        ready, unready = ray.wait(unready)
+        ready = ready[0]
+        hdf5_file = jobs[ready]['hdf5']
+        print("hentar jobben til ",jobs[ready]['run'], hdf5_file)
+        data = ray.get(ready)
+        save_to_file(hdf5_file, *data)
+        
+        if len(unready) == 0:
+            break
+    ray.shutdown()

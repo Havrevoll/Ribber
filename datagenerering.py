@@ -13,42 +13,57 @@ from hjelpefunksjonar import ranges, finn_fil
 import datetime
 import scipy.spatial.qhull as qhull
 from scipy.spatial import cKDTree
+import re
 
-import multiprocessing
+# import multiprocessing
 
-# import ray
-# ray.init()
+import ray
 
 fps = 20
 
-filnamn = "../two_q40.hdf5" #finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
+# filnamn = "../two_q40.hdf5" #finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
 
 pickle_fil = finn_fil(["../Q40_60s.pickle", "D:/Tonstad/Q40_20s.pickle", "C:/Users/havrevol/Q40_20s.pickle", "D:/Tonstad/Q40_2s.pickle"])
 
 # print("pickle fil er ", pickle_fil) 
 
-def lag_tre_multi(t_span, filnamn_ut=None):
+def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
     
-    a_pool = multiprocessing.Pool()
+    # a_pool = multiprocessing.Pool()
     
     t_min = t_span[0]
     t_max = t_span[1]
     
-    i = [(i/10,(i+1.5)/10) for i in range(int(t_min)*10,int(t_max)*10)]
+    # i = [(i/10,(i+1.5)/10) for i in range(int(t_min)*10,int(t_max)*10)]
     
-    result = a_pool.map(lag_tre, i)
+    # result = a_pool.map(lag_tre, i)
+    # jobs = [lag_tre.remote(span, filnamn_inn) for span in i]
     
-    i_0 =  range(int(t_min)*10,int(t_max)*10)
-    
-    trees = dict(zip(i_0, result))
+    ray.init()
+    jobs = {lag_tre.remote((i/10,(i+1.5)/10), filnamn_inn):i for i in range(int(t_min)*10,int(t_max)*10)}
+
+    # i_0 =  range(int(t_min)*10,int(t_max)*10)
+
+    trees = {}
+
+    not_ready = jobs.values()
+    while True:
+        ready, not_ready = ray.wait(not_ready)
+        trees[jobs[ready[0]]] = ray.get(ready)
+
+        if len(not_ready==0):
+            break
+
+
+    # trees = dict(zip(i_0, result))
          
     if filnamn_ut is None:
         return trees
     else:
         lagra_tre(trees, filnamn_ut)
 
-
-def lag_tre(t_span=(0,1), nearest=False, kutt=True, inkluder_ribs = False, kutt_kor = [-35.81,64.19 , -25, 5]):
+@ray.remote
+def lag_tre(t_span, filnamn, nearest=False, kutt=True, inkluder_ribs = False, kutt_kor = [-35.81,64.19 , -25, 5]):
     '''
     Ein metode som tek inn eit datasett og gjer alle reshapings-tinga for x og y, u og v og Re.
 
@@ -83,13 +98,24 @@ def lag_tre(t_span=(0,1), nearest=False, kutt=True, inkluder_ribs = False, kutt_
     # axis1= np.take_along_axis(ribs[:,:,1], np.argpartition(ribs[:,:,1],-2),1)[:,-2:].T
     # for rib in np.stack((axis0,axis1),axis=0).swapaxes(0,2):
         
-    
+    experiment = re.search("TONSTAD_(\w*)_", filnamn, re.IGNORECASE).group(1)
+
+    if (experiment == "TWO"):
+        v_r = 1
+        golv_nr = 8
+        h_r = 15
+        v_r_rad = 64
+        
+    else:
+        v_r = 1
+        golv_nr = 6
+        h_r = 10
 
     # Legg inn automatisk henting av desse verdiane?
-    x0 = ribs[1,0]  #-60.79
-    x1 = ribs[2,0]  #-10.84
-    y0 = ribs[1,1]  #-.8265
-    y1 = ribs[2,1]  #-1.1020
+    x0 = ribs[v_r,0]  #-60.79
+    x1 = ribs[v_r+1,0]  #-10.84
+    y0 = ribs[v_r,1]  #-.8265
+    y1 = ribs[v_r+1,1]  #-1.1020
     
     # y[64,18:55] = -.8265+ (x[0,18:55] + 60.79)* (-1.1020+0.8265)/(-10.84+60.79)
     y[64,0:56] = y0 + (x[0,0:56] - x0)* (y1 - y0)/(x1 - x0)
