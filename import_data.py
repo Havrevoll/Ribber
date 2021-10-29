@@ -50,6 +50,8 @@ maskefiler = {'Q100_FOUR': {'exp': 'TONSTAD_FOUR', 'rib': 'Mask_211020PtsL.10202
  'Q100_THREE_EXTRA3': {'exp': 'Tonstad_THREE', 'rib': 'Mask211014_4PtsL.101421115020.PPL'},
  'Q100_EXTRA2_THREE': {'exp': 'Tonstad_THREE', 'rib': 'Mask211014_5PtsL.101421115031.PPL'},
  'Q20_TWO': {'exp': 'TONSTAD_TWO', 'rib': 'two_211001PtsL.100421111059.PPL'},
+ 'Q20_TWO2': {'exp': 'TONSTAD_TWO', 'rib': 'two_211001PtsL.100421111059.PPL'},
+ 'Q20_TWO3': {'exp': 'TONSTAD_TWO', 'rib': 'two_211001PtsL.100421111059.PPL'},
  'Q40_TWO': {'exp': 'TONSTAD_TWO', 'rib': 'two_211001PtsL.100421111059.PPL'},
  'Q60_TWO': {'exp': 'TONSTAD_TWO', 'rib': 'two_211001PtsL.100421111059.PPL'},
  'Q80_TWO': {'exp': 'TONSTAD_TWO', 'rib': 'two_211001PtsL.100421111059.PPL'},

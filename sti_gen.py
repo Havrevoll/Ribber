@@ -129,7 +129,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False, verbose=Tru
         bad = [(30,40),(31,41), (32,42), (33,43), (34,44),(35,45),(36,46),(37,47),(35,41),(36,42),(37,43),(31,45),(32,46),(33,47)]
         if (combined not in bad):
             break
-
+    del bad, combined
     status_col = f"{str()};{str(random.randint(30,38))};{str(random.randint(40,48))}"
      
 

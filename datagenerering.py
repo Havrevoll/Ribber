@@ -6,11 +6,10 @@ Created on Tue Jul  6 12:37:35 2021
 """
 import h5py
 import pickle
-
 import numpy as np
 
-from hjelpefunksjonar import ranges, finn_fil
-import datetime
+# from hjelpefunksjonar import ranges, finn_fil
+# import datetime
 import scipy.spatial.qhull as qhull
 from scipy.spatial import cKDTree
 import re
@@ -23,7 +22,7 @@ fps = 20
 
 # filnamn = "../two_q40.hdf5" #finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
 
-pickle_fil = finn_fil(["../Q40_60s.pickle", "D:/Tonstad/Q40_20s.pickle", "C:/Users/havrevol/Q40_20s.pickle", "D:/Tonstad/Q40_2s.pickle"])
+# pickle_fil = finn_fil(["../Q40_60s.pickle", "D:/Tonstad/Q40_20s.pickle", "C:/Users/havrevol/Q40_20s.pickle", "D:/Tonstad/Q40_2s.pickle"])
 
 # print("pickle fil er ", pickle_fil) 
 
@@ -46,12 +45,12 @@ def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
 
     trees = {}
 
-    not_ready = jobs.values()
+    not_ready = list(jobs.keys())
     while True:
         ready, not_ready = ray.wait(not_ready)
         trees[jobs[ready[0]]] = ray.get(ready)
 
-        if len(not_ready==0):
+        if len(not_ready)==0:
             break
 
 
@@ -64,11 +63,20 @@ def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
 
 @ray.remote
 def lag_tre(t_span, filnamn, nearest=False, kutt=True, inkluder_ribs = False, kutt_kor = [-35.81,64.19 , -25, 5]):
-    '''
-    Ein metode som tek inn eit datasett og gjer alle reshapings-tinga for x og y, u og v og Re.
+    """Lagar eit delaunay- eller kd-tre ut frå t_span og ei hdf5-fil.
 
-    '''
-     
+    Args:
+        t_span (tuple): Tid frå og til
+        filnamn (string): Filnamn på hdf5-fila
+        nearest (bool, optional): lineær?  Defaults to False.
+        kutt (bool, optional): Kutt av data til eit lite område?. Defaults to True.
+        inkluder_ribs (bool, optional): Ta med ribbedata. Defaults to False.
+        kutt_kor (list, optional): Koordinatane til firkanten som skal kuttast. Defaults to [-35.81, 64.19 , -25, 5].
+
+    Returns:
+         tuple: Delaunay eller kd-tre, U pluss ev. ribber
+    """
+
     t_min = t_span[0]
     t_max = t_span[1]
     
@@ -98,56 +106,97 @@ def lag_tre(t_span, filnamn, nearest=False, kutt=True, inkluder_ribs = False, ku
     # axis1= np.take_along_axis(ribs[:,:,1], np.argpartition(ribs[:,:,1],-2),1)[:,-2:].T
     # for rib in np.stack((axis0,axis1),axis=0).swapaxes(0,2):
         
-    experiment = re.search("TONSTAD_(\w*)_", filnamn, re.IGNORECASE).group(1)
+    experiment = re.search("TONSTAD_([A-Z]*)_", filnamn, re.IGNORECASE).group(1)
 
     if (experiment == "TWO"):
         v_r = 1
         golv_nr = 8
-        h_r = 15
+        h_r = 16
+
         v_r_rad = 64
+        v_r_kol = 56
+        v_r_tjukk = 3
+
+        golv_rad1 = 113
+        golv_rad2 = 114
+        golv_skifte = 55
+
+        h_r_rad = 63
+        h_r_kol = 88
+        h_r_tjukk = 6
         
     else:
         v_r = 1
         golv_nr = 6
-        h_r = 10
+        h_r = 11
 
-    # Legg inn automatisk henting av desse verdiane?
+        if (experiment == "THREE"):
+            v_r_rad = 70
+            v_r_kol = 29
+            v_r_tjukk = 6
+
+            golv_rad1 = 122
+            golv_rad2 = 122
+            golv_skifte = 50
+
+            h_r_rad = 69
+            h_r_kol = 80
+            h_r_tjukk = 6
+        else:
+            v_r_rad = 65
+            v_r_kol = 61
+            v_r_tjukk = 6
+
+            golv_rad1 = 123
+            golv_rad2 = 122
+            golv_skifte = 46
+
+            h_r_rad = 65
+            h_r_kol = 80
+            h_r_tjukk = 6
+
+
+
+    # Venstre ribbe
     x0 = ribs[v_r,0]  #-60.79
     x1 = ribs[v_r+1,0]  #-10.84
     y0 = ribs[v_r,1]  #-.8265
     y1 = ribs[v_r+1,1]  #-1.1020
     
     # y[64,18:55] = -.8265+ (x[0,18:55] + 60.79)* (-1.1020+0.8265)/(-10.84+60.79)
-    y[64,0:56] = y0 + (x[0,0:56] - x0)* (y1 - y0)/(x1 - x0)
+    y[v_r_rad,0:v_r_kol] = y0 + (x[0,0:v_r_kol] - x0)* (y1 - y0)/(x1 - x0)
     
     # y[63,0:54]=-1.01
-    Umx_reshape[:,64:67,0:56]=0
-    Vmx_reshape[:,64:67,0:56]=0
+    Umx_reshape[:,v_r_rad:v_r_rad+v_r_tjukk,0:v_r_kol]=0
+    Vmx_reshape[:,v_r_rad:v_r_rad+v_r_tjukk,0:v_r_kol]=0
     
-    x0 = ribs[16,0]   #39.028
-    x1 = ribs[17,0]   #89.075
-    y0 = ribs[16,1]   #0.0918
-    y1 = ribs[17,1]   #0.0918
+    x0 = ribs[h_r,0]   #39.028
+    x1 = ribs[h_r+1,0]   #89.075
+    y0 = ribs[h_r,1]   #0.0918
+    y1 = ribs[h_r+1,1]   #0.0918
     
-    x[63:69,88] = x0
-    y[63,88:] = y0  + (x[0,88:] - x0)* (y1 - y0)/(x1 - x0)
-    Umx_reshape[:,63:69,88:]=0
-    Vmx_reshape[:,63:69,88:]=0
+    x[h_r_rad:h_r_rad+h_r_tjukk,h_r_kol] = x0
+    y[h_r_rad,h_r_kol:] = y0  + (x[0,h_r_kol:] - x0)* (y1 - y0)/(x1 - x0)
+    Umx_reshape[:,h_r_rad:h_r_rad+h_r_tjukk,h_r_kol:]=0
+    Vmx_reshape[:,h_r_rad:h_r_rad+h_r_tjukk,h_r_kol:]=0
     
     
-    x0 = ribs[8,0]  #-93.2075
-    x1 = ribs[9,0]  #93.3
-    y0 = ribs[8,1]  #-72.6375
-    y1 = ribs[9,1]  #-74.8415
+    x0 = ribs[golv_nr,0]  #-93.2075
+    x1 = ribs[golv_nr+1,0]  #93.3
+    y0 = ribs[golv_nr,1]  #-72.6375
+    y1 = ribs[golv_nr+1,1]  #-74.8415
     
-    y [113,0:55] = y0  + (x[0,0:55] - x0)* (y1 - y0)/(x1 - x0)
-    y [114,55:] = y0  + (x[0,55:] - x0)* (y1 - y0)/(x1 - x0)
-    Umx_reshape[:,113,0:55] = 0
-    Vmx_reshape[:,113,0:55] = 0
-    Umx_reshape[:,114,55:] = 0
-    Vmx_reshape[:,114,55:] = 0
+    y [golv_rad1,0:golv_skifte] = y0  + (x[0,0:golv_skifte] - x0)* (y1 - y0)/(x1 - x0)
+    y [golv_rad2,golv_skifte:] = y0  + (x[0,golv_skifte:] - x0)* (y1 - y0)/(x1 - x0)
+    Umx_reshape[:,golv_rad1,0:golv_skifte] = 0
+    Vmx_reshape[:,golv_rad1,0:golv_skifte] = 0
+    Umx_reshape[:,golv_rad2,golv_skifte:] = 0
+    Vmx_reshape[:,golv_rad2,golv_skifte:] = 0
+
+    
     
     if kutt:
+        kutt_kor = [ribs[v_r+1,0]-25, ribs[v_r+1,0]+(ribs[h_r,0] - ribs[v_r+1,0])+25, ribs[v_r+1,1]-24, ribs[v_r+1,1]+6] # [-35.81,64.19 , -25, 5]
         x1 = x[0,:]
         y1=y[:,0]
 
@@ -176,39 +225,38 @@ def lag_tre(t_span, filnamn, nearest=False, kutt=True, inkluder_ribs = False, ku
     if (nearest):
         tree = cKDTree(txy)
     else:
-        print(f"Byrjar på delaunay for ({t_min}, {t_max})")
-        start = datetime.datetime.now()
+        # print(f"Byrjar på delaunay for ({t_min}, {t_max})")
+        # start = datetime.datetime.now()
         tree = qhull.Delaunay(txy)
-        print(f"Ferdig med delaunay for ({t_min}, {t_max}, brukte {datetime.datetime.now()-start}")
-        del start
+        # print(f"Ferdig med delaunay for ({t_min}, {t_max}, brukte {datetime.datetime.now()-start}")
+        # del start
     
     if (inkluder_ribs):
         #venstre ribbe,
         venstre_ribbe = np.zeros((4,2))
         
-        venstre_ribbe[0] = ribs[2]
-        venstre_ribbe[1] = ribs[3]
-        venstre_ribbe[3] = [ribs[2,0]-50, ribs[2,1] + (-50) * (ribs[1,1] - ribs[2,1])/(ribs[1,0] - ribs[2,0])]
+        venstre_ribbe[0] = ribs[v_r+1]
+        venstre_ribbe[1] = ribs[v_r+2]
+        venstre_ribbe[3] = [ribs[v_r+1,0]-50, ribs[v_r+1,1] + (-50) * (ribs[v_r,1] - ribs[v_r+1,1])/(ribs[v_r,0] - ribs[v_r+1,0])]
         venstre_ribbe[2] = venstre_ribbe[1] + venstre_ribbe[3] - venstre_ribbe[0]
 
         hogre_ribbe = np.zeros((4,2))
-        hogre_ribbe[0] = ribs[15]
-        hogre_ribbe[1] = ribs[16]
-        hogre_ribbe[2] = [ribs[16,0]+50, ribs[16,1] + 50 * (ribs[17,1] - ribs[16,1])/(ribs[17,0] - ribs[16,0])]
+        hogre_ribbe[0] = ribs[h_r-1]
+        hogre_ribbe[1] = ribs[h_r]
+        hogre_ribbe[2] = [ribs[h_r,0]+50, ribs[h_r,1] + 50 * (ribs[h_r+1,1] - ribs[h_r,1])/(ribs[h_r + 1,0] - ribs[h_r,0])]
         hogre_ribbe[3] = hogre_ribbe[0] + hogre_ribbe[2] - hogre_ribbe[1]
 
         golv = np.zeros((4,2))
-        golv[0] = ribs[8]
-        golv[1] = ribs[9]
-        golv[2] = ribs[9] + np.array([0,-20])
-        golv[3] = ribs[8] + np.array([0,-20])
+        golv[0] = ribs[golv_nr]
+        golv[1] = ribs[golv_nr+1]
+        golv[2] = ribs[golv_nr+1] + np.array([0,-20])
+        golv[3] = ribs[golv_nr+1] + np.array([0,-20])
         
         
 
         return tree, U, [venstre_ribbe, hogre_ribbe, golv]
     else:
         return tree, U
-
 
 
 # def get_velocity_data(t_span=(0,1), with_gradient = False, one_dimensional = True):
@@ -225,17 +273,19 @@ def lagra_tre(tre, fil):
     with open(fil, 'wb') as f:
         pickle.dump(tre, f)
 
-def hent_tre(fil=pickle_fil):
-    with open(fil, 'rb') as f:
-        tri = pickle.load(f)
+# def hent_tre(fil=pickle_fil):
+#     with open(fil, 'rb') as f:
+#         tri = pickle.load(f)
  
-    return tri
+#     return tri
 
 class tre_objekt:
     def __init__(self, picklenamn, t_span):
         with open(picklenamn, 'rb') as f:
             self.tre = pickle.load(f)
-            self.kdtre, self.U_kd, self.ribs = lag_tre(t_span=t_span, nearest=True, inkluder_ribs=True)
+            ray.init()
+            job = lag_tre.remote(t_span=t_span, nearest=True, inkluder_ribs=True)
+            self.kdtre, self.U_kd, self.ribs = ray.get(job)
     
     
     # def find_simplex(self, x):
@@ -275,20 +325,20 @@ class tre_objekt:
 
 # import scipy.interpolate as spint
 
-def interp_weights(xyz, uvw):
+# def interp_weights(xyz, uvw):
     
-    d=3
+#     d=3
     
-    tri = qhull.Delaunay(xyz)
-    simplex = tri.find_simplex(uvw)
-    vertices = np.take(tri.simplices, simplex, axis=0)
-    temp = np.take(tri.transform, simplex, axis=0)
-    delta = uvw - temp[:, d]
-    bary = np.einsum('njk,nk->nj', temp[:, :d, :], delta)
-    return vertices, np.hstack((bary, 1 - bary.sum(axis=1, keepdims=True)))
+#     tri = qhull.Delaunay(xyz)
+#     simplex = tri.find_simplex(uvw)
+#     vertices = np.take(tri.simplices, simplex, axis=0)
+#     temp = np.take(tri.transform, simplex, axis=0)
+#     delta = uvw - temp[:, d]
+#     bary = np.einsum('njk,nk->nj', temp[:, :d, :], delta)
+#     return vertices, np.hstack((bary, 1 - bary.sum(axis=1, keepdims=True)))
 
-def interpolate(values, vtx, wts):
-    return np.einsum('nj,nj->n', np.take(values, vtx), wts)
+# def interpolate(values, vtx, wts):
+#     return np.einsum('nj,nj->n', np.take(values, vtx), wts)
 
 # Her er interpoleringa for qhull, lineært, altså.
     # uvw = (0,-88.5,87)

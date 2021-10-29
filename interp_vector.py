@@ -48,10 +48,15 @@ class MidpointNormalize(mpl.colors.Normalize):
         return np.ma.masked_array(np.interp(value, x, y))
 
 def get_reshape(dataset):
-    '''
-    Ein metode som tek inn eit datasett og gjer alle reshapings-tinga for x og y, u og v og Re.
+    """Ein metode som tek inn eit datasett og gjer alle reshapings-tinga for x og y, u og v pluss ribbelista.
 
-    '''
+    Args:
+        dataset (string): filnamnet på hdf5-fila.
+
+    Returns:
+        tuple: Ein tuple med x, y, U, V (2d-arrays) og ribs (original-lista)
+    """
+ 
     x,y,Umx,Vmx,I,J,ribs = get_xyuvijribs(dataset)
     
     x_reshape = x.reshape((J,I))
@@ -63,6 +68,14 @@ def get_reshape(dataset):
     return x_reshape, y_reshape, Umx_reshape, Vmx_reshape, ribs
 
 def get_xyuvijribs(dataset):
+    """Ein metode som hentar ut alle dataa frå ei hdf5-fil og returnerer dei som ndarrays.
+
+    Args:
+        dataset (string): filnamnet på hdf5-fila
+
+    Returns:
+        tuple: x,y,U,V (alle som 1D-array), I,J (ints) og ribbelista
+    """
     with h5py.File(dataset, 'r') as f:
         Umx = np.array(f['Umx'])
         Vmx = np.array(f['Vmx'])
