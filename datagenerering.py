@@ -9,7 +9,7 @@ import pickle
 import numpy as np
 
 # from hjelpefunksjonar import ranges, finn_fil
-# import datetime
+import datetime
 import scipy.spatial.qhull as qhull
 from scipy.spatial import cKDTree
 import re
@@ -18,7 +18,6 @@ import re
 
 import ray
 
-fps = 20
 
 # filnamn = "../two_q40.hdf5" #finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
 
@@ -38,8 +37,25 @@ def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
     # result = a_pool.map(lag_tre, i)
     # jobs = [lag_tre.remote(span, filnamn_inn) for span in i]
     
-    ray.init()
-    jobs = {lag_tre.remote((i/10,(i+1.5)/10), filnamn_inn):i for i in range(int(t_min)*10,int(t_max)*10)}
+    ray.init(num_cpus=4)
+
+    with h5py.File(filnamn_inn, 'r') as f:
+        Umx = np.array(f['Umx'])#[int(t_min*fps):int(t_max*fps),:]
+        Vmx = np.array(f['Vmx'])#[int(t_min*fps):int(t_max*fps),:]
+        (I,J) = (int(np.array(f['I'])),int(np.array(f['J'])))
+        x = np.array(f['x']).reshape(J,I)
+        y = np.array(f['y']).reshape(J,I)
+        ribs = np.array(f['ribs'])
+
+    u_r = ray.put(Umx)
+    v_r = ray.put(Vmx)
+    x_r = ray.put(x)
+    y_r = ray.put(y)
+    ribs_r = ray.put(ribs)
+
+    experiment = re.search("TONSTAD_([A-Z]*)_", filnamn_inn, re.IGNORECASE).group(1)
+
+    jobs = {lag_tre.remote((i/10,(i+1.5)/10), u_r,v_r,x_r,y_r,I,J,ribs_r, experiment):i for i in range(int(t_min)*10,int(t_max)*10)}
 
     # i_0 =  range(int(t_min)*10,int(t_max)*10)
 
@@ -53,7 +69,7 @@ def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
         if len(not_ready)==0:
             break
 
-
+    ray.shutdown()
     # trees = dict(zip(i_0, result))
          
     if filnamn_ut is None:
@@ -62,7 +78,7 @@ def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
         lagra_tre(trees, filnamn_ut)
 
 @ray.remote
-def lag_tre(t_span, filnamn, nearest=False, kutt=True, inkluder_ribs = False, kutt_kor = [-35.81,64.19 , -25, 5]):
+def lag_tre(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, nearest=False, kutt=True, inkluder_ribs = False, kutt_kor = [-35.81,64.19 , -25, 5]):
     """Lagar eit delaunay- eller kd-tre ut frå t_span og ei hdf5-fil.
 
     Args:
@@ -79,21 +95,19 @@ def lag_tre(t_span, filnamn, nearest=False, kutt=True, inkluder_ribs = False, ku
 
     t_min = t_span[0]
     t_max = t_span[1]
-    
+    fps = 20
+    Umx = Umx[int(t_min*fps):int(t_max*fps),:]
+    Vmx = Vmx[int(t_min*fps):int(t_max*fps),:]
+
     # piv_range = ranges(kutt)
     
-    with h5py.File(filnamn, 'r') as f:
-        Umx = np.array(f['Umx'])[int(t_min*fps):int(t_max*fps),:]
-        Vmx = np.array(f['Vmx'])[int(t_min*fps):int(t_max*fps),:]
-        (I,J) = (int(np.array(f['I'])),int(np.array(f['J'])))
-        x = np.array(f['x']).reshape(J,I)
-        y = np.array(f['y']).reshape(J,I)
-        ribs = np.array(f['ribs'])
+    x = np.copy(x)
+    y = np.copy(y)
     
     # finn x- og y-koordinatane for kuttinga
 
-    Umx_reshape = Umx.reshape(len(Umx), J, I)
-    Vmx_reshape = Vmx.reshape(len(Vmx), J, I)
+    Umx_reshape = np.copy(Umx.reshape(len(Umx), J, I))
+    Vmx_reshape = np.copy(Vmx.reshape(len(Vmx), J, I))
     # Umx_reshape = np.zeros((len(Umx), J+1,I))
     # Vmx_reshape = np.zeros((len(Vmx), J+1,I))
     # x = np.vstack((x,x[0,:]))
@@ -106,7 +120,7 @@ def lag_tre(t_span, filnamn, nearest=False, kutt=True, inkluder_ribs = False, ku
     # axis1= np.take_along_axis(ribs[:,:,1], np.argpartition(ribs[:,:,1],-2),1)[:,-2:].T
     # for rib in np.stack((axis0,axis1),axis=0).swapaxes(0,2):
         
-    experiment = re.search("TONSTAD_([A-Z]*)_", filnamn, re.IGNORECASE).group(1)
+
 
     if (experiment == "TWO"):
         v_r = 1
@@ -226,9 +240,9 @@ def lag_tre(t_span, filnamn, nearest=False, kutt=True, inkluder_ribs = False, ku
         tree = cKDTree(txy)
     else:
         # print(f"Byrjar på delaunay for ({t_min}, {t_max})")
-        # start = datetime.datetime.now()
+        start = datetime.datetime.now()
         tree = qhull.Delaunay(txy)
-        # print(f"Ferdig med delaunay for ({t_min}, {t_max}, brukte {datetime.datetime.now()-start}")
+        print(f"Ferdig med delaunay for ({t_min}, {t_max}, brukte {datetime.datetime.now()-start}")
         # del start
     
     if (inkluder_ribs):
