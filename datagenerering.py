@@ -64,7 +64,7 @@ def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
     not_ready = list(jobs.keys())
     while True:
         ready, not_ready = ray.wait(not_ready)
-        trees[jobs[ready[0]]] = ray.get(ready)
+        trees[jobs[ready[0]]] = ray.get(ready)[0]
 
         if len(not_ready)==0:
             break
@@ -294,12 +294,35 @@ def lagra_tre(tre, fil):
 #     return tri
 
 class tre_objekt:
-    def __init__(self, picklenamn, t_span):
-        with open(picklenamn, 'rb') as f:
+    def __init__(self, pickle_fil, hdf5_fil, t_span):
+        with open(pickle_fil, 'rb') as f:
             self.tre = pickle.load(f)
-            ray.init()
-            job = lag_tre.remote(t_span=t_span, nearest=True, inkluder_ribs=True)
-            self.kdtre, self.U_kd, self.ribs = ray.get(job)
+        for t in self.tre:
+            if type(self.tre[t]) is list:
+                self.tre[t] = self.tre[t][0]
+
+        
+        with h5py.File(hdf5_fil, 'r') as f:
+            Umx = np.array(f['Umx'])#[int(t_min*fps):int(t_max*fps),:]
+            Vmx = np.array(f['Vmx'])#[int(t_min*fps):int(t_max*fps),:]
+            (I,J) = (int(np.array(f['I'])),int(np.array(f['J'])))
+            x = np.array(f['x']).reshape(J,I)
+            y = np.array(f['y']).reshape(J,I)
+            ribs = np.array(f['ribs'])
+
+        ray.init()
+
+        u_r = ray.put(Umx)
+        v_r = ray.put(Vmx)
+        x_r = ray.put(x)
+        y_r = ray.put(y)
+        ribs_r = ray.put(ribs)
+
+        experiment = re.search("TONSTAD_([A-Z]*)_", str(pickle_fil), re.IGNORECASE).group(1)
+       
+        job = lag_tre.remote(t_span, u_r,v_r,x_r,y_r,I,J,ribs_r, experiment, nearest=True, inkluder_ribs=True)
+        self.kdtre, self.U_kd, self.ribs = ray.get(job)
+        ray.shutdown()
     
     
     # def find_simplex(self, x):

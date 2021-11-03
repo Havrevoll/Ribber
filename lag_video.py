@@ -24,7 +24,7 @@ def lag_video(partikkelfil, filmfil, t_span, fps=20):
     sti_animasjon(particle_list, t_span, utfilnamn=filmfil, fps=fps)
     print(f"Brukte {datetime.datetime.now() - start} på å lagra filmen")
 
-def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnamn="stiQ40.mp4",  fps=20 ):
+def sti_animasjon(partiklar, t_span, hdf5_fil, utfilnamn="stiQ40.mp4",  fps=20 ):
     
     # piv_range = ranges()
     
@@ -35,8 +35,6 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnam
                
     #     x_reshape = x.reshape((127,126))[piv_range]
     #     y_reshape = y.reshape((127,126))[piv_range]
-    
-    (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
 
     t_min = t_span[0]
     t_max = t_span[1]
@@ -46,16 +44,20 @@ def sti_animasjon(partiklar, t_span, dataset = h5py.File(filnamn, 'r'), utfilnam
     t_list = np.arange(t_min*fps,t_max*fps)/fps
     
     piv_range = ranges()
-    
-    Umx = np.array(dataset['Umx'])[t_min*fps:t_max*fps,:]
-    Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
-    Vmx = np.array(dataset['Vmx'])[t_min*fps:t_max*fps,:]
-    Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
 
-    ribs = np.array(dataset['ribs'])
+    with h5py.File(hdf5_fil, 'r') as dataset:
+        (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
     
-    x = np.array(dataset['x'])
-    y = np.array(dataset['y'])
+        Umx = np.array(dataset['Umx'])[t_min*fps:t_max*fps,:]
+        Umx_reshape = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
+        Vmx = np.array(dataset['Vmx'])[t_min*fps:t_max*fps,:]
+        Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
+
+        ribs = np.array(dataset['ribs'])
+        
+        x = np.array(dataset['x'])
+        y = np.array(dataset['y'])
+
     x_reshape = x.reshape(J,I)[piv_range]
     y_reshape = y.reshape(J,I)[piv_range]
             
