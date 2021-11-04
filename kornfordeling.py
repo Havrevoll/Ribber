@@ -32,7 +32,7 @@ def get_PSD_part(tal=1, PSD=None, rnd_seed=1):
     
     element = 1000
 
-    rho = 2650.0 / 1e6
+    rho = 2.650e-6 # 2.11.2021: Her stod det 2650.0/1e6. Men det er jo feil. Det skal vera 2.65e-6 i kg/mm³. 
     PSD_full = np.zeros((element*(len(PSD)-1)+1, 4))
 
     for i in range(len(PSD)-1):
@@ -52,6 +52,8 @@ def get_PSD_part(tal=1, PSD=None, rnd_seed=1):
     sum_partiklar = np.sum(PSD_full[:,2])
     PSD_full[:,3] = np.cumsum(PSD_full[:,2])/sum_partiklar
     PSD_full = PSD_full.T
+    # PSD_full er ein tabell med desse kolonnene: 0: diameter. 1: kumulert sannsynsfordeling, oppdelt i 1000 element for kvar av dei opphavlege inndelingane i PSD.
+    # 2: Tal på partiklar i eitt kilo av partiklar av den gjevne diameteren med den gjevne fordelinga som er i PSD. 3: kumulert prosentvis tal på partiklar delt på samla tal på partiklar.
     PSD = PSD.T
 
     f = interpolate.interp1d(PSD_full[3], PSD_full[0])

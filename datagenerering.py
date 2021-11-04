@@ -240,9 +240,9 @@ def lag_tre(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, nearest=False, kutt=True, 
         tree = cKDTree(txy)
     else:
         # print(f"Byrjar på delaunay for ({t_min}, {t_max})")
-        start = datetime.datetime.now()
+        # start = datetime.datetime.now()
         tree = qhull.Delaunay(txy)
-        print(f"Ferdig med delaunay for ({t_min}, {t_max}, brukte {datetime.datetime.now()-start}")
+        # print(f"Ferdig med delaunay for ({t_min}, {t_max}, brukte {datetime.datetime.now()-start}")
         # del start
     
     if (inkluder_ribs):
@@ -264,7 +264,7 @@ def lag_tre(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, nearest=False, kutt=True, 
         golv[0] = ribs[golv_nr]
         golv[1] = ribs[golv_nr+1]
         golv[2] = ribs[golv_nr+1] + np.array([0,-20])
-        golv[3] = ribs[golv_nr+1] + np.array([0,-20])
+        golv[3] = ribs[golv_nr] + np.array([0,-20])
         
         
 

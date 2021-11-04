@@ -38,4 +38,4 @@ for case in cases:
     start = datetime.datetime.now()
     lag_tre_multi(t_span=(0,178), filnamn_inn="../{}.hdf5".format(case), filnamn_ut="../{}.pickle".format(case))
     print("Ferdig med ", case, ", brukte " ,datetime.datetime.now()-start)
-    break
+    
