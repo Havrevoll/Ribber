@@ -28,7 +28,7 @@ t_min_global = 0
 
 nullfart = np.zeros(2)
 
-def simulering(tal, rnd_seed, tre,  fps = 20, t_span = (0,59), linear = True,  lift = True, addedmass = True, wraparound = False, 
+def simulering(tal, rnd_seed, tre,  fps = 20, t_span = (0,59), linear = True,  lift = True, addedmass = True, wrap_max = 50, 
       atol = 1e-1, rtol = 1e-1, method = 'RK23', tre_fil = finn_fil(["../Q40_0_60.pickle", "../Q40_0_10.pickle"]), laga_film = False, verbose=True, collision_correction=True):
 
     start = datetime.datetime.now()
@@ -58,7 +58,7 @@ def simulering(tal, rnd_seed, tre,  fps = 20, t_span = (0,59), linear = True,  l
     ribs = [Rib(rib) for rib in tre.ribs]
         
     for pa in particle_list:
-        pa.job_id = lag_sti.remote(ribs, t_span, particle=pa, tre=tre_plasma, fps = fps, wraparound=wraparound, verbose=verbose, collision_correction=collision_correction)
+        pa.job_id = lag_sti.remote(ribs, t_span, particle=pa, tre=tre_plasma, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction)
 
     fanga = 0
 
@@ -91,7 +91,7 @@ def simulering(tal, rnd_seed, tre,  fps = 20, t_span = (0,59), linear = True,  l
 
 
 # @ray.remote
-def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False, verbose=True, collision_correction=True):
+def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 50, verbose=True, collision_correction=True):
     # stien må innehalda posisjon, fart og tid.
     sti = []
     sti_komplett = []
@@ -99,7 +99,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False, verbose=Tru
     # tre = ray.get(tre)
     print(f"Partikkel nr. {particle.index} byrja, starta på {particle.init_position}, og {particle.init_time}")
     
-    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre))
+    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs))
  
     step_old = np.concatenate(([particle.init_time], particle.init_position))
     # Step_old og step_new er ein array med [t, x, y, u, v]. 
@@ -117,7 +117,11 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False, verbose=Tru
     dt_main = 1/fps
     dt = dt_main
     eps = 0.01
-    rest = 0.5
+    rest = 0.5 # collision restitution
+    wrap_counter = 0
+
+    left_edge = ribs[0].get_rib_middle()
+    right_edge = ribs[1].get_rib_middle()
     
     starttid = datetime.datetime.now()
 
@@ -143,9 +147,10 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wraparound = False, verbose=Tru
             print(status_wrap)
 
         #.strftime('%X.%f')
-        if (step_new[1] > 67 and wraparound):
-            step_new[1] -= 100
-        elif(step_new[1] > 64):
+        if (step_new[1] > right_edge and wrap_counter <= wrap_max):
+            step_new[1] = left_edge
+            wrap_counter += 1
+        elif(step_new[1] > right_edge):
             break
             
         
@@ -226,7 +231,7 @@ def rk_3 (f, t, y0, solver_args):
 #     radius = diameter/2
 #     return {'diameter': diameter, 'init_position':init_position}
 
-def f(t, x, particle, tri, linear=True, lift=False, addedmass=True):
+def f(t, x, particle, tri, ribs, linear=True, lift=False, addedmass=True):
     """
     Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
     Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
@@ -255,6 +260,8 @@ def f(t, x, particle, tri, linear=True, lift=False, addedmass=True):
     g = np.array([0, 9.81e3]) # mm/s^2 = 9.81 m/s^2
     nu = 1 # 1 mm^2/s = 1e-6 m^2/s
     rho = 1e-6  # kg/mm^3 = 1000 kg/m^3 
+    vel_limit = -0.1
+    mu = 0.5 # friksjonskoeffisenten
     
     dx_dt = x[2:]
     # vel = np.array([100,0]) - dx_dt # relativ snøggleik
@@ -302,12 +309,21 @@ def f(t, x, particle, tri, linear=True, lift=False, addedmass=True):
     # mass på høgre sida, så den må bli flytta over til venstre og delt på resten.
     
     # print("drag_component =",drag_component,", gravity_component = ",gravity_component)        
-
     du_dt = (drag_component + gravity_component + added_mass_component + lift_component ) / divisor
-    
-    # if (np.any(np.isnan(du_dt))):
-    #     print("her er nan! og t, x og dudt er dette:", t,x, du_dt)
-    
+
+    for rib in ribs:
+        collision = checkCollision(particle, x, rib)
+        try:
+            if (collision['collision_depth'] >= 0 and collision['relative_velocity'] <= 0 and collision['relative_velocity'] > vel_limit):
+                rad = collision['rib_normal'] * np.dot(collision['rib_normal'],du_dt) # projeksjon av du_dt på normalvektoren
+                tan = du_dt - rad
+
+                du_dt = tan - norm(tan)*np.hypot(rad[0],rad[1])*mu
+
+                break
+        except KeyError:
+            continue
+        
     return np.concatenate((dx_dt,du_dt))
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
@@ -590,7 +606,7 @@ def checkCollision(particle, data, rib):
                 # //compare the distance with radium to decide collision
         
                 if (dis > particle.radius):
-                    return {'is_collision':False}#, 'rib':rib}
+                    return {'is_collision':False, 'collision_depth': 0}#, 'rib':rib}
                     # return (False, collisionInfo, rib)
                 
                 normal = norm(v1)
@@ -603,7 +619,7 @@ def checkCollision(particle, data, rib):
                     radiusVec = normals[nearestEdge] * particle.radius
                     collision_info = dict(collision_depth = particle.radius - bestDistance, rib_normal = normals[nearestEdge], particle_collision_point = position - radiusVec)
                 else:
-                    return dict(is_collision =  False)
+                    return dict(is_collision =  False, collision_depth = 0)
     else:
         #     //the center of circle is inside of rectangle
         radiusVec = normals[nearestEdge] * particle.radius
@@ -639,7 +655,10 @@ class Rib:
                         # Må sjekka om punkta skal gå mot eller med klokka. 
                         # Nett no går dei MED klokka. Normals skal peika UT.
         
-        
+    def get_rib_middle(self):
+        centerPoint = np.sum(self.vertices, axis=0)/len(self.vertices)
+        return centerPoint[0]
+
     # def __init__(self, origin, width, height):
     #     # Bør kanskje ha informasjon om elastisiteten ved kollisjonar òg?
     #     self.origin = np.array(origin)
