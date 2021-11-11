@@ -25,6 +25,7 @@ from scipy.sparse.construct import rand #, atan2
 
 t_max_global = 20
 t_min_global = 0
+vel_limit = -0.1
 
 nullfart = np.zeros(2)
 
@@ -117,7 +118,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 50, verbose=True, co
     dt_main = 1/fps
     dt = dt_main
     eps = 0.01
-    rest = 0.5 # collision restitution
+    rest = 0.2 # collision restitution
     wrap_counter = 0
 
     left_edge = ribs[0].get_rib_middle()
@@ -134,7 +135,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 50, verbose=True, co
         if (combined not in bad):
             break
     del bad, combined
-    status_col = f"{str()};{str(random.randint(30,38))};{str(random.randint(40,48))}"
+    status_col = f"{str()};{str(text_color)};{str(background)}"
      
 
     while (t < t_max):
@@ -178,15 +179,19 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 50, verbose=True, co
                 #Fullfør rørsla fram til hovud-steget, vonleg med rett retning 
                 # og fart, så ein kjem inn i rett framerate igjen.
                 # dt = t_main + dt_main - t
-                dt = t_main + dt_main - step_old[0]
+                if dt != dt_main:
+                    dt = t_main + dt_main - step_old[0]
+                else:
+                    sti.append(step_old)
+                    t_main = step_old[0]
                 t = step_old[0]
 
                 # step_new = rk_3(part.f, (t, t_main+dt_main), step_old[1:])
                 
-                if (np.hypot(v[0], v[1]) < 0.01):
-                    sti_komplett.append(step_new)
-                    # sti.append(step_new)
-                    break
+                # if (np.hypot(v[0], v[1]) < 0.01):
+                #     sti_komplett.append(step_new)
+                #     # sti.append(step_new)
+                #     break
                 
                 # t = t_main + dt_main
                 
@@ -231,7 +236,7 @@ def rk_3 (f, t, y0, solver_args):
 #     radius = diameter/2
 #     return {'diameter': diameter, 'init_position':init_position}
 
-def f(t, x, particle, tri, ribs, linear=True, lift=False, addedmass=True):
+def f(t, x, particle, tri, ribs):
     """
     Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
     Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
@@ -260,14 +265,28 @@ def f(t, x, particle, tri, ribs, linear=True, lift=False, addedmass=True):
     g = np.array([0, 9.81e3]) # mm/s^2 = 9.81 m/s^2
     nu = 1 # 1 mm^2/s = 1e-6 m^2/s
     rho = 1e-6  # kg/mm^3 = 1000 kg/m^3 
-    vel_limit = -0.1
+ 
     mu = 0.5 # friksjonskoeffisenten
+    addedmass = particle.addedmass
     
     dx_dt = x[2:]
     # vel = np.array([100,0]) - dx_dt # relativ snøggleik
     # U_f = np.array(get_u(t,np.array([x[0],x[1]]),tri, linear))
+
+    resting_contact = False
+
+    for rib in ribs:
+        collision = checkCollision(particle, x, rib)
+        try:
+            if (collision['collision_depth'] >= 0 and collision['relative_velocity'] <= 0 and collision['relative_velocity'] > vel_limit):
+                resting_contact = True
+
+                break
+        except KeyError:
+            continue
+        
     
-    U_f, dudt_material, U_top_bottom = get_u(t, x, particle, tri)
+    U_f, dudt_material, U_top_bottom = get_u(t, x, particle, tri, collision= collision)
     
         # if (np.isnan(U_f[2])):
     #     U_f[2] = 0
@@ -311,24 +330,20 @@ def f(t, x, particle, tri, ribs, linear=True, lift=False, addedmass=True):
     # print("drag_component =",drag_component,", gravity_component = ",gravity_component)        
     du_dt = (drag_component + gravity_component + added_mass_component + lift_component ) / divisor
 
-    for rib in ribs:
-        collision = checkCollision(particle, x, rib)
-        try:
-            if (collision['collision_depth'] >= 0 and collision['relative_velocity'] <= 0 and collision['relative_velocity'] > vel_limit):
-                rad = collision['rib_normal'] * np.dot(collision['rib_normal'],du_dt) # projeksjon av du_dt på normalvektoren
-                tan = du_dt - rad
+    if resting_contact:
+        normalkomponent = collision['rib_normal'] * np.dot(collision['rib_normal'],du_dt) # projeksjon av du_dt på normalvektoren
+        tangentialkomponent = du_dt - normalkomponent
+        friksjonskraft = norm(tangentialkomponent)*hypot(normalkomponent[0],normalkomponent[1])*mu
+        if (hypot(tangentialkomponent[0],tangentialkomponent[1]) > hypot(friksjonskraft[0],friksjonskraft[1])):
+            du_dt = tangentialkomponent - friksjonskraft
+        else:
+            du_dt = tangentialkomponent - tangentialkomponent
 
-                du_dt = tan - norm(tan)*np.hypot(rad[0],rad[1])*mu
-
-                break
-        except KeyError:
-            continue
-        
     return np.concatenate((dx_dt,du_dt))
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
-def get_u(t, x_inn, particle, tre_samla):
+def get_u(t, x_inn, particle, tre_samla, collision):
     '''
     https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
 
@@ -351,9 +366,6 @@ def get_u(t, x_inn, particle, tre_samla):
     '''    
     radius = particle.radius
     lift, addedmass, linear = particle.lift, particle.addedmass, particle.linear
-
-    if (x_inn[1] > 20): # Ein snarveg for å seia at oppe i dei frie vassmassar treng me ikkje interpolera lineært, det held med nearest neighbor.
-        linear = False
 
     tx = np.concatenate(([t], x_inn[:2]))
     U_p = x_inn[2:]
@@ -404,6 +416,12 @@ def get_u(t, x_inn, particle, tre_samla):
         # U_f = np.einsum('ijn,ij->n', np.take(U_del, vertices, axis=0), wts)
         U_f = np.einsum('jni,ni->jn', np.take(U_del,vertices,axis=1),wts)
         
+        try:
+            if (collision['collision_depth'] >= 0 and collision['relative_velocity'] <= 0 and collision['relative_velocity'] > vel_limit):
+                U_f = U_f - np.array([collision['rib_normal']]).T * np.dot(collision['rib_normal'],U_f) # projeksjon av du_dt på normalvektoren
+        except KeyError:
+            pass
+                    
         if (addedmass):
             dUdt = (U_f[:,1] - U_f[:,0]) / dt # Fyrste verdien er dU/dt og andre er dV/dt
             dUdx = (U_f[:,2] - U_f[:,0]) / dx # Fyrste verdien er dU/dx og andre er dV/dy
@@ -467,32 +485,32 @@ get_u.simplex_prob = 0
     
 
 
-def rk_2(f, L, y0, h, tri, U):
-    ''' Heimelaga Runge-Kutta-metode '''
-    t0, t1 = L
-    N=int((t1-t0)/h)
+# def rk_2(f, L, y0, h, tri, U):
+#     ''' Heimelaga Runge-Kutta-metode '''
+#     t0, t1 = L
+#     N=int((t1-t0)/h)
 
-    t=[0]*N # initialize lists
-    y=[0]*N # initialize lists
+#     t=[0]*N # initialize lists
+#     y=[0]*N # initialize lists
     
-    t[0] = t0
-    y[0] = y0
+#     t[0] = t0
+#     y[0] = y0
     
-    for n in range(0, N-1):
-        #print(n,t[n], y[n], f(t[n],y[n]))
-        k1 = h*f(t[n], y[n], tri, U)
-        k2 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k1, tri, U)
-        k3 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k2, tri, U)
-        k4 = h*f(t[n] + h, y[n] + k3, tri, U)
+#     for n in range(0, N-1):
+#         #print(n,t[n], y[n], f(t[n],y[n]))
+#         k1 = h*f(t[n], y[n], tri, U)
+#         k2 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k1, tri, U)
+#         k3 = h*f(t[n] + 0.5 * h, y[n] + 0.5 * k2, tri, U)
+#         k4 = h*f(t[n] + h, y[n] + k3, tri, U)
         
-        if (np.isnan(k4+k3+k2+k1).any()):
-            #print(k1,k2,k3,k4)
-            return t,y
+#         if (np.isnan(k4+k3+k2+k1).any()):
+#             #print(k1,k2,k3,k4)
+#             return t,y
         
-        t[n+1] = t[n] + h
-        y[n+1] = y[n] + 1/6 * (k1 + 2*k2 + 2*k3 + k4)
+#         t[n+1] = t[n] + h
+#         y[n+1] = y[n] + 1/6 * (k1 + 2*k2 + 2*k3 + k4)
         
-    return t, y
+#     return t, y
 
 class Particle:
     #Lag ein tabell med tidspunkt og posisjon for kvar einskild partikkel.
@@ -673,11 +691,11 @@ class Rib:
 #%%
 # Her er ein funksjon for fritt fall av ein 1 mm partikkel i vatn.
 # d u_p/dt = u_p(t,y) der y er vertikal fart. Altså berre modellert drag og gravitasjon.
-def u_p(t,y):
-    if(y==0):
-        cd=1e4
-    else:
-        cd=24/abs(0-y)*(1+0.15*abs(0-y)**0.687)
+# def u_p(t,y):
+#     if(y==0):
+#         cd=1e4
+#     else:
+#         cd=24/abs(0-y)*(1+0.15*abs(0-y)**0.687)
         
-    return 3/4*(0-y)*abs(0-y)*cd*1/2.65-9810*1.65/2.65
+#     return 3/4*(0-y)*abs(0-y)*cd*1/2.65-9810*1.65/2.65
  

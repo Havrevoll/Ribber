@@ -5,7 +5,7 @@ from lag_video import sti_animasjon
 from sti_gen import Rib, lag_sti
 from sti_gen import Particle
 from pathlib import Path
-
+from sti_gen import f
 
 # tre_fil = finn_fil(["../Q40_0_60.pickle", "../Q40_0_10.pickle"])
 t_span = (0,178)
@@ -17,8 +17,9 @@ tre = tre_objekt(pickle_fil, hdf5_fil, t_span)
 
 ribs = [Rib(rib) for rib in tre.ribs]
 
-pa = Particle(0.06, [38.7,-4.5,0,0])
+# pa = Particle(0.06, [38.7,-4.5,0,0])
+pa = Particle(0.06, [11.15,-73.0,26.9,0])
 
-# sti = lag_sti(ribs, t_span, pa, tre)
-# pa.sti = sti
-# sti_animasjon(pa,(0,10),utfilnamn="ein.mp4")
+sti = lag_sti(ribs, t_span, pa, tre)
+pa.sti = sti
+sti_animasjon([pa],(0,178),hdf5_fil, utfilnamn="ein.mp4")

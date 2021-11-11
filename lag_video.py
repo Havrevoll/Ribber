@@ -127,7 +127,7 @@ def sti_animasjon(partiklar, t_span, hdf5_fil, utfilnamn="stiQ40.mp4",  fps=20 )
     print("Skal byrja på filmen")
     #ax.axis('equal')
     # ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,steps),interval=50)
-    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps),interval=int(1000/fps))
+    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps),interval=int(1000/fps), blit=True)
     plt.show()
     print("ferdig med animasjon, skal lagra")
     
