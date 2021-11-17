@@ -90,6 +90,15 @@ def simulering(tal, rnd_seed, tre,  fps = 20, t_span = (0,59), linear = True,  l
 
     return particle_list
 
+def event_check(t, x, particle, tre, ribs):
+    for rib in ribs:
+        collision = checkCollision(particle, x,rib)
+        if collision['is_collision']:
+            return 0.0
+    
+    return 1.0
+
+event_check.terminal = True
 
 # @ray.remote
 def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 50, verbose=True, collision_correction=True):
@@ -99,14 +108,6 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 50, verbose=True, co
     # print(type(tre))
     # tre = ray.get(tre)
     print(f"Partikkel nr. {particle.index} byrja, starta på {particle.init_position}, og {particle.init_time}")
-    
-    def event_check(t, x):
-        for rib in ribs:
-            collision = checkCollision(particle, x,rib)
-            if collision['is_collision']:
-                return 0.0
-        
-        return 1.0
     
     solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs), events = event_check)
  
@@ -287,14 +288,14 @@ def f(t, x, particle, tri, ribs):
         collision = checkCollision(particle, x, rib)
                     
         if collision['is_collision'] and not collision['is_resting_contact']:
-            print("Kollisjonsdjup er {} og det er {}over grenseverdien".format(collision['collision_depth'], "ikkje " if collision['collision_depth'] < eps else ""))
+            # print("Kollisjonsdjup er {} og det er {}over grenseverdien".format(collision['collision_depth'], "ikkje " if collision['collision_depth'] < eps else ""))
 
-            n = collision['rib_normal']
-            v = x[2:]
-            v_rel = collision['relative_velocity'] 
-            # v_rel er relativ fart i normalkomponentretning, jf. formel 8-3 i baraff ("notesg.pdf")
-            v_new = v - (rest + 1) * v_rel * n
-            x[2:] = v_new
+            # n = collision['rib_normal']
+            # v = x[2:]
+            # v_rel = collision['relative_velocity'] 
+            # # v_rel er relativ fart i normalkomponentretning, jf. formel 8-3 i baraff ("notesg.pdf")
+            # v_new = v - (rest + 1) * v_rel * n
+            # x[2:] = v_new
         
             break
 
