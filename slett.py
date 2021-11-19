@@ -6,14 +6,16 @@ from sti_gen import Rib, lag_sti
 from sti_gen import Particle
 from pathlib import Path
 from sti_gen import f
+import pickle
 
-# tre_fil = finn_fil(["../Q40_0_60.pickle", "../Q40_0_10.pickle"])
 t_span = (0,178)
 
 pickle_fil = Path("../TONSTAD_TWO_Q20_TWO2.pickle")
-hdf5_fil = Path("../TONSTAD_TWO_Q20_TWO2.hdf5")
+hdf5_fil = pickle_fil.with_suffix(".hdf5")
 
-tre = tre_objekt(pickle_fil, hdf5_fil, t_span)
+with open(pickle_fil,'rb') as f:
+    tre = pickle.load(f)
+
 
 ribs = [Rib(rib) for rib in tre.ribs]
 
@@ -22,4 +24,4 @@ pa = Particle(0.06, [11.15,-73.0,26.9,0])
 
 sti = lag_sti(ribs, t_span, pa, tre)
 pa.sti = sti
-sti_animasjon([pa],(0,178),hdf5_fil, utfilnamn="ein.mp4")
+# sti_animasjon([pa],(0,178),hdf5_fil, utfilnamn="ein.mp4")

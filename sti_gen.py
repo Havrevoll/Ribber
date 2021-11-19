@@ -10,7 +10,6 @@ import numpy as np
 from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#r179348322575-1
 from hjelpefunksjonar import norm, sortClockwise, finn_fil
 
-
 import ray
 
 import datetime
@@ -26,6 +25,8 @@ from scipy.sparse.construct import rand #, atan2
 t_max_global = 20
 t_min_global = 0
 vel_limit = 0.1
+eps = 0.01
+rest = 0.2 # collision restitution
 
 nullfart = np.zeros(2)
 
@@ -93,7 +94,7 @@ def simulering(tal, rnd_seed, tre,  fps = 20, t_span = (0,59), linear = True,  l
 def event_check(t, x, particle, tre, ribs):
     for rib in ribs:
         collision = checkCollision(particle, x,rib)
-        if collision['is_collision']:
+        if collision['is_collision'] and not collision['is_resting_contact']:
             return 0.0
     
     return 1.0
@@ -134,11 +135,11 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 50, verbose=True, co
     starttid = datetime.datetime.now()
 
     while True:
-        style = random.randint(0,4)
-        text_color = random.randint(30,38)
-        background = random.randint(40,48)
+        # style = random.randint(0,4)
+        text_color = random.randint(30,38)+ 60*random.randint(0,1)
+        background = random.randint(40,48) 
         combined = (text_color, background)
-        bad = [(30,40),(31,41), (32,42), (33,43), (34,44),(35,45),(36,46),(37,47),(35,41),(36,42),(37,43),(31,45),(32,46),(33,47)]
+        bad = [(30,40),(30,48),(31,41), (32,42), (33,43), (34,44),(35,44),(35,45),(36,46),(37,47),(35,41),(36,42),(37,43),(31,45),(32,46),(33,47),(96,41),(97,43)]
         if (combined not in bad):
             break
     del bad, combined
@@ -147,7 +148,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 50, verbose=True, co
 
     while (t < t_max):
         
-        step_new = rk_3(f, (t,t+dt), step_old[1:], solver_args)
+        step_new, collision = rk_3(f, (t,t+dt), step_old[1:], solver_args)
 
         if verbose:
             status_msg = "{tid} pa nr {i}, {d:.2f} mm startpos. [{pos[0]:.3f}, {pos[1]:.3f}] ferdig med t={t:.4f}, pos=[{x:.2f},{y:.2f}] U=[{u:.2f},{v:.2f}]".format(tid=(datetime.datetime.now()-starttid), i=particle.index, d=particle.diameter, pos=particle.init_position[:2], t=step_new[0], x=step_new[1], y=step_new[2], u=step_new[3], v=step_new[4])
@@ -161,64 +162,65 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 50, verbose=True, co
         elif(step_new[1] > right_edge):
             break
             
+            
+        if (collision):
+            for rib in ribs:
+                collision_info = checkCollision(particle, step_new[1:], rib)
+                if (collision_info['is_collision']):
+                    break
+
+            if not collision_correction:
+                break
+
+            assert collision_info['collision_depth'] < eps
+            if (collision_info['collision_depth'] < eps):
+                if verbose:
+                    print("kolliderte")
+                #Gjer alt som skal til for å endra retningen på partikkelen
+                n = collision_info['rib_normal']
+                v = step_new[3:]
+                v_rel = collision_info['relative_velocity'] 
+                # v_rel er relativ fart i normalkomponentretning, jf. formel 8-3 i baraff ("notesg.pdf")
+                v_new = v - (rest + 1) * v_rel * n
+                step_old = np.copy(step_new)
+                step_old[3:] = v_new
+                
+                #Fullfør rørsla fram til hovud-steget, vonleg med rett retning 
+                # og fart, så ein kjem inn i rett framerate igjen.
+                # dt = t_main + dt_main - t
+                if step_old[0] != t+dt:
+                    dt = t + dt - step_old[0]
+                else:
+                    sti.append(step_old)
+                    t_main = step_old[0]
+                t = step_old[0]
+
+                # step_new = rk_3(part.f, (t, t_main+dt_main), step_old[1:])
+                
+                # if (np.hypot(v[0], v[1]) < 0.01):
+                #     sti_komplett.append(step_new)
+                #     # sti.append(step_new)
+                #     break
+                
+                # t = t_main + dt_main
+                
+            else:
+                dt = dt/2
+                if verbose:
+                    print("må finjustera kollisjon, skulle ikkje vore her, HJELP!!!!!")
+                continue
+        else:
+            sti_komplett.append(step_new)
+            step_old = step_new
+            
+            t = round((t + dt) * 10000) / 10000
+
+        if (round(step_new[0]*10000) % round(dt_main*10000) == 0):
+            sti.append(step_new)
+            t_main = step_new[0]
+            t = t_main
+            dt = dt_main
         
-        # for rib in ribs:
-        #     collision_info = checkCollision(particle, step_new[1:], rib)
-        #     if (collision_info['is_collision']):
-        #         break
-            
-        # if (collision_info['is_collision']):
-        #     if not collision_correction:
-        #         break
-
-        #     if (collision_info['collision_depth'] < eps):
-        #         if verbose:
-        #             print("kolliderte")
-        #         #Gjer alt som skal til for å endra retningen på partikkelen
-        #         n = collision_info['rib_normal']
-        #         v = step_new[3:]
-        #         v_rel = collision_info['relative_velocity'] 
-        #         # v_rel er relativ fart i normalkomponentretning, jf. formel 8-3 i baraff ("notesg.pdf")
-        #         v_new = v - (rest + 1) * v_rel * n
-        #         step_old = np.copy(step_new)
-        #         step_old[3:] = v_new
-                
-        #         #Fullfør rørsla fram til hovud-steget, vonleg med rett retning 
-        #         # og fart, så ein kjem inn i rett framerate igjen.
-        #         # dt = t_main + dt_main - t
-        #         if dt != dt_main:
-        #             dt = t_main + dt_main - step_old[0]
-        #         else:
-        #             sti.append(step_old)
-        #             t_main = step_old[0]
-        #         t = step_old[0]
-
-        #         # step_new = rk_3(part.f, (t, t_main+dt_main), step_old[1:])
-                
-        #         # if (np.hypot(v[0], v[1]) < 0.01):
-        #         #     sti_komplett.append(step_new)
-        #         #     # sti.append(step_new)
-        #         #     break
-                
-        #         # t = t_main + dt_main
-                
-        #     else:
-        #         dt = dt/2
-        #         if verbose:
-        #             print("må finjustera kollisjon")
-        #         continue
-        # else:
-        # sti_komplett.append(step_new)
-        step_old = step_new
-            
-        t = round((t + dt) * 10000) / 10000
-
-            # if (round(step_new[0]*10000) % round(dt_main*10000) == 0):
-        sti.append(step_new)
-            #     t_main = step_new[0]
-            #     t = t_main
-            #     dt = dt_main
-            
     # if (len(sti) < t_max*fps):
     #     sti = np.pad(sti, ((0,t_max*fps - len(sti)),(0,0)),'edge')
     #     sti[int(t_main*fps):,0] = np.arange(t_main, t_max, 1/fps)
@@ -231,10 +233,15 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 50, verbose=True, co
 
 
 def rk_3 (f, t, y0, solver_args):
-    resultat = solve_ivp(f, t, y0,   t_eval = [t[1]], **solver_args)
+    assert t[1] - t[0] > 0
+    resultat = solve_ivp(f, t, y0, dense_output=True,   **solver_args) # t_eval = [t[1]],
     # har teke ut max_ste=0.02, for det vart aldri aktuelt, ser det ut til.  method=solver_args['method'], args=solver_args['args'],
-    
-    return np.concatenate((resultat.t, resultat.y[:,0]))
+    assert resultat.success == True
+
+    if (resultat.message == "A termination event occurred."):
+        return np.concatenate((resultat.t_events[0], resultat.y_events[0][0])), True
+    else:
+        return np.concatenate(([resultat.t[-1]], resultat.y[:,-1])), False
 
 
 # def createParticle(diameter, init_position, density=2.65e-6):
@@ -273,21 +280,20 @@ def f(t, x, particle, tri, ribs):
     nu = 1 # 1 mm^2/s = 1e-6 m^2/s
     rho = 1e-6  # kg/mm^3 = 1000 kg/m^3 
     
-    eps = 0.01
+
  
-    rest = 0.2 # collision restitution
     mu = 0.5 # friksjonskoeffisenten
     addedmass = particle.addedmass
     
-    dx_dt = x[2:]
-    # vel = np.array([100,0]) - dx_dt # relativ snøggleik
+    dxdt = x[2:]
+    # vel = np.array([100,0]) - dxdt # relativ snøggleik
     # U_f = np.array(get_u(t,np.array([x[0],x[1]]),tri, linear))
 
     
     for rib in ribs:
         collision = checkCollision(particle, x, rib)
                     
-        if collision['is_collision'] and not collision['is_resting_contact']:
+        if collision['is_collision'] or collision['is_resting_contact']:
             # print("Kollisjonsdjup er {} og det er {}over grenseverdien".format(collision['collision_depth'], "ikkje " if collision['collision_depth'] < eps else ""))
 
             # n = collision['rib_normal']
@@ -309,7 +315,7 @@ def f(t, x, particle, tri, ribs):
     #     # U_f[3] = dudt_mean[1][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
         
         
-    vel = U_f - dx_dt # relativ snøggleik
+    vel = U_f - dxdt # relativ snøggleik
     # vel_ang = atan2(vel[1], vel[0])
     
     
@@ -341,26 +347,32 @@ def f(t, x, particle, tri, ribs):
     # mass på høgre sida, så den må bli flytta over til venstre og delt på resten.
     
     # print("drag_component =",drag_component,", gravity_component = ",gravity_component)        
-    du_dt = (drag_component + gravity_component + added_mass_component + lift_component ) / divisor
+    dudt = (drag_component + gravity_component + added_mass_component + lift_component ) / divisor
 
     try:
         if collision['is_resting_contact']:
-            #akselerasjonen, du_dt
-            normalkomponent = collision['rib_normal'] * np.dot(collision['rib_normal'],du_dt) # projeksjon av du_dt på normalvektoren
-            tangentialkomponent = du_dt - normalkomponent
-            friksjonskraft = norm(tangentialkomponent)*hypot(normalkomponent[0],normalkomponent[1])*mu
-            if (hypot(tangentialkomponent[0],tangentialkomponent[1]) > hypot(friksjonskraft[0],friksjonskraft[1])):
-                du_dt = tangentialkomponent - friksjonskraft
-            else:
-                du_dt = tangentialkomponent - tangentialkomponent
+            #akselerasjonen, dudt
+            dudt_n = collision['rib_normal'] * np.dot(collision['rib_normal'],dudt) # projeksjon av dudt på normalvektoren
+            dxdt_n = collision['rib_normal'] * np.dot(collision['rib_normal'],dxdt)
+            
+            dudt_t = dudt - dudt_n
+            dxdt_t = dxdt - dxdt_n
 
-            # farten, dx_dx
-            normalkomponent = collision['rib_normal'] * np.dot(collision['rib_normal'],dx_dt)
-            dx_dt = dx_dt - normalkomponent
+            if hypot(dxdt_t[0],dxdt_t[1]) < vel_limit:
+                dudt_friction = -norm(dudt_t)*hypot(dudt_n[0],dudt_n[1])*mu
+                if (hypot(dudt_t[0],dudt_t[1]) > hypot(dudt_friction[0],dudt_friction[1])):
+                    dudt = dudt_t + dudt_friction #
+                else:
+                    dudt = np.zeros(2)
+            else:
+                dudt_friction = -norm(dxdt_t)*hypot(dudt_n[0],dudt_n[1])*mu
+                dudt = dudt_t + dudt_friction
+                dxdt = dxdt_t
+                
     except KeyError:
         pass
 
-    return np.concatenate((dx_dt,du_dt))
+    return np.concatenate((dxdt,dudt))
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
@@ -415,6 +427,10 @@ def get_u(t, x_inn, particle, tre_samla, collision):
         
         if (np.any(simplex==-1)):
             get_u.utanfor += 1
+            addedmass = False
+            linear = False
+            lift = False
+
             while True:
                 try:
                     U_kd[:,kdtre.query(x[0])[1]]
@@ -423,80 +439,87 @@ def get_u(t, x_inn, particle, tre_samla, collision):
                     x[np.abs(x)>1e100] /= 1e10
                     
                 
-            return U_kd[:,kdtre.query(x[0])[1]], nullfart, np.zeros((2,2))
+            U_f = U_kd[:,kdtre.query(x[0])[1]] #, nullfart, np.zeros((2,2))
             # Gjer added mass og lyftekrafta lik null, sidan den ikkje er viktig her.
-          
-        vertices = np.take(tri.simplices, simplex, axis=0)
-        temp = np.take(tri.transform, simplex, axis=0)
-                
-        delta = x - temp[:,d]
-        bary = np.einsum('njk,nk->nj', temp[:,:d, :], delta)
-        wts = np.hstack((bary, 1 - bary.sum(axis=1, keepdims=True)))
-        
-        # U_f = np.einsum('nij,ni->nj', np.take(np.column_stack(U_del),vertices,axis=0),wts)
-        # U_f = np.einsum('ijn,ij->n', np.take(U_del, vertices, axis=0), wts)
-        U_f = np.einsum('jni,ni->jn', np.take(U_del,vertices,axis=1),wts)
-        
-        try:
-            if (collision['is_resting_contact']):
-                U_f = U_f - np.array([collision['rib_normal']]).T * np.dot(collision['rib_normal'],U_f) # projeksjon av du_dt på normalvektoren
-        except KeyError:
-            pass
+        else:  
+            vertices = np.take(tri.simplices, simplex, axis=0)
+            temp = np.take(tri.transform, simplex, axis=0)
                     
-        if (addedmass):
-            dUdt = (U_f[:,1] - U_f[:,0]) / dt # Fyrste verdien er dU/dt og andre er dV/dt
-            dUdx = (U_f[:,2] - U_f[:,0]) / dx # Fyrste verdien er dU/dx og andre er dV/dy
-            dUdy = (U_f[:,3] - U_f[:,0]) / dt # Fyrste verdien er dU/dy og andre er dV/dy
-    
-            # skal finna gradienten i t, u og v-retning for å bruka på added mass.
-            # DU/Dt = dU/dt + u * dU/dx + v*dU/dy
+            delta = x - temp[:,d]
+            bary = np.einsum('njk,nk->nj', temp[:,:d, :], delta)
+            wts = np.hstack((bary, 1 - bary.sum(axis=1, keepdims=True)))
             
-            dudt_material = dUdt + U_f[0,0] * dUdx + U_f[1,0] * dUdy
-        else:
-            dudt_material = nullfart
-
-        if (lift):
-            # skal finna farten i passande punkt over og under partikkelen for lyftekraft
-            U_rel = U_f[:, 0] - U_p
-            
-            particle_top =    x_inn[0:2] + radius * norm(U_rel) @ np.array([[0, 1],[-1, 0]])
-            particle_bottom = x_inn[0:2] + radius * norm(U_rel) @ np.array([[0, -1],[1, 0]])
-            
-            part = np.array([[t, particle_top[0], particle_top[1]], [t, particle_bottom[0], particle_bottom[1]] ])
-            
-            
-            part_simplex = simplex[:2]
-            part_vertices = vertices[:2]
-            part_temp = temp[:2]
-                
-            while (True):
-                part_delta = part - part_temp[:,d] #avstanden til referansepunktet i simpleksen.
-                part_bary = np.einsum('njk,nk->nj', part_temp[:,:d, :], part_delta) 
-                part_wts = np.hstack((part_bary, 1 - part_bary.sum(axis=1, keepdims=True)))
-                break
-            
-                # if (np.any(part_wts < -0.02)):
-                #     part_simplex = tri.find_simplex(part)
-                #     if np.any(part.simplex == -1):
-                #         break
-                #     part_vertices = np.take(tri.simplices, part_simplex, axis=0)
-                #     part_temp = np.take(tri.transform, part_simplex, axis=0)
-                #     get_u.simplex_prob += 1
-                #     if get_u.simplex_prob > 20:
-                #         print("Går i loop i part_simplex og der!")
-                # else:
-                #     get_u.simplex_prob = 0
-                #     break
-                    
-            U_top_bottom = np.einsum('jni,ni->jn', np.take(U_del, part_vertices, axis=1), part_wts)
-        else:
-            U_top_bottom = np.zeros((2,2))
-                    
-        return (U_f[:,0], dudt_material, U_top_bottom)
-        # return np.einsum('j,j->', np.take(U_del[0], vertices), wts), np.einsum('j,j->', np.take(U_del[1], vertices), wts),  np.einsum('j,j->', np.take(U_del[2], vertices), wts),  np.einsum('j,j->', np.take(U_del[3], vertices), wts)
+            # U_f = np.einsum('nij,ni->nj', np.take(np.column_stack(U_del),vertices,axis=0),wts)
+            # U_f = np.einsum('ijn,ij->n', np.take(U_del, vertices, axis=0), wts)
+            U_f = np.einsum('jni,ni->jn', np.take(U_del,vertices,axis=1),wts)
     else:
-        return U_kd[:,kdtre.query(x[0])[1]], nullfart, np.zeros((2,2))
+        U_f = U_kd[:,kdtre.query(x[0])[1]]#, nullfart, np.zeros((2,2))
+        addedmass = False
+        linear = False
+        lift = False
+        # return np.einsum('j,j->', np.take(U_del[0], vertices), wts), np.einsum('j,j->', np.take(U_del[1], vertices), wts),  np.einsum('j,j->', np.take(U_del[2], vertices), wts),  np.einsum('j,j->', np.take(U_del[3], vertices), wts)
         # return U[0][kd_index], U[1][kd_index], U[2][kd_index], U[3][kd_index]
+
+    try:
+        if (collision['is_resting_contact']):
+            U_f = U_f - np.array([collision['rib_normal']]).T * np.dot(collision['rib_normal'],U_f) # projeksjon av dudt på normalvektoren
+    except KeyError:
+        pass
+                
+    if (addedmass):
+        dUdt = (U_f[:,1] - U_f[:,0]) / dt # Fyrste verdien er dU/dt og andre er dV/dt
+        dUdx = (U_f[:,2] - U_f[:,0]) / dx # Fyrste verdien er dU/dx og andre er dV/dy
+        dUdy = (U_f[:,3] - U_f[:,0]) / dt # Fyrste verdien er dU/dy og andre er dV/dy
+
+        # skal finna gradienten i t, u og v-retning for å bruka på added mass.
+        # DU/Dt = dU/dt + u * dU/dx + v*dU/dy
+        
+        dudt_material = dUdt + U_f[0,0] * dUdx + U_f[1,0] * dUdy
+    else:
+        dudt_material = nullfart
+
+    if (lift):
+        # skal finna farten i passande punkt over og under partikkelen for lyftekraft
+        U_rel = U_f[:, 0] - U_p
+        
+        particle_top =    x_inn[0:2] + radius * norm(U_rel) @ np.array([[0, 1],[-1, 0]])
+        particle_bottom = x_inn[0:2] + radius * norm(U_rel) @ np.array([[0, -1],[1, 0]])
+        
+        part = np.array([[t, particle_top[0], particle_top[1]], [t, particle_bottom[0], particle_bottom[1]] ])
+        
+        
+        part_simplex = simplex[:2]
+        part_vertices = vertices[:2]
+        part_temp = temp[:2]
+            
+        while (True):
+            part_delta = part - part_temp[:,d] #avstanden til referansepunktet i simpleksen.
+            part_bary = np.einsum('njk,nk->nj', part_temp[:,:d, :], part_delta) 
+            part_wts = np.hstack((part_bary, 1 - part_bary.sum(axis=1, keepdims=True)))
+            break
+        
+            # if (np.any(part_wts < -0.02)):
+            #     part_simplex = tri.find_simplex(part)
+            #     if np.any(part.simplex == -1):
+            #         break
+            #     part_vertices = np.take(tri.simplices, part_simplex, axis=0)
+            #     part_temp = np.take(tri.transform, part_simplex, axis=0)
+            #     get_u.simplex_prob += 1
+            #     if get_u.simplex_prob > 20:
+            #         print("Går i loop i part_simplex og der!")
+            # else:
+            #     get_u.simplex_prob = 0
+            #     break
+                
+        U_top_bottom = np.einsum('jni,ni->jn', np.take(U_del, part_vertices, axis=1), part_wts)
+    else:
+        U_top_bottom = np.zeros((2,2))
+    
+    if (linear):
+        U_f = U_f[:,0]
+
+    return (U_f, dudt_material, U_top_bottom)
+
   
 # cd = interpolate.interp1d(np.array([0.001,0.01,0.1,1,10,20,40,60,80,100,200,400,600,800,1000,2000,4000,6000,8000,10000,100000]), np.array([2.70E+04,2.40E+03,2.50E+02,2.70E+01,4.40E+00,2.80E+00,1.80E+00,1.45E+00,1.25E+00,1.12E+00,8.00E-01,6.20E-01,5.50E-01,5.00E-01,4.70E-01,4.20E-01,4.10E-01,4.15E-01,4.30E-01,4.38E-01,5.40E-01,]))
     
@@ -620,7 +643,7 @@ def checkCollision(particle, data, rib):
             dis = np.sqrt(v1.dot(v1))
             
             if (dis > particle.radius):
-                return {'is_collision':False}#, 'rib':rib}
+                return {'is_collision':False, 'is_resting_contact':False}#, 'rib':rib}
                 # (False, collisionInfo, rib) # må vel endra til (bool, depth, normal, start)
             
             normal = norm(v1)
@@ -645,7 +668,7 @@ def checkCollision(particle, data, rib):
                 # //compare the distance with radium to decide collision
         
                 if (dis > particle.radius):
-                    return {'is_collision':False, 'collision_depth': 0}#, 'rib':rib}
+                    return {'is_collision':False, 'collision_depth': 0, 'is_resting_contact':False}#, 'rib':rib}
 
                 normal = norm(v1)
                 radiusVec = normal * particle.radius*(-1)
@@ -657,7 +680,7 @@ def checkCollision(particle, data, rib):
                     radiusVec = normals[nearestEdge] * particle.radius
                     collision_info = dict(collision_depth = particle.radius - bestDistance, rib_normal = normals[nearestEdge], particle_collision_point = position - radiusVec)
                 else:
-                    return dict(is_collision =  False, collision_depth = 0)
+                    return dict(is_collision =  False, collision_depth = 0, is_resting_contact = False)
     else:
         #     //the center of circle is inside of rectangle
         radiusVec = normals[nearestEdge] * particle.radius
@@ -677,7 +700,7 @@ def checkCollision(particle, data, rib):
     else:
         collision_info['is_resting_contact'] = False
 
-    if (v_rel < 0): # Sjekk om partikkelen er på veg vekk frå veggen.
+    if (v_rel < -vel_limit): # Sjekk om partikkelen er på veg vekk frå veggen.
         collision_info['is_collision'] = True
     else:
         collision_info['is_collision'] = False

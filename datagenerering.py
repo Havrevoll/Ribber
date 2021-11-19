@@ -320,7 +320,7 @@ class tre_objekt:
 
         experiment = re.search("TONSTAD_([A-Z]*)_", str(pickle_fil), re.IGNORECASE).group(1)
        
-        job = lag_tre.remote(t_span, u_r,v_r,x_r,y_r,I,J,ribs_r, experiment, nearest=True, inkluder_ribs=True)
+        job = lag_tre.remote(t_span, u_r,v_r,x_r,y_r,I,J,ribs_r, experiment, nearest=True, kutt= False, inkluder_ribs=True)
         self.kdtre, self.U_kd, self.ribs = ray.get(job)
         ray.shutdown()
     
