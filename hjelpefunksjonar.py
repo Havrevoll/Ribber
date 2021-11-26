@@ -31,8 +31,7 @@ def draw_rect(axes, ribs, color='red'):
         # axes.add_patch(Rectangle((-61.07,-8.816),50.2,7.8,linewidth=2,edgecolor='none',facecolor=color))
         # axes.add_patch(Rectangle((37.6,-8.5),50,7.8,linewidth=2,edgecolor=color,facecolor='none'))
     for rib in ribs:
-        rib = sortClockwise(np.array(rib))
-        axes.add_patch(Polygon(rib, facecolor=color))
+        axes.add_patch(Polygon(rib.vertices, facecolor=color))
 
 def ranges(kutt=False):
     # Dette var dei eg brukte for å laga kvadrantanalysen.

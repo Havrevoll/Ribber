@@ -14,7 +14,7 @@ from hjelpefunksjonar import norm, sortClockwise, finn_fil
 import ray
 
 import datetime
-from math import floor, pi, hypot
+from math import floor, pi, hypot, ceil
 import random
 from scipy.sparse.construct import rand #, atan2
 
@@ -27,7 +27,7 @@ t_max_global = 20
 t_min_global = 0
 vel_limit = 0.1
 eps = 0.01
-collistion_restitution = 0.2 # collision restitution
+collision_restitution = 0. # collision restitution
 
 nullfart = np.zeros(2)
 
@@ -93,6 +93,10 @@ def simulering(tal, rnd_seed, tre,  fps = 20, t_span = (0,59), linear = True,  l
     return particle_list
 
 def event_check(t, x, particle, tre, ribs):
+    event_check.counter += 1
+    if hypot(x[2],x[3]) < particle.rtol *10 and hypot(x[2],x[3]) > 0:
+        return 0.0
+    
     for rib in ribs:
         collision = checkCollision(particle, x,rib)
         if collision['is_collision'] or (collision['is_resting_contact'] and particle.resting == False):
@@ -100,45 +104,52 @@ def event_check(t, x, particle, tre, ribs):
     
     return 1.0
 
+event_check.counter = 0
 event_check.terminal = True
 
-def rest_check(t, x, particle, tre, ribs):
-    if hypot(x[2],x[3]) < vel_limit/100 and hypot(x[2],x[3]) > 0:
+def wrap_check(t, x, particle, tre, ribs):
+    right_edge = ribs[1].get_rib_middle()
+        #.strftime('%X.%f')
+    if (x[0] > right_edge):
         return 0.0
     return 1.0
+wrap_check.terminal = True
 
-rest_check.terminal = True
+def eval_steps(t_span, fps):
+    if floor(t_span[0] * 10000) % floor((1/fps) * 10000) == 0:
+        t_min = ceil((t_span[0]+1/fps)*fps)/fps
+    else:
+        t_min = ceil(t_span[0]*fps)/fps
+    return np.linspace( t_min, t_span[1], num = int((t_span[1]-t_min)*fps), endpoint = False )
+
+ 
 
 # @ray.remote
-def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 50, verbose=True, collision_correction=True):
+def lag_sti(ribs, t_span, particle, tre, fps=20, verbose=True, collision_correction=True):
     # stien må innehalda posisjon, fart og tid.
+
+    fps_inv = 1/fps
     sti = []
-    sti_komplett = []
+
+    # sti_komplett = []
     # print(type(tre))
     # tre = ray.get(tre)
-    print(f"Partikkel nr. {particle.index} byrja, starta på {particle.init_position}, og {particle.init_time}")
     
-    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs), events = (event_check,rest_check))
+    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs), events = (event_check,wrap_check)        )
  
     step_old = np.concatenate(([particle.init_time], particle.init_position))
     # Step_old og step_new er ein array med [t, x, y, u, v]. 
     
     sti.append(step_old)
-    sti_komplett.append(step_old)
+    # sti_komplett.append(step_old)
     
-    # finn neste steg med rk_2 og standard tidssteg.
-    # sjekk kollisjon. Dersom ikkje kollisjon, bruk resultat frå rk_2 og gå til neste steg
-    # Dersom kollisjon: halver tidssteget, sjekk kollisjon. Dersom ikkje kollisjon
-
     t = particle.init_time
     t_max = t_span[1]
     t_main = t
-    dt_main = 1/fps
+    dt_main = fps_inv
     dt = dt_main
-    wrap_counter = 0
-
+    
     left_edge = ribs[0].get_rib_middle()
-    right_edge = ribs[1].get_rib_middle()
     
     starttid = datetime.datetime.now()
 
@@ -147,31 +158,33 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 50, verbose=True, co
         text_color = random.randint(30,38)+ 60*random.randint(0,1)
         background = random.randint(40,48) 
         combined = (text_color, background)
-        bad = [(30,40),(30,48),(31,41), (32,42), (33,43), (34,44),(35,44),(35,45),(36,46),(37,47),(35,41),(36,42),(37,43),(31,45),(32,46),(33,47),(96,41),(97,43),(97,47)]
+        bad = [(30,40),(30,48),(31,41), (32,42), (33,43), (34,44),(35,44),(35,45),(36,46),(37,47),(35,41),(36,42),(37,43),(31,45),(32,46),(33,47),(90,44),(93,47),(93,47),(96,41),(96,42),(97,43),(97,47),(98,43)]
         if (combined not in bad):
             break
     del bad, combined
     status_col = f"{str()};{str(text_color)};{str(background)}"
     
+    des4 = ">6.2f"
+
+    status_msg = f"Nr {particle.index}, {particle.diameter:.2f} mm startpos. [{particle.init_position[0]:{des4}},{particle.init_position[1]:{des4}}]  byrja på  t={particle.init_time:.4f}, pos=[{particle.init_position[0]:{des4}},{particle.init_position[1]:{des4}}] U=[{particle.init_position[2]:{des4}},{particle.init_position[3]:{des4}}]"
+    print(f"\x1b[{status_col}m {status_msg} \x1b[0m")
 
     while (t < t_max):
         
-        step_new, event = rk_3(f, (t,t+dt), step_old[1:], solver_args)
+        step_new, backcatalog, event = rk_3(f, (t,t_max), step_old[1:], solver_args, fps)
+
+        sti = sti + backcatalog
+    
 
         if verbose:
-            status_msg = "{tid} pa nr {i}, {d:.2f} mm startpos. [{pos[0]:.3f}, {pos[1]:.3f}] ferdig med t={t:.4f}, pos=[{x:.2f},{y:.2f}] U=[{u:.2f},{v:.2f}]".format(tid=(datetime.datetime.now()-starttid), i=particle.index, d=particle.diameter, pos=particle.init_position[:2], t=step_new[0], x=step_new[1], y=step_new[2], u=step_new[3], v=step_new[4])
-            status_wrap = f"\x1b[{status_col}m {status_msg} \x1b[0m"
-            print(status_wrap)
+            if (event != "finish"):
+                backcatalog = backcatalog + [step_new]
+            for step in backcatalog:
+                status_msg = f"Nr {particle.index}, {particle.diameter:.2f} mm startpos. [{particle.init_position[0]:{des4}},{particle.init_position[1]:{des4}}] ferdig med t={step[0]:.4f}, pos=[{step[1]:{des4}},{step[2]:{des4}}] U=[{step[3]:{des4}},{step[4]:{des4}}]"
+                print(f"\x1b[{status_col}m {status_msg} \x1b[0m")
 
-        #.strftime('%X.%f')
-        if (step_new[1] > right_edge and wrap_counter <= wrap_max):
-            step_new[1] = left_edge
-            wrap_counter += 1
-        elif(step_new[1] > right_edge):
-            break
-            
-            
-        if (event):
+
+        if (event== "collision"):
             for rib in ribs:
                 collision_info = checkCollision(particle, step_new[1:], rib)
                 if (collision_info['is_collision'] or collision_info['is_resting_contact']):
@@ -180,68 +193,58 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 50, verbose=True, co
             if not collision_correction:
                 break
 
-            assert collision_info['collision_depth'] < eps
+            assert collision_info['collision_depth'] < eps, collision_info['collision_depth']
             if (collision_info['is_collision']):
                 if verbose:
                     print("kolliderte")
-                rest = collistion_restitution
+                rest = collision_restitution
                     
-                #Gjer alt som skal til for å endra retningen på partikkelen
             elif (collision_info['is_resting_contact']):
                 if verbose:
                     print("kvilekontakt")
                 rest = 0
                 particle.resting = True
 
-
+            
+            #Gjer alt som skal til for å endra retningen og posisjonen på partikkelen
+            step_old = np.copy(step_new)
+            
             n = collision_info['rib_normal']
             v = step_new[3:]
-            v_rel = collision_info['relative_velocity'] 
-                # v_rel er relativ fart i normalkomponentretning, jf. formel 8-3 i baraff ("notesg.pdf")
-
-            # dxdt_t = v - v_rel
-
-            # if hypot(dxdt_t[0],dxdt_t[1]) < vel_limit:
-                # v_new = np.zeros(2)
-            # else:
+            v_rel = collision_info['relative_velocity'] # v_rel er relativ fart i normalkomponentretning, jf. formel 8-3 i baraff ("notesg.pdf")
             v_new = v - (rest + 1) * v_rel * n
-
-            if hypot(v_new[0],v_new[1]) < vel_limit/100:
+            if hypot(v_new[0],v_new[1]) < particle.rtol *10:
                 v_new = np.zeros(2)
             
-            step_old = np.copy(step_new)
+            # position = step_new[1:3]
+            # position_new = position + collision_info['collision_depth']*n
+            
+            # step_old[1:3] = position_new
             step_old[3:] = v_new
+
             
-            #Fullfør rørsla fram til hovud-steget, vonleg med rett retning 
-            # og fart, så ein kjem inn i rett framerate igjen.
-            # dt = t_main + dt_main - t
-            if step_old[0] != t+dt:
-                dt = t + dt - step_old[0]
+        elif (event == "edge"):
+            if (particle.wrap_counter <= particle.wrap_max):
+                step_old = np.copy(step_new)
+                step_old[1] = left_edge
+                particle.wrap_counter += 1
             else:
-                sti.append(step_old)
-                t_main = step_old[0]
-            t = step_old[0]
+                break
+        elif (event == "finish"):
+            break
 
-            # step_new = rk_3(part.f, (t, t_main+dt_main), step_old[1:])
+        t = step_old[0]
+        # else:
+        #     # sti_komplett.append(step_new)
+        #     # step_old = step_new
             
-            # if (np.hypot(v[0], v[1]) < 0.01):
-            #     sti_komplett.append(step_new)
-            #     # sti.append(step_new)
-            #     break
-            
-            # t = t_main + dt_main
-                
-        else:
-            sti_komplett.append(step_new)
-            step_old = step_new
-            
-            t = round((t + dt) * 10000) / 10000
+        #     t = round((t + dt) * 10000) / 10000
 
-        if (round(step_new[0]*10000) % round(dt_main*10000) == 0):
-            sti.append(step_new)
-            t_main = step_new[0]
-            t = t_main
-            dt = dt_main
+        # if (round(step_new[0]*10000) % round(dt_main*10000) == 0):
+        #     sti.append(step_new)
+        #     t_main = step_new[0]
+        #     t = t_main
+        #     dt = dt_main
         
     # if (len(sti) < t_max*fps):
     #     sti = np.pad(sti, ((0,t_max*fps - len(sti)),(0,0)),'edge')
@@ -254,20 +257,21 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 50, verbose=True, co
     return np.array(sti)
 
 
-def rk_3 (f, t, y0, solver_args):
+def rk_3 (f, t, y0, solver_args, fps):
     assert t[1] - t[0] > 0
+    solver_args['t_eval'] = eval_steps(t, fps)
     resultat = solve_ivp(f, t, y0, dense_output=True,   **solver_args) # t_eval = [t[1]],
     # har teke ut max_ste=0.02, for det vart aldri aktuelt, ser det ut til.  method=solver_args['method'], args=solver_args['args'],
     assert resultat.success == True
 
     if (resultat.message == "A termination event occurred."):
         if resultat.t_events[0].size > 0:
-            return np.concatenate((resultat.t_events[0], resultat.y_events[0][0])), True
+            return np.concatenate((resultat.t_events[0], resultat.y_events[0][0])), list(np.column_stack((resultat.t, np.asarray(resultat.y).T))), "collision"
         elif resultat.t_events[1].size > 0:
-            return np.concatenate((resultat.t_events[1], resultat.y_events[1][0])), True
+            return np.concatenate((resultat.t_events[1], resultat.y_events[1][0])), list(np.column_stack((resultat.t, np.asarray(resultat.y).T))), "edge"
 
     else:
-        return np.concatenate(([resultat.t[-1]], resultat.y[:,-1])), False
+        return [], list(np.column_stack((resultat.t, resultat.y.T))), "finish" #np.concatenate(([resultat.t[-1]], resultat.y[:,-1]))
 
 
 # def createParticle(diameter, init_position, density=2.65e-6):
@@ -612,6 +616,8 @@ class Particle:
         self.lift = True
         self.addedmass = True
         self.resting = False
+        self.wrap_counter = 0
+        self.wrap_max = 50
 
 
 def particle_copy(pa):

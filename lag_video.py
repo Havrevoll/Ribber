@@ -24,7 +24,7 @@ def lag_video(partikkelfil, filmfil, t_span, fps=20):
     sti_animasjon(particle_list, t_span, utfilnamn=filmfil, fps=fps)
     print(f"Brukte {datetime.datetime.now() - start} på å lagra filmen")
 
-def sti_animasjon(partiklar, t_span, hdf5_fil, utfilnamn="stiQ40.mp4",  fps=20 ):
+def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn="stiQ40.mp4",  fps=20 ):
     
     # piv_range = ranges()
     
@@ -53,7 +53,7 @@ def sti_animasjon(partiklar, t_span, hdf5_fil, utfilnamn="stiQ40.mp4",  fps=20 )
         Vmx = np.array(dataset['Vmx'])[t_min*fps:t_max*fps,:]
         Vmx_reshape = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
 
-        ribs = np.array(dataset['ribs'])
+        # ribs = np.array(dataset['ribs'])
         
         x = np.array(dataset['x'])
         y = np.array(dataset['y'])
@@ -64,7 +64,7 @@ def sti_animasjon(partiklar, t_span, hdf5_fil, utfilnamn="stiQ40.mp4",  fps=20 )
     V_mag_reshape = np.hypot(Umx_reshape, Vmx_reshape)        
     # V_mag_reshape = np.hypot(U[2], U[3])
        
-    myDPI = 300
+    myDPI = 150
     fig, ax = plt.subplots(figsize=(800/myDPI,700/myDPI),dpi=myDPI)
     
     field = ax.imshow(V_mag_reshape[0,:,:], extent=[x_reshape[0,0],x_reshape[0,-1], y_reshape[-1,0], y_reshape[0,0]], interpolation='none')
@@ -102,7 +102,7 @@ def sti_animasjon(partiklar, t_span, hdf5_fil, utfilnamn="stiQ40.mp4",  fps=20 )
         ax.add_patch(circle)
         part.circle = circle
         part.annotation  = ax.annotate("{:.2f} mm".format(part.diameter), xy=(np.interp(0,part.sti[:,0],part.sti[:,1]), np.interp(0,part.sti[:,0],part.sti[:,2])), xycoords="data",
-                        xytext=(5,5), fontsize=5, textcoords="offset points",
+                        xytext=(random.random()*8,random.random()*8), fontsize=5, textcoords="offset points",
                         arrowprops=dict(arrowstyle="->", connectionstyle="arc3, rad=0", color=color))
         # print("{} {} {} {}".format(part.atol,part.rtol,part.method, color))
         # gamal xytext: random.uniform(-20,20), random.uniform(-20,20)
@@ -122,14 +122,21 @@ def sti_animasjon(partiklar, t_span, hdf5_fil, utfilnamn="stiQ40.mp4",  fps=20 )
             # part.circle.center = part.sti[i,1], part.sti[i,2]
             part.annotation.xy = (np.interp(t,part.sti[:,0],part.sti[:,1], left=-100), np.interp(t,part.sti[:,0],part.sti[:,2], left=-100) )
         
-        return 1 #field,particle
+        circles = [p.circle for p in partiklar]
+        annotations = [p.annotation for p in partiklar]
+
+        return circles + annotations
     
     print("Skal byrja på filmen")
     #ax.axis('equal')
     # ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,steps),interval=50)
-    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps),interval=int(1000/fps), blit=True)
+    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps),interval=int(1000/fps), blit=False)
     plt.show()
     print("ferdig med animasjon, skal lagra")
     
+    
+    starttid = datetime.datetime.now()
+
     ani.save(utfilnamn)
+    print(f"Brukte {datetime.datetime.now()-starttid} på å lagra filmen")
     plt.close()

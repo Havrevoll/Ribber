@@ -55,7 +55,7 @@ def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
 
     experiment = re.search("TONSTAD_([A-Z]*)_", filnamn_inn, re.IGNORECASE).group(1)
 
-    jobs = {lag_tre.remote((i/10,(i+1.5)/10), u_r,v_r,x_r,y_r,I,J,ribs_r, experiment):i for i in range(int(t_min)*10,int(t_max)*10)}
+    jobs = {lag_tre.remote((i/10,(i+1.5)/10), u_r,v_r,x_r,y_r,I,J,ribs_r, experiment):i for i in range(int(t_min)*10,int(t_max)*10+1)}
 
     # i_0 =  range(int(t_min)*10,int(t_max)*10)
 
@@ -69,13 +69,19 @@ def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
         if len(not_ready)==0:
             break
 
+    kdjob = lag_tre.remote(t_span, u_r,v_r,x_r,y_r,I,J,ribs_r, experiment, nearest=True, kutt= False, inkluder_ribs=True)
+    
+    kdtre, u, ribs = ray.get(kdjob)
+    
     ray.shutdown()
     # trees = dict(zip(i_0, result))
          
+    tre_obj = tre_objekt(trees, kdtre, u, ribs)
+
     if filnamn_ut is None:
-        return trees
+        return tre_obj
     else:
-        lagra_tre(trees, filnamn_ut)
+        lagra_tre(tre_obj, filnamn_ut)
 
 @ray.remote
 def lag_tre(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, nearest=False, kutt=True, inkluder_ribs = False, kutt_kor = [-35.81,64.19 , -25, 5]):
@@ -294,35 +300,14 @@ def lagra_tre(tre, fil):
 #     return tri
 
 class tre_objekt:
-    def __init__(self, pickle_fil, hdf5_fil, t_span):
-        with open(pickle_fil, 'rb') as f:
-            self.tre = pickle.load(f)
+    def __init__(self, delaunay, kdtre, U_kd, ribs):
+        self.tre = delaunay
         for t in self.tre:
             if type(self.tre[t]) is list:
                 self.tre[t] = self.tre[t][0]
-
-        
-        with h5py.File(hdf5_fil, 'r') as f:
-            Umx = np.array(f['Umx'])#[int(t_min*fps):int(t_max*fps),:]
-            Vmx = np.array(f['Vmx'])#[int(t_min*fps):int(t_max*fps),:]
-            (I,J) = (int(np.array(f['I'])),int(np.array(f['J'])))
-            x = np.array(f['x']).reshape(J,I)
-            y = np.array(f['y']).reshape(J,I)
-            ribs = np.array(f['ribs'])
-
-        ray.init()
-
-        u_r = ray.put(Umx)
-        v_r = ray.put(Vmx)
-        x_r = ray.put(x)
-        y_r = ray.put(y)
-        ribs_r = ray.put(ribs)
-
-        experiment = re.search("TONSTAD_([A-Z]*)_", str(pickle_fil), re.IGNORECASE).group(1)
-       
-        job = lag_tre.remote(t_span, u_r,v_r,x_r,y_r,I,J,ribs_r, experiment, nearest=True, kutt= False, inkluder_ribs=True)
-        self.kdtre, self.U_kd, self.ribs = ray.get(job)
-        ray.shutdown()
+        self.kdtre = kdtre
+        self.U_kd = U_kd
+        self.ribs = ribs
     
     
     # def find_simplex(self, x):
