@@ -20,7 +20,7 @@ plt.rcParams['mathtext.fontset'] = 'stix'
 def get_PSD_part(tal=1, PSD=None, rnd_seed=1):
 
     if PSD is None:
-        PSD = np.array([[0.05,  0.00], #Det er ukjend kor 0 % er, altså kva som er minste storleik. Må anta at det er ganske lite.
+        PSD = np.array([[0.05,  0.00], #Det er ukjend kor 0 % er, altså kva som er minste storleik. Må anta at det er ganske lite. Dette var data frå tunnelsoleni engelsk rapport frå Lysne i 1969.
                     [0.149, 0.02],	
                     [0.297, 0.095],	
                     [0.594, 0.28],	
@@ -29,6 +29,10 @@ def get_PSD_part(tal=1, PSD=None, rnd_seed=1):
                     [4.752, 0.91],	
                     [9.504, 0.98],	
                     [12.0,  1.00]])
+
+        # PSD = np.array([
+        #     []
+        # ])
     
     element = 1000
 
@@ -65,7 +69,7 @@ def get_PSD_part(tal=1, PSD=None, rnd_seed=1):
 
     return korndiameter
 
-def PSD_plot(part_array):
+def PSD_plot(part_array, path):
     korndiameter = part_array
 
     masse = korndiameter**3 /6 * pi * 2650 * 1e-9 # masse i kg,tettleik i kg/mm³.
@@ -99,3 +103,5 @@ def PSD_plot(part_array):
     # logbins = np.logspace(np.log10(bins[0]),np.log10(bins[-1]),len(bins))
 
     # n, bins, patches = ax.hist(korndiameter, cumulative=True, logx=True, bins=bins)
+
+    fig.savefig(path)
