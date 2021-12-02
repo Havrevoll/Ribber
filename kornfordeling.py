@@ -69,7 +69,7 @@ def get_PSD_part(tal=1, PSD=None, rnd_seed=1):
 
     return korndiameter
 
-def PSD_plot(part_array, path):
+def PSD_plot(part_array, ax):
     korndiameter = part_array
 
     masse = korndiameter**3 /6 * pi * 2650 * 1e-9 # masse i kg,tettleik i kg/mm³.
@@ -78,16 +78,15 @@ def PSD_plot(part_array, path):
     massebins = np.concatenate(([0], bins**3 /6 * pi * 2650 * 1e-9))
     # print( "bins: ", bins)
 
-    x_diameter = np.histogram(korndiameter, np.concatenate(([0], bins)))
-    x_masse = np.histogram(masse, massebins)
+    # x_diameter = np.histogram(korndiameter, np.concatenate(([0], bins)))
+    # x_masse = np.histogram(masse, massebins)
     sum_masse = np.sum(masse)
     masse_per_gradering = np.array([np.sum(masse[(masse > massebins[i]) & (masse < massebins[i+1])]) for i in range(0,len(massebins)-1)])/sum_masse
 
     x1 = np.cumsum(masse_per_gradering)
 
-    myDPI = 300
 
-    fig, ax = plt.subplots(figsize=(1190/myDPI,800/myDPI),dpi=myDPI)
+    # fig, ax = plt.subplots(figsize=(1190/myDPI,800/myDPI),dpi=myDPI)
 
     ax.semilogx(bins, x1, color="blue", label="kornfordeling")
 
@@ -104,4 +103,13 @@ def PSD_plot(part_array, path):
 
     # n, bins, patches = ax.hist(korndiameter, cumulative=True, logx=True, bins=bins)
 
+
+def save_PSD_plot(part_array, path):
+    myDPI = 300
+    fig, ax = plt.subplots(figsize=(1190/myDPI,800/myDPI),dpi=myDPI)
+
+    PSD_plot(part_array,ax)
+
     fig.savefig(path)
+    plt.close()
+
