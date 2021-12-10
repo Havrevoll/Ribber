@@ -6,39 +6,60 @@ Created on Wed Jul  7 09:22:39 2021
 """
 import matplotlib
 matplotlib.use("Agg")
-from kornfordeling import get_PSD_part
+# from kornfordeling import get_PSD_part
 import pickle
-import random
-from sti_gen import Particle, simulering
-import numpy as np
-from datagenerering import hent_tre, lag_tre, tre_objekt, lag_tre_multi
-from hjelpefunksjonar import finn_fil
-import ray
+# import random
+from sti_gen import Particle, Rib, simulering
+from lag_video import sti_animasjon
+# import numpy as np
+# from datagenerering import lag_tre, tre_objekt, lag_tre_multi
+# from hjelpefunksjonar import finn_fil
+# import ray
 import datetime
+from pathlib import Path
+from subprocess import run
 
-talsamling = [1000]
+talsamling = [100]
 rnd_seed=1
 
-tre_fil = finn_fil(["../Q40_0_60.pickle", "../Q40_0_10.pickle"])
-t_span = (0,59)
+pickle_fil = Path("../TONSTAD_TWO_Q20_TWO2.pickle")
+
+t_span = (0,179)
+print("Skal henta tre_objekt")
+with open(pickle_fil,'rb') as f:
+    tre = pickle.load(f)
+print("Ferdig med tre-objektet")
+
+ribs = [Rib(rib) for rib in tre.ribs]
 
 sim_args = dict(fps = 20, t_span=t_span,
-linear = False, lift = False, addedmass = False, wraparound = False,
+linear = True, lift = True, addedmass = True, wrap_max = 50,
 method = 'RK23', atol = 1e-1, rtol = 1e-1, 
-laga_film = False, verbose = False, collision_correction = False)
-print("Skal byrja å byggja tre_objekt")
-tre = tre_objekt(tre_fil, t_span)
+ verbose = False, collision_correction = True, multi = True)
+laga_film = True
 
 tider = {}
 
 for tal in talsamling:
     talstart = datetime.datetime.now()
-    partikkelfil = f"particles_{sim_args['method']}_{tal}_{sim_args['atol']:.0e}_noaddedmass_ray.pickle"
 
-    particle_list = simulering(tal, rnd_seed, tre, **sim_args)
+    partikkelfil = Path(f"particles_{pickle_fil.stem}_{sim_args['method']}_{tal}_{sim_args['atol']:.0e}.pickle")
+    if not partikkelfil.exists():
+        particle_list = simulering(tal, rnd_seed, tre, **sim_args)
+        with open(partikkelfil, 'wb') as f:
+            pickle.dump(particle_list, f)
+    else:
+        with open(partikkelfil, 'rb') as f:
+            particle_list = pickle.load(f)
 
-    with open(partikkelfil, 'wb') as f:
-        pickle.dump(particle_list, f)
+    if laga_film:
+        start_film = datetime.datetime.now()
+        film_fil = f"sti_{sim_args['method']}_{len(particle_list)}_{sim_args['atol']:.0e}.mp4"
+        sti_animasjon(particle_list, ribs,t_span=t_span, hdf5_fil = pickle_fil.with_suffix(".hdf5"),  utfilnamn=film_fil, fps=sim_args['fps'])
+        print("Brukte  {} s på å laga film".format(datetime.datetime.now() - start_film))
+
+        run(f"rsync {film_fil} havrevol@login.ansatt.ntnu.no:", shell=True)
+
 
     tider[tal] = datetime.datetime.now() - talstart
 

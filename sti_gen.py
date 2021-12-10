@@ -4,12 +4,13 @@
 import matplotlib
 from ray.core.generated.common_pb2 import _TASKSPEC_OVERRIDEENVIRONMENTVARIABLESENTRY
 matplotlib.use("Agg")
-from lag_video import sti_animasjon
+
 from kornfordeling import get_PSD_part
 import numpy as np
 # from scipy import interpolate
 from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#r179348322575-1
 from hjelpefunksjonar import norm, sortClockwise, finn_fil
+
 
 import ray
 
@@ -22,32 +23,21 @@ from scipy.sparse.construct import rand #, atan2
 # x = np.array(h5py.File(filnamn, 'r')['x']).reshape(127,126)[ranges()]
 # vass = fil['vassføringar']
 
-
 t_max_global = 20
 t_min_global = 0
 vel_limit = 0.1
 eps = 0.01
 collision_restitution = 0. # collision restitution
-
 nullfart = np.zeros(2)
 
-def simulering(tal, rnd_seed, tre,  fps = 20, t_span = (0,59), linear = True,  lift = True, addedmass = True, wrap_max = 50, 
-      atol = 1e-1, rtol = 1e-1, method = 'RK23', tre_fil = finn_fil(["../Q40_0_60.pickle", "../Q40_0_10.pickle"]), laga_film = False, verbose=True, collision_correction=True):
+def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  lift = True, addedmass = True, wrap_max = 50, atol = 1e-1, rtol = 1e-1, 
+    method = 'RK23', laga_film = False, verbose=True, collision_correction=True, multi = True):
 
     start = datetime.datetime.now()
 
-
-    ray.init() 
-    tre_plasma = ray.put(tre)
-    
-    
     random.seed(rnd_seed)
-    diameters = get_PSD_part(tal, rnd_seed=rnd_seed)
-    # diameters[0]=0.34
-
-    # diameters = [0.08]
-    particle_list = [Particle(d, [-35.81,random.uniform(0,90), 0, 0], random.uniform(0,50)) for d in diameters]
-    # particle_list = [Particle(d, [-90,43.43268, 0, 0], 3.65) for d in diameters]
+    diameters = get_PSD_part(tal, rnd_seed=rnd_seed).tolist()
+    particle_list = [Particle(float(d), [-35.81,random.uniform(0,90), 0, 0], random.uniform(0,50)) for d in diameters]
 
     for i, p in enumerate(particle_list):
         p.atol , p.rtol = atol, rtol
@@ -56,59 +46,82 @@ def simulering(tal, rnd_seed, tre,  fps = 20, t_span = (0,59), linear = True,  l
         p.init_time = floor(p.init_time *fps)/fps #rettar opp init_tid slik at det blir eit tal som finst i datasettet.
         p.index = i
 
-    print("Har laga tre_objekt, skal putta")
-
     ribs = [Rib(rib) for rib in tre.ribs]
-        
-    for pa in particle_list:
-        pa.job_id = lag_sti.remote(ribs, t_span, particle=pa, tre=tre_plasma, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction)
-
-    fanga = 0
-
-    for pa in particle_list:
-        pa.sti = ray.get(pa.job_id)
-        if pa.sti[-1][2] < -10:
-            fanga += 1
-
     
+    if multi:
+        ray.init()#num_cpus=4) 
+        tre_plasma = ray.put(tre)
+        jobs = {remote_lag_sti.remote(ribs, t_span, particle=pa, tre=tre_plasma, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction):pa for pa in particle_list}
+            # pa.job_id = 
 
+        not_ready = list(jobs.keys())
+        while True:
+            ready, not_ready = ray.wait(not_ready)
+            jobs[ready[0]].sti_dict = ray.get(ready)[0]
+            print(f"Dei som står att no er {[jobs[p].index for p in not_ready]}")
+            if len(not_ready)==0:
+                break
+        ray.shutdown()
+    else:
+        for pa in particle_list:
+            if pa.index == 51:
+                pa.sti_dict = lag_sti(ribs, t_span, particle=pa, tre=tre, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction)
 
-    print("Brukte {} s fram til filmlaging.".format(datetime.datetime.now()-start))
-    print(f"Av {len(particle_list)} partiklar vart {fanga} fanga, altså {100* fanga/len(particle_list)}%")
+    caught = 0
+    uncaught=0
+    for pa in particle_list:
+        if pa.sti_dict[round(pa.sti_dict['final_time']*100)]['caught']:
+            caught += 1
+        else:
+            uncaught += 1
+
+    print(f"Brukte {datetime.datetime.now()-start} s fram til filmlaging.")
+    print(f"Av {len(particle_list)} partiklar vart {caught} fanga, altså {100* caught/len(particle_list):.2f}%")
+    print(f"Av {len(particle_list)} partiklar vart {uncaught} ikkje fanga, altså {100* uncaught/len(particle_list):.2f}%")
 
     # while (True):
     #     ready_refs, remaining_refs = ray.wait(object_refs, num_returns=1, timeout=None)
     #     if remaining_refs == 0:
     #         break
 
-    if laga_film:
-        start_film = datetime.datetime.now()
-        film_fil = f"sti_{method}_{len(particle_list)}_{atol:.0e}_noaddedmass_nolift_ray.mp4"
-        sti_animasjon(particle_list,t_span=t_span, utfilnamn=film_fil, fps=fps)
-        print("Brukte  {} s på å laga film".format(datetime.datetime.now() - start_film))
+    # if laga_film:
+    #     start_film = datetime.datetime.now()
+    #     film_fil = f"sti_{method}_{len(particle_list)}_{atol:.0e}.mp4"
+    #     sti_animasjon(particle_list, ribs,t_span=t_span, hdf5_fil = hdf5_fil,  utfilnamn=film_fil, fps=fps)
+    #     print("Brukte  {} s på å laga film".format(datetime.datetime.now() - start_film))
 
-    ray.shutdown()
+        
+    #     run(f"rsync {film_fil} havrevol@login.ansatt.ntnu.no:", shell=True)
+
     print("Brukte totalt {} s på heile operasjonen".format(datetime.datetime.now() - start))
 
     return particle_list
 
 def event_check(t, x, particle, tre, ribs):
     event_check.counter += 1
-    if hypot(x[2],x[3]) < particle.rtol *10 and hypot(x[2],x[3]) > 0:
+    if hypot(x[2],x[3]) < particle.rtol *1 and hypot(x[2],x[3]) > 0 and particle.resting == True:
         return 0.0
-    
+    # Kvifor har eg denne her? Det er for å dempa farten om den er så bitteliten at han må leggjast til ro. Men det må jo skje berre dersom det er kontakt i tillegg. Så då må eg vel sjekka kollisjon uansett?
+
     for rib in ribs:
         collision = checkCollision(particle, x,rib)
-        if collision['is_collision'] or (collision['is_resting_contact'] and particle.resting == False):
+        collision['rib'] = rib
+        particle.collision = collision
+        if collision['is_collision'] and collision['inside']:
+            return -1.0
+        elif collision['is_collision'] or (collision['is_resting_contact'] and particle.resting == False):
             return 0.0
-    
+        elif collision['is_leaving']: # Forlet resting contact og kjem i fri flyt igjen.
+            return 0.0
+        if collision['is_collision'] or collision['is_resting_contact']:
+            break
     return 1.0
 
 event_check.counter = 0
 event_check.terminal = True
 
 def wrap_check(t, x, particle, tre, ribs):
-    right_edge = ribs[1].get_rib_middle()
+    right_edge = ribs[1].get_rib_middle()[0]
         #.strftime('%X.%f')
     if (x[0] > right_edge):
         return 0.0
@@ -116,20 +129,23 @@ def wrap_check(t, x, particle, tre, ribs):
 wrap_check.terminal = True
 
 def eval_steps(t_span, fps):
-    if floor(t_span[0] * 10000) % floor((1/fps) * 10000) == 0:
-        t_min = ceil((t_span[0]+1/fps)*fps)/fps
+    if floor(t_span[0] * 1000000) % floor((1/fps) * 1000000) == 0:
+        t_min = ceil(round(t_span[0]+1/fps,5)*fps)/fps
     else:
         t_min = ceil(t_span[0]*fps)/fps
     return np.linspace( t_min, t_span[1], num = int((t_span[1]-t_min)*fps), endpoint = False )
 
- 
+@ray.remote
+def remote_lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, collision_correction=True):
+    return lag_sti(ribs, t_span, particle, tre, fps=fps, wrap_max = wrap_max, verbose=verbose, collision_correction=collision_correction)
 
 # @ray.remote
-def lag_sti(ribs, t_span, particle, tre, fps=20, verbose=True, collision_correction=True):
+def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, collision_correction=True):
     # stien må innehalda posisjon, fart og tid.
 
     fps_inv = 1/fps
-    sti = []
+    # sti = []
+    sti_dict = {}
 
     # sti_komplett = []
     # print(type(tre))
@@ -140,16 +156,19 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, verbose=True, collision_correct
     step_old = np.concatenate(([particle.init_time], particle.init_position))
     # Step_old og step_new er ein array med [t, x, y, u, v]. 
     
-    sti.append(step_old)
-    # sti_komplett.append(step_old)
+    # sti.append(step_old)
+    sti_dict[round(particle.init_time*100)] = dict(position = particle.init_position, loops = 0, caught = False)
+    sti_dict['init_time'] = particle.init_time
     
+    final_time = particle.init_time
+
     t = particle.init_time
     t_max = t_span[1]
     t_main = t
     dt_main = fps_inv
     dt = dt_main
     
-    left_edge = ribs[0].get_rib_middle()
+    left_edge = ribs[0].get_rib_middle()[0]
     
     starttid = datetime.datetime.now()
 
@@ -158,7 +177,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, verbose=True, collision_correct
         text_color = random.randint(30,38)+ 60*random.randint(0,1)
         background = random.randint(40,48) 
         combined = (text_color, background)
-        bad = [(30,40),(30,48),(31,41), (32,42), (33,43), (34,44),(35,44),(35,45),(36,46),(37,47),(35,41),(36,42),(37,43),(31,45),(32,46),(33,47),(90,44),(93,47),(93,47),(96,41),(96,42),(97,43),(97,47),(98,43)]
+        bad = [(30,40),(30,48),(31,41), (32,42), (33,43), (34,44),(35,44),(35,45),(36,46),(37,47),(35,41),(36,42),(37,43),(31,45),(32,46),(33,47),(90,44),(93,43),(93,47),(93,47),(96,41),(96,42),(97,43),(97,47),(98,43)]
         if (combined not in bad):
             break
     del bad, combined
@@ -171,10 +190,22 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, verbose=True, collision_correct
 
     while (t < t_max):
         
+        for rib in ribs:
+            particle.collision = checkCollision(particle, step_old[1:], rib)
+            if particle.collision['is_collision'] or particle.collision['is_resting_contact'] or particle.collision['is_leaving']:
+                particle.collision['rib'] = rib
+                break
+
+
         step_new, backcatalog, event = rk_3(f, (t,t_max), step_old[1:], solver_args, fps)
 
-        sti = sti + backcatalog
-    
+        # sti = sti + backcatalog
+
+        for index, step in enumerate(backcatalog):
+            sti_dict[round(step[0]*100)] = dict(position = step[1:], loops = particle.wrap_counter, caught = True if step[2] < ribs[1].get_rib_middle()[1] else False)
+            final_time = step[0]
+            if np.all(index+1 < len(backcatalog) and backcatalog[index+1:,3:] == 0): 
+                break
 
         if verbose:
             if (event != "finish"):
@@ -187,25 +218,31 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, verbose=True, collision_correct
         if (event== "collision"):
             for rib in ribs:
                 collision_info = checkCollision(particle, step_new[1:], rib)
-                if (collision_info['is_collision'] or collision_info['is_resting_contact']):
+                if collision_info['is_collision'] or collision_info['is_resting_contact'] or collision_info['is_leaving']:
                     break
+            # collision_info = particle.collision
 
             if not collision_correction:
                 break
 
-            assert collision_info['collision_depth'] < eps, collision_info['collision_depth']
+            # assert collision_info['collision_depth'] < eps, collision_info['collision_depth']
             if (collision_info['is_collision']):
                 if verbose:
                     print("kolliderte")
                 rest = collision_restitution
+                particle.resting = False
                     
-            elif (collision_info['is_resting_contact']):
+            elif (collision_info['is_resting_contact']):# and np.dot(collision_info['rib_normal'],collision_info['closest_rib_normal']) == 1.0 ):
                 if verbose:
                     print("kvilekontakt")
                 rest = 0
                 particle.resting = True
 
-            
+            elif collision_info['is_leaving']:
+                if verbose:
+                    print("Forlet overflata")
+                particle.resting = False
+
             #Gjer alt som skal til for å endra retningen og posisjonen på partikkelen
             step_old = np.copy(step_new)
             
@@ -213,7 +250,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, verbose=True, collision_correct
             v = step_new[3:]
             v_rel = collision_info['relative_velocity'] # v_rel er relativ fart i normalkomponentretning, jf. formel 8-3 i baraff ("notesg.pdf")
             v_new = v - (rest + 1) * v_rel * n
-            if hypot(v_new[0],v_new[1]) < particle.rtol *10:
+            if hypot(v_new[0],v_new[1]) < particle.rtol *1:
                 v_new = np.zeros(2)
             
             # position = step_new[1:3]
@@ -224,9 +261,15 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, verbose=True, collision_correct
 
             
         elif (event == "edge"):
-            if (particle.wrap_counter <= particle.wrap_max):
+            if (particle.wrap_counter <= wrap_max):
                 step_old = np.copy(step_new)
                 step_old[1] = left_edge
+                for rib in ribs:
+                    edgecollision = checkCollision(particle, step_old[1:], rib)
+                    if edgecollision['is_collision'] or edgecollision['is_resting_contact'] or edgecollision['is_leaving']:
+                        step_old[1:3] = step_old[1:3] + edgecollision['rib_normal']*edgecollision['collision_depth']
+                        break
+
                 particle.wrap_counter += 1
             else:
                 break
@@ -253,8 +296,12 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, verbose=True, collision_correct
     # if (len(sti) > t_max*fps):
     #     sti = sti[0:t_max*fps]
 
-    print(f"Partikkel nr. {particle.index} brukte {datetime.datetime.now()-starttid}")    
-    return np.array(sti)
+    sti_dict['final_time'] = final_time
+    
+    status_msg = f"Nr. {particle.index} brukte {datetime.datetime.now()-starttid}"
+    print(f"\x1b[{status_col}m {status_msg} \x1b[0m")    
+    # return np.array(sti), sti_dict
+    return sti_dict
 
 
 def rk_3 (f, t, y0, solver_args, fps):
@@ -266,12 +313,12 @@ def rk_3 (f, t, y0, solver_args, fps):
 
     if (resultat.message == "A termination event occurred."):
         if resultat.t_events[0].size > 0:
-            return np.concatenate((resultat.t_events[0], resultat.y_events[0][0])), list(np.column_stack((resultat.t, np.asarray(resultat.y).T))), "collision"
+            return np.concatenate((resultat.t_events[0], resultat.y_events[0][0])), np.column_stack((resultat.t, np.asarray(resultat.y).T)), "collision"
         elif resultat.t_events[1].size > 0:
-            return np.concatenate((resultat.t_events[1], resultat.y_events[1][0])), list(np.column_stack((resultat.t, np.asarray(resultat.y).T))), "edge"
+            return np.concatenate((resultat.t_events[1], resultat.y_events[1][0])), np.column_stack((resultat.t, np.asarray(resultat.y).T)), "edge"
 
     else:
-        return [], list(np.column_stack((resultat.t, resultat.y.T))), "finish" #np.concatenate(([resultat.t[-1]], resultat.y[:,-1]))
+        return [], np.column_stack((resultat.t, resultat.y.T)), "finish" #np.concatenate(([resultat.t[-1]], resultat.y[:,-1]))
 
 
 # def createParticle(diameter, init_position, density=2.65e-6):
@@ -319,21 +366,21 @@ def f(t, x, particle, tri, ribs):
     # vel = np.array([100,0]) - dxdt # relativ snøggleik
     # U_f = np.array(get_u(t,np.array([x[0],x[1]]),tri, linear))
 
-    
-    for rib in ribs:
-        collision = checkCollision(particle, x, rib)
+    collision = particle.collision 
+    # for rib in ribs:
+    #     collision = checkCollision(particle, x, rib)
                     
-        if collision['is_collision'] or collision['is_resting_contact']:
-            # print("Kollisjonsdjup er {} og det er {}over grenseverdien".format(collision['collision_depth'], "ikkje " if collision['collision_depth'] < eps else ""))
+    #     if collision['is_collision'] or collision['is_resting_contact'] or collision['is_leaving']:
+    #         # print("Kollisjonsdjup er {} og det er {}over grenseverdien".format(collision['collision_depth'], "ikkje " if collision['collision_depth'] < eps else ""))
 
-            # n = collision['rib_normal']
-            # v = x[2:]
-            # v_rel = collision['relative_velocity'] 
-            # # v_rel er relativ fart i normalkomponentretning, jf. formel 8-3 i baraff ("notesg.pdf")
-            # v_new = v - (rest + 1) * v_rel * n
-            # x[2:] = v_new
+    #         # n = collision['rib_normal']
+    #         # v = x[2:]
+    #         # v_rel = collision['relative_velocity'] 
+    #         # # v_rel er relativ fart i normalkomponentretning, jf. formel 8-3 i baraff ("notesg.pdf")
+    #         # v_new = v - (rest + 1) * v_rel * n
+    #         # x[2:] = v_new
         
-            break
+    #         break
 
     U_f, dudt_material, U_top_bottom = get_u(t, x, particle, tri, collision= collision)
     
@@ -353,7 +400,8 @@ def f(t, x, particle, tri, ribs):
     
     if (Re<1000):
         try:
-            cd = 24 / Re * (1+0.15*Re**0.687)
+            # with np.errstate(divide='raise'):
+                cd = 24 / Re * (1+0.15*Re**0.687)
             # Cheng (1997) skildrar Cd for kantete og runde steinar. Dette 
             # er kanskje den viktigaste grunnen til at eg bør gjera dette?
             # Ferguson og Church (2004) gjev nokre liknande bidrag, men viser til Cheng.
@@ -383,7 +431,7 @@ def f(t, x, particle, tri, ribs):
     dudt = (drag_component + gravity_component + added_mass_component + lift_component ) / divisor
 
     try:
-        if (collision['is_resting_contact'] and particle.resting) and np.dot(collision['rib_normal'],dudt) <= 0:
+        if (collision['is_resting_contact'] and particle.resting):# and np.dot(collision['rib_normal'],dudt) <= 0: #Kan ikkje sjekka om partikkelen skal ut frå flata midt i berekninga. Må ha ein event til alt slikt.
             #akselerasjonen, dudt
             dudt_n = collision['rib_normal'] * np.dot(collision['rib_normal'],dudt) # projeksjon av dudt på normalvektoren
             dxdt_n = collision['rib_normal'] * np.dot(collision['rib_normal'],dxdt)
@@ -405,8 +453,8 @@ def f(t, x, particle, tri, ribs):
                 # if hypot(dxdt_t[0],dxdt_t[1]) < 0.001:
                 #     dxdt = np.zeros(2)
                 # dxdt = dxdt_t
-        elif np.dot(collision['rib_normal'],dudt) > 0 and particle.resting == True:
-            particle.resting = False
+        # elif np.dot(collision['rib_normal'],dudt) > 0 and particle.resting == True:
+        #     particle.resting = False
 
     except KeyError:
         pass
@@ -688,7 +736,7 @@ def checkCollision(particle, data, rib):
             dis = np.sqrt(v1.dot(v1))
             
             if (dis > particle.radius):
-                return {'is_collision':False, 'is_resting_contact':False}#, 'rib':rib}
+                return {'is_collision':False, 'is_resting_contact':False, 'is_leaving':False}#, 'rib':rib}
                 # (False, collisionInfo, rib) # må vel endra til (bool, depth, normal, start)
             
             normal = norm(v1)
@@ -696,7 +744,7 @@ def checkCollision(particle, data, rib):
             radiusVec = normal*particle.radius*(-1)
             
             # sender informasjon til collisioninfo:                    
-            collision_info = dict(collision_depth=particle.radius - dis, rib_normal=normal, particle_collision_point = position + radiusVec)
+            collision_info = dict(collision_depth=particle.radius - dis, rib_normal=normal, particle_collision_point = position + radiusVec, inside = inside)
             
         else:
             # //the center of circle is in corner region of mVertex[nearestEdge+1]
@@ -713,24 +761,24 @@ def checkCollision(particle, data, rib):
                 # //compare the distance with radium to decide collision
         
                 if (dis > particle.radius):
-                    return {'is_collision':False, 'collision_depth': 0, 'is_resting_contact':False}#, 'rib':rib}
+                    return {'is_collision':False, 'collision_depth': 0, 'is_resting_contact':False, 'is_leaving':False}#, 'rib':rib}
 
                 normal = norm(v1)
                 radiusVec = normal * particle.radius*(-1)
                 
-                collision_info = dict(collision_depth=particle.radius - dis, rib_normal = normal, particle_collision_point = position + radiusVec)
+                collision_info = dict(collision_depth=particle.radius - dis, rib_normal = normal, particle_collision_point = position + radiusVec, inside = inside)
             else:
                 #//the center of circle is in face region of face[nearestEdge]
                 if (bestDistance < particle.radius):
                     radiusVec = normals[nearestEdge] * particle.radius
-                    collision_info = dict(collision_depth = particle.radius - bestDistance, rib_normal = normals[nearestEdge], particle_collision_point = position - radiusVec)
+                    collision_info = dict(collision_depth = particle.radius - bestDistance, rib_normal = normals[nearestEdge], particle_collision_point = position - radiusVec, inside = inside)
                 else:
-                    return dict(is_collision =  False, collision_depth = 0, is_resting_contact = False)
+                    return dict(is_collision =  False, collision_depth = 0, is_resting_contact = False, is_leaving = False, inside = inside)
     else:
         #     //the center of circle is inside of rectangle
         radiusVec = normals[nearestEdge] * particle.radius
 
-        return dict(is_collision = True, is_resting_contact = False, rib = rib, collision_depth = particle.radius - bestDistance, rib_normal = normals[nearestEdge], particle_collision_point = position - radiusVec, inside = True)
+        return dict(is_collision = True, is_resting_contact = False, is_leaving = False, rib = rib, collision_depth = particle.radius - bestDistance, rib_normal = normals[nearestEdge], particle_collision_point = position - radiusVec, inside = inside)
         # Måtte laga denne returen så han ikkje byrja å rekna ut relativ fart når partikkelen uansett er midt inne i ribba.
 
     # Rekna ut relativ fart i retning av normalkomponenten, jamfør Baraff (2001) formel 8-3.
@@ -739,16 +787,22 @@ def checkCollision(particle, data, rib):
     v_rel = np.dot(n,v)
     collision_info['relative_velocity'] = v_rel
     collision_info['rib'] = rib
+    # collision_info['closest_rib_normal'] = normals[nearestEdge]
 
-    if (abs(v_rel) < vel_limit):
+    if (abs(v_rel) < vel_limit and round(np.dot(n, normals[nearestEdge]),3)==1.0 ):
         collision_info['is_resting_contact'] = True
     else:
         collision_info['is_resting_contact'] = False
 
-    if (v_rel < -vel_limit): # Sjekk om partikkelen er på veg vekk frå veggen.
+    if (v_rel < -vel_limit): # Sjekk om partikkelen er på veg vekk frå veggen. Negativ v_rel er på veg mot vegg, positiv er på veg ut av vegg.
         collision_info['is_collision'] = True
     else:
         collision_info['is_collision'] = False
+
+    if v_rel > vel_limit and particle.resting:
+        collision_info['is_leaving'] = True
+    else:
+        collision_info['is_leaving'] = False
     
     return collision_info
 
@@ -766,8 +820,7 @@ class Rib:
                         # Nett no går dei MED klokka. Normals skal peika UT.
         
     def get_rib_middle(self):
-        centerPoint = np.sum(self.vertices, axis=0)/len(self.vertices)
-        return centerPoint[0]
+        return np.sum(self.vertices, axis=0)/len(self.vertices)
 
     # def __init__(self, origin, width, height):
     #     # Bør kanskje ha informasjon om elastisiteten ved kollisjonar òg?

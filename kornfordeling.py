@@ -8,6 +8,8 @@ import random
 import numpy as np
 from scipy import interpolate
 from math import log2, pi
+import matplotlib
+matplotlib.use("Agg")
 
 from scipy.linalg.special_matrices import kron
 import matplotlib.pyplot as plt
@@ -69,34 +71,29 @@ def get_PSD_part(tal=1, PSD=None, rnd_seed=1):
 
     return korndiameter
 
-def PSD_plot(part_array, ax):
+def PSD_plot(part_array, bins):
     korndiameter = part_array
 
     masse = korndiameter**3 /6 * pi * 2650 * 1e-9 # masse i kg,tettleik i kg/mm³.
 
-    bins = 2.0**(np.arange(-4,5))
+   
     massebins = np.concatenate(([0], bins**3 /6 * pi * 2650 * 1e-9))
     # print( "bins: ", bins)
 
     # x_diameter = np.histogram(korndiameter, np.concatenate(([0], bins)))
     # x_masse = np.histogram(masse, massebins)
     sum_masse = np.sum(masse)
-    masse_per_gradering = np.array([np.sum(masse[(masse > massebins[i]) & (masse < massebins[i+1])]) for i in range(0,len(massebins)-1)])/sum_masse
+    if sum_masse == 0:
+        sum_masse = 1
+        
+    masse_per_gradering = np.asarray([np.sum(masse[(masse > massebins[i]) & (masse < massebins[i+1])]) for i in range(0,len(massebins)-1)])/sum_masse
 
-    x1 = np.cumsum(masse_per_gradering)
+    return np.cumsum(masse_per_gradering)
 
 
     # fig, ax = plt.subplots(figsize=(1190/myDPI,800/myDPI),dpi=myDPI)
 
-    ax.semilogx(bins, x1, color="blue", label="kornfordeling")
 
-    # ax.semilogx(PSD_full[0], PSD_full[3], color="red", label="original")
-    ax.set_xticks(bins)
-    ax.set_xticklabels(bins)
-    # ax.plot(x, y2, color="red", label="y'(x)")
-    # ax.plot(x, y3, color="green", label="y”(x)")
-    ax.set_xlabel("d [mm]")
-    ax.set_ylabel("% tal partiklar passert")
     # ax.legend()
 
     # logbins = np.logspace(np.log10(bins[0]),np.log10(bins[-1]),len(bins))
@@ -108,7 +105,17 @@ def save_PSD_plot(part_array, path):
     myDPI = 300
     fig, ax = plt.subplots(figsize=(1190/myDPI,800/myDPI),dpi=myDPI)
 
-    PSD_plot(part_array,ax)
+    bins = 2.0**(np.arange(-6,5))
+    x1 = PSD_plot(part_array, bins)
+    ax.semilogx(bins, x1, color="blue", label="kornfordeling")
+
+    # ax.semilogx(PSD_full[0], PSD_full[3], color="red", label="original")
+    ax.set_xticks(bins)
+    ax.set_xticklabels(bins)
+    # ax.plot(x, y2, color="red", label="y'(x)")
+    # ax.plot(x, y3, color="green", label="y”(x)")
+    ax.set_xlabel("d [mm]")
+    ax.set_ylabel("% tal partiklar passert")
 
     fig.savefig(path)
     plt.close()
