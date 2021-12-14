@@ -46,7 +46,7 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
         p.init_time = floor(p.init_time *fps)/fps #rettar opp init_tid slik at det blir eit tal som finst i datasettet.
         p.index = i
 
-    ribs = [Rib(rib) for rib in tre.ribs]
+    ribs = [Rib(rib, mu = 0.5 if rib_index < 2 else 1) for rib_index, rib in enumerate(tre.ribs)]
     
     if multi:
         ray.init()#num_cpus=4) 
@@ -57,14 +57,16 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
         not_ready = list(jobs.keys())
         while True:
             ready, not_ready = ray.wait(not_ready)
-            jobs[ready[0]].sti_dict = ray.get(ready)[0]
+            sti_dict = ray.get(ready)[0]
+            assert all([i in sti_dict.keys() for i in np.linspace(round(sti_dict['init_time']*100), round(sti_dict['final_time']*100), round((sti_dict['final_time']-sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {jobs[ready[0]].index} har ein feil i seg, ikkje alle elementa er der"
+            jobs[ready[0]].sti_dict = sti_dict
             print(f"Dei som står att no er {[jobs[p].index for p in not_ready]}")
             if len(not_ready)==0:
                 break
         ray.shutdown()
     else:
         for pa in particle_list:
-            if pa.index == 51:
+            if pa.index == 7:
                 pa.sti_dict = lag_sti(ribs, t_span, particle=pa, tre=tre, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction)
 
     caught = 0
@@ -93,15 +95,15 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
         
     #     run(f"rsync {film_fil} havrevol@login.ansatt.ntnu.no:", shell=True)
 
-    print("Brukte totalt {} s på heile operasjonen".format(datetime.datetime.now() - start))
 
     return particle_list
 
 def event_check(t, x, particle, tre, ribs):
     event_check.counter += 1
-    if hypot(x[2],x[3]) < particle.rtol *1 and hypot(x[2],x[3]) > 0 and particle.resting == True:
+    if hypot(x[2],x[3]) < 0.01 and hypot(x[2],x[3]) > 0 and particle.resting == True:
         return 0.0
-    # Kvifor har eg denne her? Det er for å dempa farten om den er så bitteliten at han må leggjast til ro. Men det må jo skje berre dersom det er kontakt i tillegg. Så då må eg vel sjekka kollisjon uansett?
+    # Kvifor har eg denne her? Det er for å dempa farten om den er så bitteliten at han må leggjast til ro. Men det må jo skje berre dersom det er kontakt i tillegg. Så då må eg vel sjekka kollisjon uansett? 
+    # Brukte particle.rtol *1 eller particle.rtol * 10, men det verkar til å vera feil uansett. Prøver med 0.01. (OHH 13.12.2021)
 
     for rib in ribs:
         collision = checkCollision(particle, x,rib)
@@ -177,7 +179,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
         text_color = random.randint(30,38)+ 60*random.randint(0,1)
         background = random.randint(40,48) 
         combined = (text_color, background)
-        bad = [(30,40),(30,48),(31,41), (32,42), (33,43), (34,44),(35,44),(35,45),(36,46),(37,47),(35,41),(36,42),(37,43),(31,45),(32,46),(33,47),(90,44),(93,43),(93,47),(93,47),(96,41),(96,42),(97,43),(97,47),(98,43)]
+        bad = [(30,40),(30,48),(31,41), (32,42), (33,43), (34,44),(35,44),(35,45),(36,46),(37,47),(35,41),(36,42),(37,43),(31,45),(32,46),(33,47),(90,44),(92,42),(93,43),(93,47),(93,47),(96,41),(96,42),(96,45),(97,43),(97,47),(98,43)]
         if (combined not in bad):
             break
     del bad, combined
@@ -193,7 +195,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
         for rib in ribs:
             particle.collision = checkCollision(particle, step_old[1:], rib)
             if particle.collision['is_collision'] or particle.collision['is_resting_contact'] or particle.collision['is_leaving']:
-                particle.collision['rib'] = rib
+                # particle.colliksion['rib'] = rib
                 break
 
 
@@ -235,6 +237,8 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
             elif (collision_info['is_resting_contact']):# and np.dot(collision_info['rib_normal'],collision_info['closest_rib_normal']) == 1.0 ):
                 if verbose:
                     print("kvilekontakt")
+                if collision_info['rib'].mu == 1:
+                    break
                 rest = 0
                 particle.resting = True
 
@@ -250,7 +254,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
             v = step_new[3:]
             v_rel = collision_info['relative_velocity'] # v_rel er relativ fart i normalkomponentretning, jf. formel 8-3 i baraff ("notesg.pdf")
             v_new = v - (rest + 1) * v_rel * n
-            if hypot(v_new[0],v_new[1]) < particle.rtol *1:
+            if hypot(v_new[0],v_new[1]) < 0.01:
                 v_new = np.zeros(2)
             
             # position = step_new[1:3]
@@ -298,7 +302,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
 
     sti_dict['final_time'] = final_time
     
-    status_msg = f"Nr. {particle.index} brukte {datetime.datetime.now()-starttid}"
+    status_msg = f"Nr. {particle.index} brukte {datetime.datetime.now()-starttid} og kalla get_u {get_u.counter} gonger."
     print(f"\x1b[{status_col}m {status_msg} \x1b[0m")    
     # return np.array(sti), sti_dict
     return sti_dict
@@ -359,14 +363,17 @@ def f(t, x, particle, tri, ribs):
     
 
  
-    mu = 0.5 # friksjonskoeffisenten
     addedmass = particle.addedmass
+    collision = particle.collision 
+    try:
+        mu = collision['rib'].mu # friksjonskoeffisenten
+    except KeyError:
+        mu = 0.5
     
     dxdt = x[2:]
     # vel = np.array([100,0]) - dxdt # relativ snøggleik
     # U_f = np.array(get_u(t,np.array([x[0],x[1]]),tri, linear))
 
-    collision = particle.collision 
     # for rib in ribs:
     #     collision = checkCollision(particle, x, rib)
                     
@@ -421,7 +428,7 @@ def f(t, x, particle, tri, ribs):
     if dudt_material[0] == 0.0 and dudt_material[1] == 0.0:
         addedmass = False
 
-    lift_component = 3/4 * 0.5 / particle.diameter * rho_self_density * (U_top_bottom[:,0]*U_top_bottom[:,0] - U_top_bottom[:,1]*U_top_bottom[:,1])
+    lift_component = 3/4 * 0.5 / particle.diameter * rho_self_density * (U_top_bottom[:,0]*U_top_bottom[:,0] - U_top_bottom[:,1]*U_top_bottom[:,1]) * norm(drag_component) @ np.array([[0, 1],[-1, 0]])
     
     divisor = 1 + 0.5 * rho_self_density * addedmass
     # divisoren trengst for akselerasjonen av partikkel kjem fram i added 
@@ -808,7 +815,7 @@ def checkCollision(particle, data, rib):
 
 
 class Rib:
-    def __init__(self, coords):
+    def __init__(self, coords, mu=0.5):
         self.vertices = sortClockwise(np.array(coords))
         
         self.normals = [norm(np.cross(self.vertices[1]-self.vertices[0],np.array([0,0,-1]))[:2]),
@@ -819,6 +826,7 @@ class Rib:
                         # Må sjekka om punkta skal gå mot eller med klokka. 
                         # Nett no går dei MED klokka. Normals skal peika UT.
         
+        self.mu = mu
     def get_rib_middle(self):
         return np.sum(self.vertices, axis=0)/len(self.vertices)
 

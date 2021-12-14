@@ -24,7 +24,7 @@ def dobla(a, tal=1):
         return dobla(c,tal-1)
 
 def norm(v):
-    return v / (v**2).sum()**0.5
+    return np.divide(v , (v**2).sum()**0.5, out=np.zeros_like(v), where=v!=0)
 
 def draw_rect(axes, ribs, color='red'):
     

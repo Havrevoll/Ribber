@@ -19,7 +19,7 @@ import datetime
 from pathlib import Path
 from subprocess import run
 
-talsamling = [100]
+talsamling = [1000]
 rnd_seed=1
 
 pickle_fil = Path("../TONSTAD_TWO_Q20_TWO2.pickle")
@@ -38,8 +38,8 @@ method = 'RK23', atol = 1e-1, rtol = 1e-1,
  verbose = False, collision_correction = True, multi = True)
 laga_film = True
 
-tider = {}
 
+tider = {}
 for tal in talsamling:
     talstart = datetime.datetime.now()
 

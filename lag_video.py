@@ -12,7 +12,6 @@ plt.rcParams["font.family"] = "STIXGeneral"
 plt.rcParams['mathtext.fontset'] = 'stix'
 from matplotlib import animation
 
-
 import random
 import h5py
 from hjelpefunksjonar import ranges, draw_rect
@@ -173,8 +172,6 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn="stiQ40.mp4",  fp
                     part.circle.set_visible(True)
                     part.annotation.set_visible(True)
 
-
-
             else:
                 part.circle.set_visible(False)
                 part.annotation.set_visible(False)
@@ -184,7 +181,8 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn="stiQ40.mp4",  fp
         uncaught_text.set_text(f"Free: {len(uncaught)}")
         caught_text.set_text(f"Trapped: {len(caught)}")
 
-        print(f"Tida er {t:>6.2f} og klokka er {datetime.datetime.now()- filmstart[0]}")
+        if t % 10 == 0:
+            print(f"Har laga {t:>6.2f} av filmen, brukar {datetime.datetime.now()- filmstart[0]} på kvart bilete")
         filmstart[0] = datetime.datetime.now()
 
         circles = [p.circle for p in partiklar]
@@ -192,19 +190,12 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn="stiQ40.mp4",  fp
 
         return circles + annotations
     
-
-
-    print("Skal byrja på filmen")
     #ax.axis('equal')
     # ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,steps),interval=50)
     ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps),interval=int(1000/fps), blit=False)
     # plt.show()
-    print("ferdig med animasjon, skal lagra")
-    
     
     starttid = datetime.datetime.now()
     ani.save(utfilnamn)
     print(f"Brukte {datetime.datetime.now()-starttid} på å lagra filmen")
     plt.close()
-
-   
