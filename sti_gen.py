@@ -56,18 +56,19 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
 
         not_ready = list(jobs.keys())
         while True:
-            ready, not_ready = ray.wait(not_ready)
+            ready, not_ready = ray.wait(not_ready,timeout=60)
             sti_dict = ray.get(ready)[0]
             assert all([i in sti_dict.keys() for i in np.linspace(round(sti_dict['init_time']*100), round(sti_dict['final_time']*100), round((sti_dict['final_time']-sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {jobs[ready[0]].index} har ein feil i seg, ikkje alle elementa er der"
             jobs[ready[0]].sti_dict = sti_dict
-            print(f"Dei som står att no er {[jobs[p].index for p in not_ready]}")
+            print(f"Dei som står att no er {[jobs[p].index for p in not_ready] if len(not_ready)<100 else len(not_ready)}")
             if len(not_ready)==0:
                 break
         ray.shutdown()
     else:
         for pa in particle_list:
-            if pa.index == 7:
+            # if pa.index == 22:
                 pa.sti_dict = lag_sti(ribs, t_span, particle=pa, tre=tre, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction)
+                assert all([i in pa.sti_dict.keys() for i in np.linspace(round(pa.sti_dict['init_time']*100), round(pa.sti_dict['final_time']*100), round((pa.sti_dict['final_time']-pa.sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {pa.index} har ein feil i seg, ikkje alle elementa er der"
 
     caught = 0
     uncaught=0
@@ -135,7 +136,7 @@ def eval_steps(t_span, fps):
         t_min = ceil(round(t_span[0]+1/fps,5)*fps)/fps
     else:
         t_min = ceil(t_span[0]*fps)/fps
-    return np.linspace( t_min, t_span[1], num = int((t_span[1]-t_min)*fps), endpoint = False )
+    return np.linspace( t_min, t_span[1], num = round((t_span[1]-t_min)*fps), endpoint = False )
 
 @ray.remote
 def remote_lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, collision_correction=True):
@@ -169,6 +170,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
     t_main = t
     dt_main = fps_inv
     dt = dt_main
+    nfev = 0
     
     left_edge = ribs[0].get_rib_middle()[0]
     
@@ -199,14 +201,14 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
                 break
 
 
-        step_new, backcatalog, event = rk_3(f, (t,t_max), step_old[1:], solver_args, fps)
-
+        step_new, backcatalog, event, nfev_ny = rk_3(f, (t,t_max), step_old[1:], solver_args, fps)
+        nfev += nfev_ny
         # sti = sti + backcatalog
 
         for index, step in enumerate(backcatalog):
             sti_dict[round(step[0]*100)] = dict(position = step[1:], loops = particle.wrap_counter, caught = True if step[2] < ribs[1].get_rib_middle()[1] else False)
             final_time = step[0]
-            if np.all(index+1 < len(backcatalog) and backcatalog[index+1:,3:] == 0): 
+            if np.all(index+1 < len(backcatalog) and backcatalog[index+1:,3:] == 0) and event == 'finish': 
                 break
 
         if verbose:
@@ -302,7 +304,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
 
     sti_dict['final_time'] = final_time
     
-    status_msg = f"Nr. {particle.index} brukte {datetime.datetime.now()-starttid} og kalla get_u {get_u.counter} gonger."
+    status_msg = f"Nr. {particle.index} brukte {datetime.datetime.now()-starttid} og kalla funksjonen {nfev} gonger."
     print(f"\x1b[{status_col}m {status_msg} \x1b[0m")    
     # return np.array(sti), sti_dict
     return sti_dict
@@ -317,12 +319,12 @@ def rk_3 (f, t, y0, solver_args, fps):
 
     if (resultat.message == "A termination event occurred."):
         if resultat.t_events[0].size > 0:
-            return np.concatenate((resultat.t_events[0], resultat.y_events[0][0])), np.column_stack((resultat.t, np.asarray(resultat.y).T)), "collision"
+            return np.concatenate((resultat.t_events[0], resultat.y_events[0][0])), np.column_stack((resultat.t, np.asarray(resultat.y).T)), "collision", resultat.nfev
         elif resultat.t_events[1].size > 0:
-            return np.concatenate((resultat.t_events[1], resultat.y_events[1][0])), np.column_stack((resultat.t, np.asarray(resultat.y).T)), "edge"
+            return np.concatenate((resultat.t_events[1], resultat.y_events[1][0])), np.column_stack((resultat.t, np.asarray(resultat.y).T)), "edge", resultat.nfev
 
     else:
-        return [], np.column_stack((resultat.t, resultat.y.T)), "finish" #np.concatenate(([resultat.t[-1]], resultat.y[:,-1]))
+        return [], np.column_stack((resultat.t, resultat.y.T)), "finish", resultat.nfev #np.concatenate(([resultat.t[-1]], resultat.y[:,-1]))
 
 
 # def createParticle(diameter, init_position, density=2.65e-6):

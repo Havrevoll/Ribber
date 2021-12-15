@@ -19,7 +19,7 @@ import datetime
 from pathlib import Path
 from subprocess import run
 
-talsamling = [1000]
+talsamling = [10]
 rnd_seed=1
 
 pickle_fil = Path("../TONSTAD_TWO_Q20_TWO2.pickle")
@@ -34,7 +34,7 @@ ribs = [Rib(rib) for rib in tre.ribs]
 
 sim_args = dict(fps = 20, t_span=t_span,
 linear = True, lift = True, addedmass = True, wrap_max = 50,
-method = 'RK23', atol = 1e-1, rtol = 1e-1, 
+method = 'BDF', atol = 1e-1, rtol = 1e-1, 
  verbose = False, collision_correction = True, multi = True)
 laga_film = True
 
