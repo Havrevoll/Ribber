@@ -2,6 +2,7 @@ import datetime
 import pickle
 import numpy as np
 import matplotlib
+from pathlib import Path
 
 from kornfordeling import PSD_plot
 matplotlib.use("Agg")
@@ -17,7 +18,7 @@ import h5py
 from hjelpefunksjonar import ranges, draw_rect
 from math import hypot
 
-filnamn = "../Q40.hdf5" #finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
+# filnamn = "../Q40.hdf5" #finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
 
 def lag_video(partikkelfil, filmfil, t_span, fps=20):
     with open(partikkelfil, 'rb') as f:
@@ -27,7 +28,7 @@ def lag_video(partikkelfil, filmfil, t_span, fps=20):
     sti_animasjon(particle_list, t_span, utfilnamn=filmfil, fps=fps)
     print(f"Brukte {datetime.datetime.now() - start} på å lagra filmen")
 
-def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn="stiQ40.mp4",  fps=20 ):
+def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"),  fps=20 ):
     
     # piv_range = ranges()
     
@@ -67,8 +68,8 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn="stiQ40.mp4",  fp
     V_mag_reshape = np.hypot(Umx_reshape, Vmx_reshape)        
     # V_mag_reshape = np.hypot(U[2], U[3])
        
-    myDPI = 150
-    fig = plt.figure()
+    myDPI = 300
+    fig = plt.figure(dpi=myDPI, figsize=(7.2,4.8))
     gs = GridSpec(2, 2, width_ratios=[2, 1] )
     ax = fig.add_subplot( gs[:, :-1] )
     ax2 = fig.add_subplot( gs[0, -1])
@@ -131,7 +132,7 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn="stiQ40.mp4",  fp
     ax2.set_xticks(bins[0::2])
     ax2.set_xticklabels(bins[0::2])
     ax2.set_xlabel("d [mm]")
-    ax2.set_ylabel("% tal partiklar passert")
+    ax2.set_ylabel("% masse partiklar passert")
     ax2.set_ylim(0,1)
 
     x2 = PSD_plot(np.asarray(caught), bins)
@@ -139,7 +140,7 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn="stiQ40.mp4",  fp
     ax3.set_xticks(bins[0::2])
     ax3.set_xticklabels(bins[0::2])
     ax3.set_xlabel("d [mm]")
-    ax3.set_ylabel("% tal partiklar passert")
+    ax3.set_ylabel("% masse partiklar passert")
     ax3.set_ylim(0,1)
 
     uncaught_text = fig.text(0.15,0.6, f"Free: {len(uncaught)}")
@@ -153,14 +154,18 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn="stiQ40.mp4",  fp
 
         caught = []
         uncaught = []
+        caught_mass = 0
+        uncaught_mass = 0
         
         # https://stackoverflow.com/questions/16527930/matplotlib-update-position-of-patches-or-set-xy-for-circles
         for part in partiklar:
             
             if part.sti_dict[max(round(part.sti_dict['init_time']*100), min(round(t*100), round(part.sti_dict['final_time']*100))) ]['caught']:
                 caught.append(part.diameter)
+                caught_mass += part.mass
             else:
                 uncaught.append(part.diameter)
+                uncaught_mass += part.mass
 
             if t>= part.sti_dict['init_time'] and t <= part.sti_dict['final_time']:
                 part.circle.center = part.sti_dict[round(t*100)]['position'][0:2]
@@ -178,12 +183,12 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn="stiQ40.mp4",  fp
 
         uncaught_plot.set_ydata(PSD_plot(np.asarray(uncaught), bins))
         caught_plot.set_ydata(PSD_plot(np.asarray(caught), bins))
-        uncaught_text.set_text(f"Free: {len(uncaught)}")
-        caught_text.set_text(f"Trapped: {len(caught)}")
+        uncaught_text.set_text(f"Free: {len(uncaught)}\nMass: {1e6*uncaught_mass:.2f} mg")
+        caught_text.set_text(f"Trapped: {len(caught)}\nMass: {1e6*caught_mass:.2f} mg")
 
-        if t % 10 == 0:
-            print(f"Har laga {t:>6.2f} av filmen, brukar {datetime.datetime.now()- filmstart[0]} på kvart bilete")
-        filmstart[0] = datetime.datetime.now()
+        # if t % 100 == 0:
+        #     print(f"Har laga {t:>6.2f} av filmen, brukar {datetime.datetime.now()- filmstart[0]} på kvart bilete")
+        # filmstart[0] = datetime.datetime.now()
 
         circles = [p.circle for p in partiklar]
         annotations = [p.annotation for p in partiklar]
@@ -192,7 +197,7 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn="stiQ40.mp4",  fp
     
     #ax.axis('equal')
     # ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,steps),interval=50)
-    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps),interval=int(1000/fps), blit=False)
+    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps),interval=int(1000/fps), blit=True)
     # plt.show()
     
     starttid = datetime.datetime.now()
