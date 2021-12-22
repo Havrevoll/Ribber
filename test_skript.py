@@ -70,7 +70,7 @@ for pickle_namn in ["../TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
     sim_args = dict(fps = 20, t_span=t_span,
     linear = True, lift = True, addedmass = True, wrap_max = 50,
     method = 'BDF', atol = 1e-1, rtol = 1e-1, 
-    verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = False)
+    verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = True)
     laga_film = True
 
 

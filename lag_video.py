@@ -20,12 +20,12 @@ from math import hypot
 
 # filnamn = "../Q40.hdf5" #finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
 
-def lag_video(partikkelfil, filmfil, t_span, fps=20):
+def lag_video(partikkelfil, filmfil, hdf5_fil, ribs, t_span, fps=20):
     with open(partikkelfil, 'rb') as f:
         particle_list = pickle.load(f)
 
     start = datetime.datetime.now()
-    sti_animasjon(particle_list, t_span, utfilnamn=filmfil, fps=fps)
+    sti_animasjon(particle_list, ribs, t_span, hdf5_fil=hdf5_fil, utfilnamn=filmfil, fps=fps)
     print(f"Brukte {datetime.datetime.now() - start} på å lagra filmen")
 
 def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"),  fps=20 ):

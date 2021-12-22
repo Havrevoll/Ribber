@@ -50,6 +50,7 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
         p.linear, p.lift, p.addedmass = linear, lift, addedmass
         p.init_time = floor(p.init_time *fps)/fps #rettar opp init_tid slik at det blir eit tal som finst i datasettet.
         p.index = i
+        p.resting_tolerance = 0.0001 if method == "BDF" else 0.01
 
     
     if multi:
@@ -94,7 +95,7 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
         ray.shutdown()
     else:
         for pa in particle_list:
-            if pa.index == 250:
+            if pa.index == 31:
                 pa.sti_dict = lag_sti(ribs, t_span, particle=pa, tre=tre, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction)
                 assert all([i in pa.sti_dict.keys() for i in np.linspace(round(pa.sti_dict['init_time']*100), round(pa.sti_dict['final_time']*100), round((pa.sti_dict['final_time']-pa.sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {pa.index} har ein feil i seg, ikkje alle elementa er der"
 
@@ -120,10 +121,12 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
 
 def event_check(t, x, particle, tre, ribs):
     event_check.counter += 1
-    if hypot(x[2],x[3]) < 0.01 and hypot(x[2],x[3]) > 0 and particle.resting == True:
+    if hypot(x[2],x[3]) < 0.0001 and hypot(x[2],x[3]) > 0 and particle.resting and not particle.still:
         return 0.0
     # Kvifor har eg denne her? Det er for å dempa farten om den er så bitteliten at han må leggjast til ro. Men det må jo skje berre dersom det er kontakt i tillegg. Så då må eg vel sjekka kollisjon uansett? 
     # Brukte particle.rtol *1 eller particle.rtol * 10, men det verkar til å vera feil uansett. Prøver med 0.01. (OHH 13.12.2021)
+    if hypot(x[2],x[3]) > 0.0001 and particle.still:
+        particle.still = False
 
     for rib in ribs:
         collision = checkCollision(particle, x,rib)
@@ -208,8 +211,8 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
     
     des4 = ">6.2f"
 
-    # status_msg = f"Nr {particle.index}, {particle.diameter:.2f} mm startpos. [{particle.init_position[0]:{des4}},{particle.init_position[1]:{des4}}]  byrja på  t={particle.init_time:.4f}, pos=[{particle.init_position[0]:{des4}},{particle.init_position[1]:{des4}}] U=[{particle.init_position[2]:{des4}},{particle.init_position[3]:{des4}}]"
-    # print(f"\x1b[{status_col}m {status_msg} \x1b[0m")
+    status_msg = f"Nr {particle.index}, {particle.diameter:.2f} mm startpos. [{particle.init_position[0]:{des4}},{particle.init_position[1]:{des4}}]  byrja på  t={particle.init_time:.4f}, pos=[{particle.init_position[0]:{des4}},{particle.init_position[1]:{des4}}] U=[{particle.init_position[2]:{des4}},{particle.init_position[3]:{des4}}]"
+    print(f"\x1b[{status_col}m {status_msg} \x1b[0m")
 
     while (t < t_max):
         
@@ -275,15 +278,11 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
             v = step_new[3:]
             v_rel = collision_info['relative_velocity'] # v_rel er relativ fart i normalkomponentretning, jf. formel 8-3 i baraff ("notesg.pdf")
             v_new = v - (rest + 1) * v_rel * n
-            if hypot(v_new[0],v_new[1]) < 0.01:
+            if hypot(v_new[0],v_new[1]) < 0.0001:
                 v_new = np.zeros(2)
+                particle.still = True
             
-            # position = step_new[1:3]
-            # position_new = position + collision_info['collision_depth']*n
-            
-            # step_old[1:3] = position_new
             step_old[3:] = v_new
-
             
         elif (event == "edge"):
             if (particle.wrap_counter <= wrap_max):
@@ -302,29 +301,11 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
             break
 
         t = step_old[0]
-        # else:
-        #     # sti_komplett.append(step_new)
-        #     # step_old = step_new
-            
-        #     t = round((t + dt) * 10000) / 10000
-
-        # if (round(step_new[0]*10000) % round(dt_main*10000) == 0):
-        #     sti.append(step_new)
-        #     t_main = step_new[0]
-        #     t = t_main
-        #     dt = dt_main
-        
-    # if (len(sti) < t_max*fps):
-    #     sti = np.pad(sti, ((0,t_max*fps - len(sti)),(0,0)),'edge')
-    #     sti[int(t_main*fps):,0] = np.arange(t_main, t_max, 1/fps)
-    
-    # if (len(sti) > t_max*fps):
-    #     sti = sti[0:t_max*fps]
 
     sti_dict['final_time'] = final_time
     
-    # status_msg = f"Nr. {particle.index} brukte {datetime.datetime.now()-starttid} og kalla funksjonen {nfev} gonger."
-    # print(f"\x1b[{status_col}m {status_msg} \x1b[0m")    
+    status_msg = f"Nr. {particle.index} brukte {datetime.datetime.now()-starttid} og kalla funksjonen {nfev} gonger."
+    print(f"\x1b[{status_col}m {status_msg} \x1b[0m")    
     # return np.array(sti), sti_dict
     return sti_dict
 
@@ -345,12 +326,6 @@ def rk_3 (f, t, y0, solver_args, fps):
     else:
         return [], np.column_stack((resultat.t, resultat.y.T)), "finish", resultat.nfev #np.concatenate(([resultat.t[-1]], resultat.y[:,-1]))
 
-
-# def createParticle(diameter, init_position, density=2.65e-6):
-#     volume = diameter**3 * pi * 1/6
-#     mass = volume*density
-#     radius = diameter/2
-#     return {'diameter': diameter, 'init_position':init_position}
 
 def f(t, x, particle, tri, ribs):
     """
@@ -381,8 +356,6 @@ def f(t, x, particle, tri, ribs):
     g = np.array([0, 9.81e3]) # mm/s^2 = 9.81 m/s^2
     nu = 1 # 1 mm^2/s = 1e-6 m^2/s
     rho = 1e-6  # kg/mm^3 = 1000 kg/m^3 
-    
-
  
     addedmass = particle.addedmass
     collision = particle.collision 
@@ -392,37 +365,11 @@ def f(t, x, particle, tri, ribs):
         mu = 0.5
     
     dxdt = x[2:]
-    # vel = np.array([100,0]) - dxdt # relativ snøggleik
-    # U_f = np.array(get_u(t,np.array([x[0],x[1]]),tri, linear))
-
-    # for rib in ribs:
-    #     collision = checkCollision(particle, x, rib)
-                    
-    #     if collision['is_collision'] or collision['is_resting_contact'] or collision['is_leaving']:
-    #         # print("Kollisjonsdjup er {} og det er {}over grenseverdien".format(collision['collision_depth'], "ikkje " if collision['collision_depth'] < eps else ""))
-
-    #         # n = collision['rib_normal']
-    #         # v = x[2:]
-    #         # v_rel = collision['relative_velocity'] 
-    #         # # v_rel er relativ fart i normalkomponentretning, jf. formel 8-3 i baraff ("notesg.pdf")
-    #         # v_new = v - (rest + 1) * v_rel * n
-    #         # x[2:] = v_new
-        
-    #         break
 
     U_f, dudt_material, U_top_bottom = get_u(t, x, particle, tri, collision= collision)
     
-        # if (np.isnan(U_f[2])):
-    #     U_f[2] = 0
-    #     # U_f[2] = dudt_mean[0][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
-    # if (np.isnan(U_f[3])):
-    #     U_f[3] = 0
-    #     # U_f[3] = dudt_mean[1][ckdtre.query(np.concatenate(([t], np.array([x[0],x[1]]))))[1]]
-        
-        
     vel = U_f - dxdt # relativ snøggleik
     # vel_ang = atan2(vel[1], vel[0])
-    
     
     Re = hypot(vel[0],vel[1]) * particle.diameter / nu 
     
@@ -478,12 +425,6 @@ def f(t, x, particle, tri, ribs):
                 dudt_friction = -norm(dxdt_t)*hypot(dudt_n[0],dudt_n[1])*mu
                 dudt = dudt_t + dudt_friction
 
-                # if hypot(dxdt_t[0],dxdt_t[1]) < 0.001:
-                #     dxdt = np.zeros(2)
-                # dxdt = dxdt_t
-        # elif np.dot(collision['rib_normal'],dudt) > 0 and particle.resting == True:
-        #     particle.resting = False
-
     except KeyError:
         pass
 
@@ -520,8 +461,6 @@ def get_u(t, x_inn, particle, tre_samla, collision):
         
     dt, dx, dy = 0.01, 0.1, 0.1
     
-    # tre_samla = ray.get(tre_plasma)
-
     U_del = tre_samla.get_U(tx)
     tri = tre_samla.get_tri(tx)
     
@@ -531,9 +470,6 @@ def get_u(t, x_inn, particle, tre_samla, collision):
     U_kd = tre_samla.U_kd
     
     get_u.counter +=1
-    
-    # if (get_u.counter > 2000000):
-    #     raise Exception("Alt for mange iterasjonar")
     
     if(linear):
         d=3
@@ -609,25 +545,25 @@ def get_u(t, x_inn, particle, tre_samla, collision):
         part_simplex = simplex[:2]
         part_vertices = vertices[:2]
         part_temp = temp[:2]
-            
+
+        simplex_prob = 0
         while (True):
             part_delta = part - part_temp[:,d] #avstanden til referansepunktet i simpleksen.
             part_bary = np.einsum('njk,nk->nj', part_temp[:,:d, :], part_delta) 
             part_wts = np.hstack((part_bary, 1 - part_bary.sum(axis=1, keepdims=True)))
-            break
         
-            # if (np.any(part_wts < -0.02)):
-            #     part_simplex = tri.find_simplex(part)
-            #     if np.any(part.simplex == -1):
-            #         break
-            #     part_vertices = np.take(tri.simplices, part_simplex, axis=0)
-            #     part_temp = np.take(tri.transform, part_simplex, axis=0)
-            #     get_u.simplex_prob += 1
-            #     if get_u.simplex_prob > 20:
-            #         print("Går i loop i part_simplex og der!")
-            # else:
-            #     get_u.simplex_prob = 0
-            #     break
+            if (np.any(part_wts < -0.02)):
+                part_simplex = tri.find_simplex(part)
+                if np.any(part_simplex == -1):
+                    break
+                part_vertices = np.take(tri.simplices, part_simplex, axis=0)
+                part_temp = np.take(tri.transform, part_simplex, axis=0)
+                simplex_prob += 1
+                if simplex_prob > 20:
+                    print("Går i loop i part_simplex og der!")
+                    break
+            else:
+                break
                 
         U_top_bottom = np.einsum('jni,ni->jn', np.take(U_del, part_vertices, axis=1), part_wts)
     else:
@@ -692,8 +628,10 @@ class Particle:
         self.lift = True
         self.addedmass = True
         self.resting = False
+        self.still = False
         self.wrap_counter = 0
         self.wrap_max = 50
+        self.resting_tolerance = 0.01
 
 
 def particle_copy(pa):

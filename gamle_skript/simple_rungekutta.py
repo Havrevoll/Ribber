@@ -17,7 +17,11 @@ def f(t,y):
     
     cd = 24 / Re * (1+0.15*Re**0.687)
 
-    return np.hstack([y[2:], 3/4* cd /0.06 /2.65 * abs(-y[2:]) * (-y[2:]) + np.array([0,(1/2.65-1)*9810])])
+    drag =  3/4* cd /0.06 /2.65 * abs(-y[2:]) * (-y[2:])
+    gravity =  np.array([0,(1/2.65-1)*9810])
+
+
+    return np.hstack([y[2:], drag + gravity])
 
 
 y0 = np.array([13.11481, -73.7378, 0.114264 , 0.3707])
