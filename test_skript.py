@@ -57,6 +57,7 @@ for pickle_namn in ["../TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
 "../TONSTAD_TWO_Q140_TWO.pickle"]:
 
     pickle_fil = Path(pickle_namn)
+    assert pickle_fil.exists()
 
     talstart = datetime.datetime.now()
     t_span = (0,179)

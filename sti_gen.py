@@ -222,8 +222,11 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
                 # particle.colliksion['rib'] = rib
                 break
 
+        try:
+            step_new, backcatalog, event, nfev_ny = rk_3(f, (t,t_max), step_old[1:], solver_args, fps)
+        except Exception as e:
+            raise Exception(f"Feil, med partikkel {particle.index} og tida t0 {t}").with_traceback(e.__traceback__)
 
-        step_new, backcatalog, event, nfev_ny = rk_3(f, (t,t_max), step_old[1:], solver_args, fps)
         nfev += nfev_ny
         # sti = sti + backcatalog
 
@@ -321,10 +324,10 @@ def rk_3 (f, t, y0, solver_args, fps):
         if resultat.t_events[0].size > 0:
             return np.concatenate((resultat.t_events[0], resultat.y_events[0][0])), np.column_stack((resultat.t, np.asarray(resultat.y).T)), "collision", resultat.nfev
         elif resultat.t_events[1].size > 0:
-            return np.concatenate((resultat.t_events[1], resultat.y_events[1][0])), np.column_stack((resultat.t, np.asarray(resultat.y).T)), "edge", resultat.nfev
+            return np.concatenate((resultat.t_events[1], resultat.y_events[1][0])), np.column_stack((np.asarray(resultat.t), np.asarray(resultat.y).T)), "edge", resultat.nfev
 
     else:
-        return [], np.column_stack((resultat.t, resultat.y.T)), "finish", resultat.nfev #np.concatenate(([resultat.t[-1]], resultat.y[:,-1]))
+        return [], np.column_stack((resultat.t, np.asarray(resultat.y).T)), "finish", resultat.nfev #np.concatenate(([resultat.t[-1]], resultat.y[:,-1]))
 
 
 def f(t, x, particle, tri, ribs):
