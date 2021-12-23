@@ -3,7 +3,7 @@
 
 import h5py
 import matplotlib
-from ray.core.generated.common_pb2 import _TASKSPEC_OVERRIDEENVIRONMENTVARIABLESENTRY
+# from ray.core.generated.common_pb2 import _TASKSPEC_OVERRIDEENVIRONMENTVARIABLESENTRY
 matplotlib.use("Agg")
 
 from kornfordeling import get_PSD_part
@@ -19,6 +19,7 @@ import datetime
 from math import floor, pi, hypot, ceil
 import random
 from scipy.sparse.construct import rand #, atan2
+import psutil
 
 # fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
 # x = np.array(h5py.File(filnamn, 'r')['x']).reshape(127,126)[ranges()]
@@ -65,15 +66,16 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
         for elem in not_ready:
             # if len(ready) == 0:
             try:
-                sti_dict = ray.get(elem, timeout=20)
+                
+                sti_dict = ray.get(elem, timeout=(240/psutil.cpu_count()))
                         
                 assert all([i in sti_dict.keys() for i in np.linspace(round(sti_dict['init_time']*100), round(sti_dict['final_time']*100), round((sti_dict['final_time']-sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {jobs[elem].index} har ein feil i seg, ikkje alle elementa er der"
                 jobs[elem].sti_dict = sti_dict
                 # jobs[ready[0]].sti_dict = sti_dict
-                print(f"Har kome til partikkel nr. {jobs[elem].index}")
+                # print(f"Har kome til partikkel nr. {jobs[elem].index}")
             except (GetTimeoutError,AssertionError):
                 ray.cancel(elem, force=True)
-                print(f"Måtte kansellera {jobs[elem].index}, vart visst aldri ferdig.")
+                # print(f"Måtte kansellera {jobs[elem].index}, vart visst aldri ferdig.")
                 cancelled.append(jobs[elem])
                 jobs[elem].method = "RK23"
                 
@@ -87,7 +89,7 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
                 assert all([i in sti_dict.keys() for i in np.linspace(round(sti_dict['init_time']*100), round(sti_dict['final_time']*100), round((sti_dict['final_time']-sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {jobs[ready[0]].index} har ein feil i seg, ikkje alle elementa er der"
                 jobs2[ready[0]].sti_dict = sti_dict
 
-                print(f"Dei som står att no er {[jobs2[p].index for p in not_ready] if len(not_ready)<100 else len(not_ready)}")
+                # print(f"Dei som står att no er {[jobs2[p].index for p in not_ready] if len(not_ready)<100 else len(not_ready)}")
                 if len(not_ready)==0:
                     break
             
@@ -95,12 +97,12 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
         ray.shutdown()
     else:
         for pa in particle_list:
-            if pa.index == 31:
+            if pa.index == 266:
                 pa.sti_dict = lag_sti(ribs, t_span, particle=pa, tre=tre, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction)
                 assert all([i in pa.sti_dict.keys() for i in np.linspace(round(pa.sti_dict['init_time']*100), round(pa.sti_dict['final_time']*100), round((pa.sti_dict['final_time']-pa.sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {pa.index} har ein feil i seg, ikkje alle elementa er der"
 
 
-    print(f"Brukte {datetime.datetime.now()-start} s fram til filmlaging.")
+    # print(f"Brukte {datetime.datetime.now()-start} s fram til filmlaging.")
 
     # while (True):
     #     ready_refs, remaining_refs = ray.wait(object_refs, num_returns=1, timeout=None)
@@ -121,11 +123,11 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
 
 def event_check(t, x, particle, tre, ribs):
     event_check.counter += 1
-    if hypot(x[2],x[3]) < 0.0001 and hypot(x[2],x[3]) > 0 and particle.resting and not particle.still:
+    if hypot(x[2],x[3]) < particle.resting_tolerance and hypot(x[2],x[3]) > 0 and particle.resting and not particle.still:
         return 0.0
     # Kvifor har eg denne her? Det er for å dempa farten om den er så bitteliten at han må leggjast til ro. Men det må jo skje berre dersom det er kontakt i tillegg. Så då må eg vel sjekka kollisjon uansett? 
     # Brukte particle.rtol *1 eller particle.rtol * 10, men det verkar til å vera feil uansett. Prøver med 0.01. (OHH 13.12.2021)
-    if hypot(x[2],x[3]) > 0.0001 and particle.still:
+    if hypot(x[2],x[3]) > particle.resting_tolerance and particle.still:
         particle.still = False
 
     for rib in ribs:
@@ -211,8 +213,8 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
     
     des4 = ">6.2f"
 
-    status_msg = f"Nr {particle.index}, {particle.diameter:.2f} mm startpos. [{particle.init_position[0]:{des4}},{particle.init_position[1]:{des4}}]  byrja på  t={particle.init_time:.4f}, pos=[{particle.init_position[0]:{des4}},{particle.init_position[1]:{des4}}] U=[{particle.init_position[2]:{des4}},{particle.init_position[3]:{des4}}]"
-    print(f"\x1b[{status_col}m {status_msg} \x1b[0m")
+    # status_msg = f"Nr {particle.index}, {particle.diameter:.2f} mm startpos. [{particle.init_position[0]:{des4}},{particle.init_position[1]:{des4}}]  byrja på  t={particle.init_time:.4f}, pos=[{particle.init_position[0]:{des4}},{particle.init_position[1]:{des4}}] U=[{particle.init_position[2]:{des4}},{particle.init_position[3]:{des4}}]"
+    # print(f"\x1b[{status_col}m {status_msg} \x1b[0m")
 
     while (t < t_max):
         
@@ -281,7 +283,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
             v = step_new[3:]
             v_rel = collision_info['relative_velocity'] # v_rel er relativ fart i normalkomponentretning, jf. formel 8-3 i baraff ("notesg.pdf")
             v_new = v - (rest + 1) * v_rel * n
-            if hypot(v_new[0],v_new[1]) < 0.0001:
+            if hypot(v_new[0],v_new[1]) < particle.resting_tolerance:
                 v_new = np.zeros(2)
                 particle.still = True
             
@@ -307,8 +309,8 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
 
     sti_dict['final_time'] = final_time
     
-    status_msg = f"Nr. {particle.index} brukte {datetime.datetime.now()-starttid} og kalla funksjonen {nfev} gonger."
-    print(f"\x1b[{status_col}m {status_msg} \x1b[0m")    
+    # status_msg = f"Nr. {particle.index} brukte {datetime.datetime.now()-starttid} og kalla funksjonen {nfev} gonger."
+    # print(f"\x1b[{status_col}m {status_msg} \x1b[0m")    
     # return np.array(sti), sti_dict
     return sti_dict
 
@@ -318,7 +320,7 @@ def rk_3 (f, t, y0, solver_args, fps):
     solver_args['t_eval'] = eval_steps(t, fps)
     resultat = solve_ivp(f, t, y0, dense_output=True,   **solver_args) # t_eval = [t[1]],
     # har teke ut max_ste=0.02, for det vart aldri aktuelt, ser det ut til.  method=solver_args['method'], args=solver_args['args'],
-    assert resultat.success == True
+    # assert resultat.success == True
 
     if (resultat.message == "A termination event occurred."):
         if resultat.t_events[0].size > 0:

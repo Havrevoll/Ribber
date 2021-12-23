@@ -8,7 +8,7 @@ import numpy as np
 # import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon, Rectangle
 
-import os.path
+from pathlib import Path
 
 from copy import deepcopy
 
@@ -52,7 +52,7 @@ def ranges(kutt=False):
 
 def finn_fil(kandidatar):
     for fil in kandidatar:
-        if os.path.isfile(fil):
+        if fil.exists():
             return fil
     return Exception("Fila finst ikkje på dei stadene du leita")
 

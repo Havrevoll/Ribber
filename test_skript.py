@@ -13,7 +13,7 @@ from sti_gen import Particle, Rib, simulering
 from lag_video import sti_animasjon
 # import numpy as np
 # from datagenerering import lag_tre, tre_objekt, lag_tre_multi
-# from hjelpefunksjonar import finn_fil
+from hjelpefunksjonar import finn_fil
 # import ray
 import datetime
 from pathlib import Path
@@ -23,48 +23,49 @@ tal = 1000
 rnd_seed=1
 tider = {}
 
-for pickle_namn in ["../TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
-"../TONSTAD_FOUR_Q20_FOUR CHECK.pickle",
-"../TONSTAD_FOUR_Q20_FOUR REPEAT.pickle",
-"../TONSTAD_FOUR_Q40_FOUR.pickle",
-"../TONSTAD_FOUR_Q40_REPEAT.pickle",
-"../TONSTAD_FOUR_Q60_FOUR.pickle",
-"../TONSTAD_FOUR_Q60_FOUR REPEAT.pickle",
-"../TONSTAD_FOUR_Q80_FOURDTCHANGED.pickle",
-"../TONSTAD_FOUR_Q80_FOUR.pickle",
-"../TONSTAD_FOUR_Q100_FOUR DT.pickle",
-"../TONSTAD_FOUR_Q100_FOUR.pickle",
-"../Tonstad_THREE_Q20_THREE.pickle",
-"../Tonstad_THREE_Q40_THREE.pickle",
-"../Tonstad_THREE_Q40_THREE_EXTRA.pickle",
-"../Tonstad_THREE_Q40_THREE FINAL.pickle",
-"../Tonstad_THREE_Q60_THREE.pickle",
-"../Tonstad_THREE_Q80_THREE.pickle",
-"../Tonstad_THREE_Q80_THREE_EXTRA.pickle",
-"../Tonstad_THREE_Q80EXTRA2_THREE.pickle",
-"../Tonstad_THREE_Q100_THREE.pickle",
-"../Tonstad_THREE_Q100_THREE_EXTRA.pickle",
-"../Tonstad_THREE_Q100_EXTRA2_THREE.pickle",
-"../Tonstad_THREE_Q100_THREE_EXTRA3.pickle",
-"../TONSTAD_TWO_Q20_TWO.pickle",
-"../TONSTAD_TWO_Q20_TWO2.pickle",
-"../TONSTAD_TWO_Q20_TWO3.pickle",
-"../TONSTAD_TWO_Q40_TWO.pickle",
-"../TONSTAD_TWO_Q60_TWO.pickle",
-"../TONSTAD_TWO_Q80_TWO.pickle",
-"../TONSTAD_TWO_Q100_TWO.pickle",
-"../TONSTAD_TWO_Q120_TWO.pickle",
-"../TONSTAD_TWO_Q140_TWO.pickle"]:
+for pickle_namn in ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
+"TONSTAD_FOUR_Q20_FOUR CHECK.pickle",
+"TONSTAD_FOUR_Q20_FOUR REPEAT.pickle",
+"TONSTAD_FOUR_Q40_FOUR.pickle",
+"TONSTAD_FOUR_Q40_REPEAT.pickle",
+"TONSTAD_FOUR_Q60_FOUR.pickle",
+"TONSTAD_FOUR_Q60_FOUR REPEAT.pickle",
+"TONSTAD_FOUR_Q80_FOURDTCHANGED.pickle",
+"TONSTAD_FOUR_Q80_FOUR.pickle",
+"TONSTAD_FOUR_Q100_FOUR DT.pickle",
+"TONSTAD_FOUR_Q100_FOUR.pickle",
+"Tonstad_THREE_Q20_THREE.pickle",
+"Tonstad_THREE_Q40_THREE.pickle",
+"Tonstad_THREE_Q40_THREE_EXTRA.pickle",
+"Tonstad_THREE_Q40_THREE FINAL.pickle",
+"Tonstad_THREE_Q60_THREE.pickle",
+"Tonstad_THREE_Q80_THREE.pickle",
+"Tonstad_THREE_Q80_THREE_EXTRA.pickle",
+"Tonstad_THREE_Q80EXTRA2_THREE.pickle",
+"Tonstad_THREE_Q100_THREE.pickle",
+"Tonstad_THREE_Q100_THREE_EXTRA.pickle",
+"Tonstad_THREE_Q100_EXTRA2_THREE.pickle",
+"Tonstad_THREE_Q100_THREE_EXTRA3.pickle",
+"TONSTAD_TWO_Q20_TWO.pickle",
+"TONSTAD_TWO_Q20_TWO2.pickle",
+"TONSTAD_TWO_Q20_TWO3.pickle",
+"TONSTAD_TWO_Q40_TWO.pickle",
+"TONSTAD_TWO_Q60_TWO.pickle",
+"TONSTAD_TWO_Q80_TWO.pickle",
+"TONSTAD_TWO_Q100_TWO.pickle",
+"TONSTAD_TWO_Q120_TWO.pickle",
+"TONSTAD_TWO_Q140_TWO.pickle"]:
 
-    pickle_fil = Path(pickle_namn)
-    assert pickle_fil.exists()
+    
+    # assert pickle_fil.exists()
+    pickle_fil = finn_fil([Path("..").joinpath(Path(pickle_namn)), Path("~/buf/nye/").joinpath(Path(pickle_namn)).expanduser()])
 
     talstart = datetime.datetime.now()
     t_span = (0,179)
-    print("Skal henta tre_objekt")
+    # print("Skal henta tre_objekt")
     with open(pickle_fil,'rb') as f:
         tre = pickle.load(f)
-    print("Ferdig med tre-objektet")
+    # print("Ferdig med tre-objektet")
 
     ribs = [Rib(rib) for rib in tre.ribs]
 
@@ -99,11 +100,12 @@ for pickle_namn in ["../TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
             uncaught_mass += pa.mass
 
     print(pickle_fil.stem)
+    print("Brukte  {} s på å simulera.".format(datetime.datetime.now() - talstart))
     print(f"Av {len(particle_list)} partiklar vart {caught} fanga, altså {100* caught/len(particle_list):.2f}%, og det er {1e3*caught_mass:.2f} mg")
     print(f"Av {len(particle_list)} partiklar vart {uncaught} ikkje fanga, altså {100* uncaught/len(particle_list):.2f}%, og det er {1e3*uncaught_mass:.2f} mg")
 
+    start_film = datetime.datetime.now()
     if laga_film:
-        start_film = datetime.datetime.now()
         film_fil = partikkelfil.with_suffix(".mp4") #Path(f"./filmar/sti_{pickle_fil.stem}_{sim_args['method']}_{len(particle_list)}_{sim_args['atol']:.0e}.mp4")
         sti_animasjon(particle_list, ribs,t_span=t_span, hdf5_fil = pickle_fil.with_suffix(".hdf5"),  utfilnamn=film_fil, fps=sim_args['fps'])
         print("Brukte  {} s på å laga film".format(datetime.datetime.now() - start_film))
