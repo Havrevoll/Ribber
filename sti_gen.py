@@ -279,6 +279,8 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
             #Gjer alt som skal til for å endra retningen og posisjonen på partikkelen
             step_old = np.copy(step_new)
             
+            assert 'relative_velocity' in collision_info, f"Noko feil i kollisjonsinfo for partikkel nr. {particle.index} etter berekninga med t0 {t} og sluttid {final_time}"
+
             n = collision_info['rib_normal']
             v = step_new[3:]
             v_rel = collision_info['relative_velocity'] # v_rel er relativ fart i normalkomponentretning, jf. formel 8-3 i baraff ("notesg.pdf")

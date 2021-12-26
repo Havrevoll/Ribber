@@ -77,6 +77,7 @@ for pickle_namn in ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
 
 
     # for tal in talsamling:
+    print(pickle_fil.stem)
 
     partikkelfil = Path(f"./partikkelsimulasjonar/particles_{pickle_fil.stem}_{sim_args['method']}_{tal}_{sim_args['atol']:.0e}_{'linear' if sim_args['linear'] else 'NN'}.pickle")
     if not partikkelfil.exists():
@@ -84,6 +85,7 @@ for pickle_namn in ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
         with open(partikkelfil, 'wb') as f:
             pickle.dump(particle_list, f)
     else:
+        print("Berekningane fanst frå før, hentar dei.")
         with open(partikkelfil, 'rb') as f:
             particle_list = pickle.load(f)
 
@@ -99,7 +101,6 @@ for pickle_namn in ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
             uncaught += 1
             uncaught_mass += pa.mass
 
-    print(pickle_fil.stem)
     print("Brukte  {} s på å simulera.".format(datetime.datetime.now() - talstart))
     print(f"Av {len(particle_list)} partiklar vart {caught} fanga, altså {100* caught/len(particle_list):.2f}%, og det er {1e3*caught_mass:.2f} mg")
     print(f"Av {len(particle_list)} partiklar vart {uncaught} ikkje fanga, altså {100* uncaught/len(particle_list):.2f}%, og det er {1e3*uncaught_mass:.2f} mg")
