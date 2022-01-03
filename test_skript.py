@@ -56,7 +56,7 @@ for pickle_namn in ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
 "TONSTAD_TWO_Q120_TWO.pickle",
 "TONSTAD_TWO_Q140_TWO.pickle"]:
 
-    
+    pickle_namn = "TONSTAD_FOUR_Q40_FOUR.pickle"
     # assert pickle_fil.exists()
     pickle_fil = finn_fil([Path("..").joinpath(Path(pickle_namn)), Path("~/buf/nye/").joinpath(Path(pickle_namn)).expanduser()])
 
@@ -72,7 +72,7 @@ for pickle_namn in ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
     sim_args = dict(fps = 20, t_span=t_span,
     linear = True, lift = True, addedmass = True, wrap_max = 50,
     method = 'BDF', atol = 1e-1, rtol = 1e-1, 
-    verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = True)
+    verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = False)
     laga_film = True
 
 
@@ -108,15 +108,18 @@ for pickle_namn in ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
     start_film = datetime.datetime.now()
     if laga_film:
         film_fil = partikkelfil.with_suffix(".mp4") #Path(f"./filmar/sti_{pickle_fil.stem}_{sim_args['method']}_{len(particle_list)}_{sim_args['atol']:.0e}.mp4")
-        sti_animasjon(particle_list, ribs,t_span=t_span, hdf5_fil = pickle_fil.with_suffix(".hdf5"),  utfilnamn=film_fil, fps=sim_args['fps'])
-        print("Brukte  {} s på å laga film".format(datetime.datetime.now() - start_film))
+        if not film_fil.exists():
+            sti_animasjon(particle_list, ribs,t_span=t_span, hdf5_fil = pickle_fil.with_suffix(".hdf5"),  utfilnamn=film_fil, fps=sim_args['fps'])
+            print("Brukte  {} s på å laga film".format(datetime.datetime.now() - start_film))
+        else:
+            print("Filmen finst jo frå før, hoppar over dette steget.")
 
         # run(f"rsync {film_fil} havrevol@login.ansatt.ntnu.no:", shell=True)
 
 
     tider[pickle_fil.stem] = dict(totalt = datetime.datetime.now() - talstart, 
         berre_film =  datetime.datetime.now() - start_film, berre_sim = start_film-talstart)
-    # break
+    break
 
 for t in tider:
     print(f"{t} brukte {tider[t]['berre_sim']} på simulering og  {tider[t]['berre_film']} på film og  {tider[t]['totalt']} på alt.")
