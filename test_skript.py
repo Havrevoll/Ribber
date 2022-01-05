@@ -56,7 +56,7 @@ for pickle_namn in ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
 "TONSTAD_TWO_Q120_TWO.pickle",
 "TONSTAD_TWO_Q140_TWO.pickle"]:
 
-    pickle_namn = "TONSTAD_FOUR_Q40_FOUR.pickle"
+    # pickle_namn = "TONSTAD_FOUR_Q40_FOUR.pickle"
     # assert pickle_fil.exists()
     pickle_fil = finn_fil([Path("..").joinpath(Path(pickle_namn)), Path("~/buf/nye/").joinpath(Path(pickle_namn)).expanduser()])
 
@@ -72,7 +72,7 @@ for pickle_namn in ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
     sim_args = dict(fps = 20, t_span=t_span,
     linear = True, lift = True, addedmass = True, wrap_max = 50,
     method = 'BDF', atol = 1e-1, rtol = 1e-1, 
-    verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = False)
+    verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = True)
     laga_film = True
 
 
@@ -102,8 +102,8 @@ for pickle_namn in ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
             uncaught_mass += pa.mass
 
     print("Brukte  {} s på å simulera.".format(datetime.datetime.now() - talstart))
-    print(f"Av {len(particle_list)} partiklar vart {caught} fanga, altså {100* caught/len(particle_list):.2f}%, og det er {1e3*caught_mass:.2f} mg")
-    print(f"Av {len(particle_list)} partiklar vart {uncaught} ikkje fanga, altså {100* uncaught/len(particle_list):.2f}%, og det er {1e3*uncaught_mass:.2f} mg")
+    print(f"Av {len(particle_list)} partiklar vart {caught} fanga, altså {100* caught/len(particle_list):.2f}%, og det er {1e6*caught_mass:.2f} mg")
+    print(f"Av {len(particle_list)} partiklar vart {uncaught} ikkje fanga, altså {100* uncaught/len(particle_list):.2f}%, og det er {1e6*uncaught_mass:.2f} mg")
 
     start_film = datetime.datetime.now()
     if laga_film:
@@ -119,7 +119,7 @@ for pickle_namn in ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
 
     tider[pickle_fil.stem] = dict(totalt = datetime.datetime.now() - talstart, 
         berre_film =  datetime.datetime.now() - start_film, berre_sim = start_film-talstart)
-    break
+    # break
 
 for t in tider:
     print(f"{t} brukte {tider[t]['berre_sim']} på simulering og  {tider[t]['berre_film']} på film og  {tider[t]['totalt']} på alt.")
