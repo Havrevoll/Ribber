@@ -9,7 +9,7 @@ matplotlib.use("Agg")
 # from kornfordeling import get_PSD_part
 import pickle
 # import random
-from sti_gen import Particle, Rib, simulering
+from sti_gen import Rib, simulering #,Particle
 from lag_video import sti_animasjon
 # import numpy as np
 # from datagenerering import lag_tre, tre_objekt, lag_tre_multi
@@ -17,13 +17,14 @@ from hjelpefunksjonar import finn_fil
 # import ray
 import datetime
 from pathlib import Path
-from subprocess import run
+# from subprocess import run
+import logging
 
 tal = 1000
 rnd_seed=1
 tider = {}
 
-for pickle_namn in ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
+pickle_filer = ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
 "TONSTAD_FOUR_Q20_FOUR CHECK.pickle",
 "TONSTAD_FOUR_Q20_FOUR REPEAT.pickle",
 "TONSTAD_FOUR_Q40_FOUR.pickle",
@@ -54,18 +55,49 @@ for pickle_namn in ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
 "TONSTAD_TWO_Q80_TWO.pickle",
 "TONSTAD_TWO_Q100_TWO.pickle",
 "TONSTAD_TWO_Q120_TWO.pickle",
-"TONSTAD_TWO_Q140_TWO.pickle"]:
+"TONSTAD_TWO_Q140_TWO.pickle"]
 
-    # pickle_namn = "TONSTAD_FOUR_Q40_FOUR.pickle"
+logging.basicConfig(filename='simuleringar.log', level=logging.DEBUG, format='%(asctime)s - %(name)s - %(message)s')
+
+
+log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(name)s %(funcName)s(%(lineno)d) %(message)s')
+
+#File to log to
+logFile = 'simuleringar.log'
+
+#Setup File handler
+file_handler = logging.FileHandler(logFile)
+file_handler.setFormatter(log_formatter)
+file_handler.setLevel(logging.DEBUG)
+
+#Setup Stream Handler (i.e. console)
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(log_formatter)
+stream_handler.setLevel(logging.INFO)
+
+#Get our logger
+app_log = logging.getLogger('root')
+app_log.setLevel(logging.DEBUG)
+
+#Add both Handlers
+app_log.addHandler(file_handler)
+app_log.addHandler(stream_handler)
+
+
+app_log.debug('Byrja simuleringa med denne lista:')
+app_log.debug(f"{pickle_filer}")
+
+
+for pickle_namn in pickle_filer:
+
+    # pickle_namn = "TONSTAD_FOUR_Q40_REPEAT.pickle"
     # assert pickle_fil.exists()
     pickle_fil = finn_fil([Path("..").joinpath(Path(pickle_namn)), Path("~/buf/nye/").joinpath(Path(pickle_namn)).expanduser()])
 
     talstart = datetime.datetime.now()
     t_span = (0,179)
-    # print("Skal henta tre_objekt")
     with open(pickle_fil,'rb') as f:
         tre = pickle.load(f)
-    # print("Ferdig med tre-objektet")
 
     ribs = [Rib(rib) for rib in tre.ribs]
 
@@ -77,7 +109,7 @@ for pickle_namn in ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
 
 
     # for tal in talsamling:
-    print(pickle_fil.stem)
+    app_log.info(f"Byrja med {pickle_fil.stem}")
 
     partikkelfil = Path(f"./partikkelsimulasjonar/particles_{pickle_fil.stem}_{sim_args['method']}_{tal}_{sim_args['atol']:.0e}_{'linear' if sim_args['linear'] else 'NN'}.pickle")
     if not partikkelfil.exists():
@@ -85,7 +117,7 @@ for pickle_namn in ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
         with open(partikkelfil, 'wb') as f:
             pickle.dump(particle_list, f)
     else:
-        print("Berekningane fanst frå før, hentar dei.")
+        app_log.info("Berekningane fanst frå før, hentar dei.")
         with open(partikkelfil, 'rb') as f:
             particle_list = pickle.load(f)
 
@@ -101,18 +133,18 @@ for pickle_namn in ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
             uncaught += 1
             uncaught_mass += pa.mass
 
-    print("Brukte  {} s på å simulera.".format(datetime.datetime.now() - talstart))
-    print(f"Av {len(particle_list)} partiklar vart {caught} fanga, altså {100* caught/len(particle_list):.2f}%, og det er {1e6*caught_mass:.2f} mg")
-    print(f"Av {len(particle_list)} partiklar vart {uncaught} ikkje fanga, altså {100* uncaught/len(particle_list):.2f}%, og det er {1e6*uncaught_mass:.2f} mg")
+    app_log.info("Brukte  {} s på å simulera.".format(datetime.datetime.now() - talstart))
+    app_log.info(f"Av {len(particle_list)} partiklar vart {caught} fanga, altså {100* caught/len(particle_list):.2f}%, og det er {1e6*caught_mass:.2f} mg")
+    app_log.info(f"Av {len(particle_list)} partiklar vart {uncaught} ikkje fanga, altså {100* uncaught/len(particle_list):.2f}%, og det er {1e6*uncaught_mass:.2f} mg")
 
     start_film = datetime.datetime.now()
     if laga_film:
         film_fil = partikkelfil.with_suffix(".mp4") #Path(f"./filmar/sti_{pickle_fil.stem}_{sim_args['method']}_{len(particle_list)}_{sim_args['atol']:.0e}.mp4")
         if not film_fil.exists():
             sti_animasjon(particle_list, ribs,t_span=t_span, hdf5_fil = pickle_fil.with_suffix(".hdf5"),  utfilnamn=film_fil, fps=sim_args['fps'])
-            print("Brukte  {} s på å laga film".format(datetime.datetime.now() - start_film))
+            app_log.info("Brukte  {} s på å laga film".format(datetime.datetime.now() - start_film))
         else:
-            print("Filmen finst jo frå før, hoppar over dette steget.")
+            app_log.info("Filmen finst jo frå før, hoppar over dette steget.")
 
         # run(f"rsync {film_fil} havrevol@login.ansatt.ntnu.no:", shell=True)
 
@@ -122,4 +154,4 @@ for pickle_namn in ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
     # break
 
 for t in tider:
-    print(f"{t} brukte {tider[t]['berre_sim']} på simulering og  {tider[t]['berre_film']} på film og  {tider[t]['totalt']} på alt.")
+    app_log.info(f"{t} brukte {tider[t]['berre_sim']} på simulering og  {tider[t]['berre_film']} på film og  {tider[t]['totalt']} på alt.")

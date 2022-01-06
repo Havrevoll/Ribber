@@ -24,7 +24,10 @@ import datetime
 from math import floor, hypot, ceil
 import random
 # from scipy.sparse.construct import rand #, atan2
-import psutil
+# import psutil
+import logging
+
+app_log = logging.getLogger(__name__)
 
 # fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
 # x = np.array(h5py.File(filnamn, 'r')['x']).reshape(127,126)[ranges()]
@@ -67,20 +70,20 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
             # if len(ready) == 0:
             try:
                 
-                sti_dict = ray.get(elem, timeout=(240/psutil.cpu_count()))
+                sti_dict = ray.get(elem, timeout=(10))
                         
                 assert all([i in sti_dict.keys() for i in np.linspace(round(sti_dict['init_time']*100), round(sti_dict['final_time']*100), round((sti_dict['final_time']-sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {jobs[elem].index} har ein feil i seg, ikkje alle elementa er der"
                 jobs[elem].sti_dict = sti_dict
                 # jobs[ready[0]].sti_dict = sti_dict
-                # print(f"Har kome til partikkel nr. {jobs[elem].index}")
+                app_log.debug(f"Har kome til partikkel nr. {jobs[elem].index}")
             except (GetTimeoutError,AssertionError):
                 ray.cancel(elem, force=True)
-                # print(f"Måtte kansellera {jobs[elem].index}, vart visst aldri ferdig.")
+                app_log.debug(f"Måtte kansellera {jobs[elem].index}, vart visst aldri ferdig.")
                 cancelled.append(jobs[elem])
                 jobs[elem].method = "RK23"
                 
         if len(cancelled) > 0:
-            print("Skal ta dei som ikkje klarte BDF")
+            app_log.debug("Skal ta dei som ikkje klarte BDF")
             jobs2 = {remote_lag_sti.remote(ribs, t_span, particle=pa, tre=tre_plasma, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction):pa for pa in cancelled}
             not_ready = list(jobs2.keys())
             while True:
@@ -89,7 +92,7 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
                 assert all([i in sti_dict.keys() for i in np.linspace(round(sti_dict['init_time']*100), round(sti_dict['final_time']*100), round((sti_dict['final_time']-sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {jobs[ready[0]].index} har ein feil i seg, ikkje alle elementa er der"
                 jobs2[ready[0]].sti_dict = sti_dict
 
-                # print(f"Dei som står att no er {[jobs2[p].index for p in not_ready] if len(not_ready)<100 else len(not_ready)}")
+                app_log.debug(f"Dei som står att no er {[jobs2[p].index for p in not_ready] if len(not_ready)<100 else len(not_ready)}")
                 if len(not_ready)==0:
                     break
             
@@ -97,7 +100,7 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
         ray.shutdown()
     else:
         for pa in particle_list:
-            if pa.index == 768:
+            if pa.index == 555:
                 pa.sti_dict = lag_sti(ribs, t_span, particle=pa, tre=tre, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction)
                 assert all([i in pa.sti_dict.keys() for i in np.linspace(round(pa.sti_dict['init_time']*100), round(pa.sti_dict['final_time']*100), round((pa.sti_dict['final_time']-pa.sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {pa.index} har ein feil i seg, ikkje alle elementa er der"
 
@@ -155,7 +158,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
     des4 = ">6.2f"
 
     status_msg = f"Nr {particle.index}, {particle.diameter:.2f} mm startpos. [{particle.init_position[0]:{des4}},{particle.init_position[1]:{des4}}]  byrja på  t={particle.init_time:.4f}, pos=[{particle.init_position[0]:{des4}},{particle.init_position[1]:{des4}}] U=[{particle.init_position[2]:{des4}},{particle.init_position[3]:{des4}}]"
-    print(f"\x1b[{status_col}m {status_msg} \x1b[0m")
+    app_log.debug(f"\x1b[{status_col}m {status_msg} \x1b[0m")
 
     while (t < t_max):
         
@@ -215,8 +218,11 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
             #Gjer alt som skal til for å endra retningen og posisjonen på partikkelen
             step_old = np.copy(step_new)
             
-            assert 'relative_velocity' in collision_info, f"Noko feil i kollisjonsinfo for partikkel nr. {particle.index} etter berekninga med t0 {t} og sluttid {final_time}"
-
+            # assert 'relative_velocity' in collision_info, f"Noko feil i kollisjonsinfo for partikkel nr. {particle.index} etter berekninga med t0 {t} og sluttid {final_time}"
+            if 'relative_velocity' not in collision_info:
+                app_log.warning(f"Noko feil i kollisjonsinfo for partikkel nr. {particle.index} etter berekninga med t0 {t} og sluttid {final_time}")
+                break
+            
             n = collision_info['rib_normal']
             v = step_new[3:]
             v_rel = collision_info['relative_velocity'] # v_rel er relativ fart i normalkomponentretning, jf. formel 8-3 i baraff ("notesg.pdf")
@@ -251,8 +257,8 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
 
     sti_dict['final_time'] = final_time
     
-    # status_msg = f"Nr. {particle.index} brukte {datetime.datetime.now()-starttid} og kalla funksjonen {nfev} gonger."
-    # print(f"\x1b[{status_col}m {status_msg} \x1b[0m")    
+    status_msg = f"Nr. {particle.index} brukte {datetime.datetime.now()-starttid} og kalla funksjonen {nfev} gonger."
+    app_log.debug(f"\x1b[{status_col}m {status_msg} \x1b[0m")    
     # return np.array(sti), sti_dict
     return sti_dict
 
