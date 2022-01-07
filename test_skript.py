@@ -67,7 +67,7 @@ file_handler.setLevel(logging.DEBUG)
 #Setup Stream Handler (i.e. console)
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(log_formatter)
-stream_handler.setLevel(logging.DEBUG)
+stream_handler.setLevel(logging.INFO)
 
 #Get our logger
 app_log = logging.getLogger()
@@ -91,13 +91,20 @@ for pickle_namn in pickle_filer:
     assert pickle_fil.exists() and pickle_fil.with_suffix(".hdf5").exists()
 
     talstart = datetime.datetime.now()
+    app_log.info("Skal henta tre.")
+    with open(pickle_fil,'rb') as f:
+        tre = pickle.load(f)
+    app_log.info("Ferdig å henta tre.")
+
+    ribs = [Rib(rib) for rib in tre.ribs]
+
     t_span = (0,179)
 
     sim_args = dict(fps = 20, t_span=t_span,
     linear = True, lift = True, addedmass = True, wrap_max = 50,
     method = 'BDF', atol = 1e-1, rtol = 1e-1, 
     verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = True)
-    laga_film = True
+    laga_film = False
 
 
     # for tal in talsamling:
@@ -105,10 +112,6 @@ for pickle_namn in pickle_filer:
 
     partikkelfil = Path(f"./partikkelsimulasjonar/particles_{pickle_fil.stem}_{sim_args['method']}_{tal}_{sim_args['atol']:.0e}_{'linear' if sim_args['linear'] else 'NN'}.pickle")
     if not partikkelfil.exists():
-        with open(pickle_fil,'rb') as f:
-            tre = pickle.load(f)
-
-        ribs = [Rib(rib) for rib in tre.ribs]
         particle_list = simulering(tal, rnd_seed, tre, **sim_args)
         with open(partikkelfil, 'wb') as f:
             pickle.dump(particle_list, f)
@@ -116,7 +119,7 @@ for pickle_namn in pickle_filer:
         app_log.info("Berekningane fanst frå før, hentar dei.")
         with open(partikkelfil, 'rb') as f:
             particle_list = pickle.load(f)
-
+    del tre
     caught = 0
     caught_mass = 0
     uncaught=0
@@ -147,7 +150,7 @@ for pickle_namn in pickle_filer:
 
     tider[pickle_fil.stem] = dict(totalt = datetime.datetime.now() - talstart, 
         berre_film =  datetime.datetime.now() - start_film, berre_sim = start_film-talstart)
-    break
+    # break
 
 for t in tider:
     app_log.info(f"{t} brukte {tider[t]['berre_sim']} på simulering og  {tider[t]['berre_film']} på film og  {tider[t]['totalt']} på alt.")

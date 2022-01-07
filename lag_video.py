@@ -186,9 +186,9 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"
         uncaught_text.set_text(f"Free: {len(uncaught)}\nMass: {1e6*uncaught_mass:.2f} mg")
         caught_text.set_text(f"Trapped: {len(caught)}\nMass: {1e6*caught_mass:.2f} mg")
 
-        # if t % 100 == 0:
-        #     print(f"Har laga {t:>6.2f} av filmen, brukar {datetime.datetime.now()- filmstart[0]} på kvart bilete")
-        # filmstart[0] = datetime.datetime.now()
+        # if t % 10 == 0:
+        print(f"Har laga {t:>6.2f} av filmen, brukar {datetime.datetime.now()- filmstart[0]} på kvart bilete")
+        filmstart[0] = datetime.datetime.now()
 
         circles = [p.circle for p in partiklar]
         annotations = [p.annotation for p in partiklar]
@@ -197,7 +197,7 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"
     
     #ax.axis('equal')
     # ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,steps),interval=50)
-    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps),interval=int(1000/fps), blit=True)
+    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps),interval=int(1000/fps), blit=False)
     # plt.show()
     
     starttid = datetime.datetime.now()
