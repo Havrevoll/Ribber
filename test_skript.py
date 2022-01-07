@@ -6,28 +6,22 @@ Created on Wed Jul  7 09:22:39 2021
 """
 import matplotlib
 matplotlib.use("Agg")
-# from kornfordeling import get_PSD_part
 import pickle
-# import random
 from sti_gen import Rib, simulering #,Particle
 from lag_video import sti_animasjon
-# import numpy as np
-# from datagenerering import lag_tre, tre_objekt, lag_tre_multi
 from hjelpefunksjonar import finn_fil
-# import ray
 import datetime
 from pathlib import Path
-# from subprocess import run
 import logging
 
 tal = 1000
 rnd_seed=1
 tider = {}
 
-pickle_filer = ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
-"TONSTAD_FOUR_Q20_FOUR CHECK.pickle",
-"TONSTAD_FOUR_Q20_FOUR REPEAT.pickle",
-"TONSTAD_FOUR_Q40_FOUR.pickle",
+pickle_filer = [#"TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
+# "TONSTAD_FOUR_Q20_FOUR CHECK.pickle",
+# "TONSTAD_FOUR_Q20_FOUR REPEAT.pickle",
+# "TONSTAD_FOUR_Q40_FOUR.pickle",
 "TONSTAD_FOUR_Q40_REPEAT.pickle",
 "TONSTAD_FOUR_Q60_FOUR.pickle",
 "TONSTAD_FOUR_Q60_FOUR REPEAT.pickle",
@@ -57,7 +51,7 @@ pickle_filer = ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
 "TONSTAD_TWO_Q120_TWO.pickle",
 "TONSTAD_TWO_Q140_TWO.pickle"]
 
-logging.basicConfig(filename='simuleringar.log', level=logging.DEBUG, format='%(asctime)s - %(name)s - %(message)s')
+# logging.basicConfig(filename='simuleringar.log', level=logging.DEBUG, format='%(asctime)s - %(name)s - %(message)s')
 
 
 log_formatter = logging.Formatter('%(asctime)s %(levelname)s %(name)s %(funcName)s(%(lineno)d) %(message)s')
@@ -73,16 +67,16 @@ file_handler.setLevel(logging.DEBUG)
 #Setup Stream Handler (i.e. console)
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(log_formatter)
-stream_handler.setLevel(logging.INFO)
+stream_handler.setLevel(logging.DEBUG)
 
 #Get our logger
-app_log = logging.getLogger('root')
-app_log.setLevel(logging.DEBUG)
+app_log = logging.getLogger()
 
 #Add both Handlers
 app_log.addHandler(file_handler)
 app_log.addHandler(stream_handler)
 
+app_log.setLevel(logging.DEBUG)
 
 app_log.debug('Byrja simuleringa med denne lista:')
 app_log.debug(f"{pickle_filer}")
@@ -92,7 +86,7 @@ for pickle_namn in pickle_filer:
 
     # pickle_namn = "TONSTAD_FOUR_Q40_REPEAT.pickle"
     # assert pickle_fil.exists()
-    pickle_fil = finn_fil([Path("..").joinpath(Path(pickle_namn)), Path("~/buf/nye/").joinpath(Path(pickle_namn)).expanduser()])
+    pickle_fil = finn_fil([Path("..").joinpath(Path(pickle_namn)), Path("~/hard/").joinpath(Path(pickle_namn)).expanduser()])
 
     talstart = datetime.datetime.now()
     t_span = (0,179)

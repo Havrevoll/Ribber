@@ -26,6 +26,7 @@ import random
 # from scipy.sparse.construct import rand #, atan2
 # import psutil
 import logging
+from loguru import logger
 
 app_log = logging.getLogger(__name__)
 
@@ -35,6 +36,7 @@ app_log = logging.getLogger(__name__)
 
 from constants import collision_restitution
 
+@logger.catch
 def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  lift = True, addedmass = True, wrap_max = 50, atol = 1e-1, rtol = 1e-1, 
     method = 'RK23', laga_film = False, verbose=True, collision_correction=True, hdf5_fil=Path("./"), multi = True):
     random.seed(rnd_seed)
@@ -158,7 +160,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
     des4 = ">6.2f"
 
     status_msg = f"Nr {particle.index}, {particle.diameter:.2f} mm startpos. [{particle.init_position[0]:{des4}},{particle.init_position[1]:{des4}}]  byrja på  t={particle.init_time:.4f}, pos=[{particle.init_position[0]:{des4}},{particle.init_position[1]:{des4}}] U=[{particle.init_position[2]:{des4}},{particle.init_position[3]:{des4}}]"
-    app_log.debug(f"\x1b[{status_col}m {status_msg} \x1b[0m")
+    print(f"\x1b[{status_col}m {status_msg} \x1b[0m")
 
     while (t < t_max):
         
@@ -214,6 +216,9 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
                 if verbose:
                     print("Forlet overflata")
                 particle.resting = False
+            else:
+                app_log.warning(f"Noko feil i kollisjonsinfo for partikkel nr. {particle.index} etter berekninga med t0 {t} og sluttid {final_time}. Det kan sjå ut til at event er collision men det vart ikkje registrert nokon kollisjon.")
+                break
 
             #Gjer alt som skal til for å endra retningen og posisjonen på partikkelen
             step_old = np.copy(step_new)
@@ -258,7 +263,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
     sti_dict['final_time'] = final_time
     
     status_msg = f"Nr. {particle.index} brukte {datetime.datetime.now()-starttid} og kalla funksjonen {nfev} gonger."
-    app_log.debug(f"\x1b[{status_col}m {status_msg} \x1b[0m")    
+    print(f"\x1b[{status_col}m {status_msg} \x1b[0m")    
     # return np.array(sti), sti_dict
     return sti_dict
 
