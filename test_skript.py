@@ -86,14 +86,12 @@ for pickle_namn in pickle_filer:
 
     # pickle_namn = "TONSTAD_FOUR_Q40_REPEAT.pickle"
     # assert pickle_fil.exists()
-    pickle_fil = finn_fil([Path("..").joinpath(Path(pickle_namn)), Path("~/hard/").joinpath(Path(pickle_namn)).expanduser()])
+    pickle_fil = finn_fil([Path("..").joinpath(Path(pickle_namn)), Path("~/hard/").joinpath(Path(pickle_namn)).expanduser(), Path("/mnt/g/pickle/").joinpath(Path(pickle_namn))])
+
+    assert pickle_fil.exists() and pickle_fil.with_suffix(".hdf5").exists()
 
     talstart = datetime.datetime.now()
     t_span = (0,179)
-    with open(pickle_fil,'rb') as f:
-        tre = pickle.load(f)
-
-    ribs = [Rib(rib) for rib in tre.ribs]
 
     sim_args = dict(fps = 20, t_span=t_span,
     linear = True, lift = True, addedmass = True, wrap_max = 50,
@@ -107,6 +105,10 @@ for pickle_namn in pickle_filer:
 
     partikkelfil = Path(f"./partikkelsimulasjonar/particles_{pickle_fil.stem}_{sim_args['method']}_{tal}_{sim_args['atol']:.0e}_{'linear' if sim_args['linear'] else 'NN'}.pickle")
     if not partikkelfil.exists():
+        with open(pickle_fil,'rb') as f:
+            tre = pickle.load(f)
+
+        ribs = [Rib(rib) for rib in tre.ribs]
         particle_list = simulering(tal, rnd_seed, tre, **sim_args)
         with open(partikkelfil, 'wb') as f:
             pickle.dump(particle_list, f)
@@ -145,7 +147,7 @@ for pickle_namn in pickle_filer:
 
     tider[pickle_fil.stem] = dict(totalt = datetime.datetime.now() - talstart, 
         berre_film =  datetime.datetime.now() - start_film, berre_sim = start_film-talstart)
-    # break
+    break
 
 for t in tider:
     app_log.info(f"{t} brukte {tider[t]['berre_sim']} på simulering og  {tider[t]['berre_film']} på film og  {tider[t]['totalt']} på alt.")
