@@ -77,10 +77,10 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
                 assert all([i in sti_dict.keys() for i in np.linspace(round(sti_dict['init_time']*100), round(sti_dict['final_time']*100), round((sti_dict['final_time']-sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {jobs[elem].index} har ein feil i seg, ikkje alle elementa er der"
                 jobs[elem].sti_dict = sti_dict
                 # jobs[ready[0]].sti_dict = sti_dict
-                app_log.debug(f"Har kome til partikkel nr. {jobs[elem].index}")
+                app_log.info(f"Har kome til partikkel nr. {jobs[elem].index}")
             except (GetTimeoutError,AssertionError):
                 ray.cancel(elem, force=True)
-                app_log.debug(f"Måtte kansellera {jobs[elem].index}, vart visst aldri ferdig.")
+                app_log.info(f"Måtte kansellera {jobs[elem].index}, vart visst aldri ferdig.")
                 cancelled.append(jobs[elem])
                 jobs[elem].method = "RK23"
                 
@@ -94,7 +94,7 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
                 assert all([i in sti_dict.keys() for i in np.linspace(round(sti_dict['init_time']*100), round(sti_dict['final_time']*100), round((sti_dict['final_time']-sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {jobs[ready[0]].index} har ein feil i seg, ikkje alle elementa er der"
                 jobs2[ready[0]].sti_dict = sti_dict
 
-                app_log.debug(f"Dei som står att no er {[jobs2[p].index for p in not_ready] if len(not_ready)<100 else len(not_ready)}")
+                app_log.info(f"Dei som står att no er {[jobs2[p].index for p in not_ready] if len(not_ready)<100 else len(not_ready)}")
                 if len(not_ready)==0:
                     break
             
@@ -102,7 +102,7 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
         ray.shutdown()
     else:
         for pa in particle_list:
-            if pa.index == 555:
+            if pa.index == 446:
                 pa.sti_dict = lag_sti(ribs, t_span, particle=pa, tre=tre, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction)
                 assert all([i in pa.sti_dict.keys() for i in np.linspace(round(pa.sti_dict['init_time']*100), round(pa.sti_dict['final_time']*100), round((pa.sti_dict['final_time']-pa.sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {pa.index} har ein feil i seg, ikkje alle elementa er der"
 
@@ -162,7 +162,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
     status_msg = f"Nr {particle.index}, {particle.diameter:.2f} mm startpos. [{particle.init_position[0]:{des4}},{particle.init_position[1]:{des4}}]  byrja på  t={particle.init_time:.4f}, pos=[{particle.init_position[0]:{des4}},{particle.init_position[1]:{des4}}] U=[{particle.init_position[2]:{des4}},{particle.init_position[3]:{des4}}]"
     print(f"\x1b[{status_col}m {status_msg} \x1b[0m")
 
-    while (t < t_max):
+    while (t < t_max-2):
         
         particle.collision = check_all_collisions(particle, step_old[1:], ribs)
         if particle.collision['is_resting_contact']:
