@@ -13,17 +13,18 @@ from hjelpefunksjonar import finn_fil
 import datetime
 from pathlib import Path
 import logging
+import numpy as np
 
 tal = 1000
 rnd_seed=1
 tider = {}
 
-pickle_filer = [#"TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
-# "TONSTAD_FOUR_Q20_FOUR CHECK.pickle",
-# "TONSTAD_FOUR_Q20_FOUR REPEAT.pickle",
-# "TONSTAD_FOUR_Q40_FOUR.pickle",
-# "TONSTAD_FOUR_Q40_REPEAT.pickle",
-# "TONSTAD_FOUR_Q60_FOUR.pickle",
+pickle_filer = ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
+"TONSTAD_FOUR_Q20_FOUR CHECK.pickle",
+"TONSTAD_FOUR_Q20_FOUR REPEAT.pickle",
+"TONSTAD_FOUR_Q40_FOUR.pickle",
+"TONSTAD_FOUR_Q40_REPEAT.pickle",
+"TONSTAD_FOUR_Q60_FOUR.pickle",
 "TONSTAD_FOUR_Q60_FOUR REPEAT.pickle",
 "TONSTAD_FOUR_Q80_FOURDTCHANGED.pickle",
 "TONSTAD_FOUR_Q80_FOUR.pickle",
@@ -90,21 +91,13 @@ for pickle_namn in pickle_filer:
 
     assert pickle_fil.exists() and pickle_fil.with_suffix(".hdf5").exists()
 
-    talstart = datetime.datetime.now()
-    app_log.info("Skal henta tre.")
-    with open(pickle_fil,'rb') as f:
-        tre = pickle.load(f)
-    app_log.info("Ferdig å henta tre.")
-
-    ribs = [Rib(rib) for rib in tre.ribs]
-
     t_span = (0,179)
 
     sim_args = dict(fps = 20, t_span=t_span,
     linear = True, lift = True, addedmass = True, wrap_max = 50,
     method = 'BDF', atol = 1e-1, rtol = 1e-1, 
     verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = True)
-    laga_film = False
+    laga_film = True
 
 
     # for tal in talsamling:
@@ -112,14 +105,25 @@ for pickle_namn in pickle_filer:
 
     partikkelfil = Path(f"./partikkelsimulasjonar/particles_{pickle_fil.stem}_{sim_args['method']}_{tal}_{sim_args['atol']:.0e}_{'linear' if sim_args['linear'] else 'NN'}.pickle")
     if not partikkelfil.exists():
+
+        talstart = datetime.datetime.now()
+        app_log.info("Skal henta tre.")
+        with open(pickle_fil,'rb') as f:
+            tre = pickle.load(f)
+        app_log.info("Ferdig å henta tre.")
+
+        ribs = [Rib(rib) for rib in tre.ribs]
         particle_list = simulering(tal, rnd_seed, tre, **sim_args)
         with open(partikkelfil, 'wb') as f:
             pickle.dump(particle_list, f)
+        del tre
     else:
         app_log.info("Berekningane fanst frå før, hentar dei.")
         with open(partikkelfil, 'rb') as f:
             particle_list = pickle.load(f)
-    del tre
+        with open(pickle_fil.with_name(f"{pickle_namn}_ribs.hdf5")) as f:
+            ribs = [Rib(rib) for rib in np.asarray(f['ribs'])]
+
     caught = 0
     caught_mass = 0
     uncaught=0

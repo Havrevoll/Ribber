@@ -63,16 +63,14 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
         ray.init()#dashboard_port=8266,num_cpus=4) 
         tre_plasma = ray.put(tre)
         jobs = {remote_lag_sti.remote(ribs, t_span, particle=pa, tre=tre_plasma, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction):pa for pa in particle_list}
-            # pa.job_id = 
 
         not_ready = list(jobs.keys())
         cancelled = []
-        # while True:
         for elem in not_ready:
             # if len(ready) == 0:
             try:
                 
-                sti_dict = ray.get(elem, timeout=(20))
+                sti_dict = ray.get(elem, timeout=(90))
                         
                 assert all([i in sti_dict.keys() for i in np.linspace(round(sti_dict['init_time']*100), round(sti_dict['final_time']*100), round((sti_dict['final_time']-sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {jobs[elem].index} har ein feil i seg, ikkje alle elementa er der"
                 jobs[elem].sti_dict = sti_dict

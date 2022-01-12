@@ -28,8 +28,10 @@ def lag_video(partikkelfil, filmfil, hdf5_fil, ribs, t_span, fps=20):
     sti_animasjon(particle_list, ribs, t_span, hdf5_fil=hdf5_fil, utfilnamn=filmfil, fps=fps)
     print(f"Brukte {datetime.datetime.now() - start} på å lagra filmen")
 
-def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"),  fps=20 ):
+def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"),  fps=20, diameter_span=(0,20) ):
     
+    partiklar =  [pa  for pa in partiklar if (pa.diameter > diameter_span[0] and pa.diameter < diameter_span[1])]
+
     # piv_range = ranges()
     
     # with h5py.File(filnamn, mode='r') as f:

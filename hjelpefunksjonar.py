@@ -54,7 +54,7 @@ def finn_fil(kandidatar):
     for fil in kandidatar:
         if fil.exists():
             return fil
-    return Exception("Fila finst ikkje på dei stadene du leita")
+    raise Exception("Fila finst ikkje på dei stadene du leita")
 
 
 def sortClockwise(A):
