@@ -16,12 +16,12 @@ import h5py
 import re
 import scipy.stats as stats
 
-from hjelpefunksjonar import ranges
+from hjelpefunksjonar import ranges, draw_rect
 
 # from IPython.display import clear_output
 
 
-from math import ceil, floor, log, sqrt
+from math import ceil, floor, hypot, log, sqrt
 # import os.path.join as pjoin
 
 # fil = h5py.File("D:/Tonstad/alle.hdf5", 'a')
@@ -48,11 +48,16 @@ class MidpointNormalize(mpl.colors.Normalize):
         return np.ma.masked_array(np.interp(value, x, y))
 
 def get_reshape(dataset):
-    '''
-    Ein metode som tek inn eit datasett og gjer alle reshapings-tinga for x og y, u og v og Re.
+    """Ein metode som tek inn eit datasett og gjer alle reshapings-tinga for x og y, u og v pluss ribbelista.
 
-    '''
-    x,y,Umx,Vmx,I,J = get_xyuvij(dataset)
+    Args:
+        dataset (string): filnamnet på hdf5-fila.
+
+    Returns:
+        tuple: Ein tuple med x, y, U, V (2d-arrays) og ribs (original-lista)
+    """
+ 
+    x,y,Umx,Vmx,I,J,ribs = get_xyuvijribs(dataset)
     
     x_reshape = x.reshape((J,I))
     y_reshape = y.reshape((J,I))
@@ -60,20 +65,29 @@ def get_reshape(dataset):
     Umx_reshape = Umx.reshape((len(Umx),J,I))
     Vmx_reshape = Vmx.reshape((len(Vmx),J,I))
     
-    return x_reshape, y_reshape, Umx_reshape, Vmx_reshape
+    return x_reshape, y_reshape, Umx_reshape, Vmx_reshape, ribs
 
-def get_xyuvij(dataset):
+def get_xyuvijribs(dataset):
+    """Ein metode som hentar ut alle dataa frå ei hdf5-fil og returnerer dei som ndarrays.
+
+    Args:
+        dataset (string): filnamnet på hdf5-fila
+
+    Returns:
+        tuple: x,y,U,V (alle som 1D-array), I,J (ints) og ribbelista
+    """
     with h5py.File(dataset, 'r') as f:
         Umx = np.array(f['Umx'])
         Vmx = np.array(f['Vmx'])
         (I,J) = (int(np.array(f['I'])),int(np.array(f['J'])))
         x = np.array(f['x'])
         y = np.array(f['y'])
+        ribs = np.array(f['ribs'])
     
-    return x,y,Umx,Vmx,I,J
+    return x,y,Umx,Vmx,I,J,ribs
         
 def get_mean(dataset):
-    x,y,Umx,Vmx,I,J = get_xyuvij(dataset)
+    _,_,Umx,Vmx,I,J,_ = get_xyuvijribs(dataset)
     
     u_bar = np.nanmean(Umx,0).reshape((J,I))
     v_bar = np.nanmean(Vmx,0).reshape((J,I))
@@ -113,15 +127,15 @@ def finn_u(y,v):
      
     return u
 
-def draw_rect(axes,color='red',new_setup=True):
+# def draw_rect(axes,color='red',new_setup=True):
     
-    if (new_setup):
-        axes.add_patch(Rectangle((-62.4,-9.56),50,8,linewidth=2,edgecolor=color,facecolor='none'))
-        axes.add_patch(Rectangle((37.6,-8.5),50,8,linewidth=2,edgecolor=color,facecolor='none'))
+#     if (new_setup):
+#         axes.add_patch(Rectangle((-62.4,-9.56),50,8,linewidth=2,edgecolor=color,facecolor='none'))
+#         axes.add_patch(Rectangle((37.6,-8.5),50,8,linewidth=2,edgecolor=color,facecolor='none'))
 
-    else:
-        axes.add_patch(Rectangle((-62.4,-9.56),50,8,linewidth=2,edgecolor=color,facecolor='none'))
-        axes.add_patch(Rectangle((37.6,-8.5),50,8,linewidth=2,edgecolor=color,facecolor='none'))
+#     else:
+#         axes.add_patch(Rectangle((-62.4,-9.56),50,8,linewidth=2,edgecolor=color,facecolor='none'))
+#         axes.add_patch(Rectangle((37.6,-8.5),50,8,linewidth=2,edgecolor=color,facecolor='none'))
 
 def draw_shade(axes, x0=0, x=430, color='red'):
     axes.add_patch(Rectangle((x0,-9.8),x,10.8,linewidth=2,edgecolor='none',facecolor='lightcoral'))
@@ -930,36 +944,46 @@ def kvervel_naerbilete(case):
     fig.savefig(filnamn)
     plt.close()
 
-def film_fartogpiler(case):
+def film_fartogpiler(datafil):
     ''' Lagar ein film av området nedstraums for ribba, med absoluttverdien av farten i bakgrunnen, og piler for farten oppå.'''
     
-    x_reshape1= np.array(case['x_reshape1'])
-    y_reshape1 = np.array(case['y_reshape1'])
-    V_mag_reshape = np.array(case['V_mag_reshape'])
-    Umx_reshape = np.array(case['Umx_reshape'])
-    Vmx_reshape = np.array(case['Vmx_reshape'])
+    # x_reshape1= np.array(case['x_reshape1'])
+    # y_reshape1 = np.array(case['y_reshape1'])
+    # V_mag_reshape = np.array(case['V_mag_reshape'])
+    # Umx_reshape = np.array(case['Umx_reshape'])
+    # Vmx_reshape = np.array(case['Vmx_reshape'])
     
+    x,y,u,v, ribs = get_reshape(datafil)
+    x1 = x[0,:]
+    y1 = y[:,0]
+    v_mag = np.hypot(u,v)
+
     myDPI = 200
     fig, ax = plt.subplots(figsize=(1000/myDPI,1000/myDPI),dpi=myDPI)
     
-    field = ax.imshow(V_mag_reshape[0,55:80,45:67], extent=[x_reshape1[0,45],x_reshape1[0,67], y_reshape1[80,0], y_reshape1[55,0]])
-    pil = ax.quiver(x_reshape1[55:80,45:67], y_reshape1[55:80,45:67], Umx_reshape[0,55:80,45:67], Vmx_reshape[0,55:80,45:67], scale=1000)
-    draw_rect(ax)
+    range = np.index_exp[0:1,60:75,80:95]
+
+    field = ax.imshow(v_mag[0,range[1],range[2]], extent=[x1[np.r_[range[2]][0]],x1[np.r_[range[2]][-1]], y1[np.r_[range[1]][-1]], y1[np.r_[range[1]][0]]])
+    pil = ax.quiver(x[range[1:]], y[range[1:]], u[0,range[1],range[2]], v[0,range[1],range[2]], scale=1000)
+    # draw_rect(ax, ribs )
         
     def nypkt(i):
-        field.set_data(V_mag_reshape[i,55:80,45:67])
-        pil.set_UVC(Umx_reshape[i,55:80,45:67], Vmx_reshape[i,55:80,45:67])
+        field.set_data(v_mag[i,range[1],range[2]])
+        pil.set_UVC(u[i,range[1],range[2]], v[i,range[1],range[2]])
         return field,pil
     
     print("Skal byrja på filmen")
     #ax.axis('equal')
     ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,600),interval=50)
-    plt.show()
+    # plt.show()
     print("ferdig med animasjon, skal lagra")
     
-    filnamn = "kvervelQ{}.mp4".format(re.split(r'/',case.name)[-1])
+    filnamn = "ribbe.mp4"
     ani.save(filnamn)
-    plt.close()
+    # plt.close()
+
+
+
 
 def film_vortisitetogpiler(case):
     ''' Lagar ein film av området nedstraums for ribba, med vortisiteten i bakgrunnen, og piler for farten oppå.'''

@@ -8,7 +8,7 @@ import numpy as np
 # import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon, Rectangle
 
-import os.path
+from pathlib import Path
 
 from copy import deepcopy
 
@@ -24,15 +24,14 @@ def dobla(a, tal=1):
         return dobla(c,tal-1)
 
 def norm(v):
-    return v / (v**2).sum()**0.5
+    return np.divide(v , (v**2).sum()**0.5, out=np.zeros_like(v), where=v!=0)
 
 def draw_rect(axes, ribs, color='red'):
     
         # axes.add_patch(Rectangle((-61.07,-8.816),50.2,7.8,linewidth=2,edgecolor='none',facecolor=color))
         # axes.add_patch(Rectangle((37.6,-8.5),50,7.8,linewidth=2,edgecolor=color,facecolor='none'))
     for rib in ribs:
-        rib = sortClockwise(np.array(rib))
-        axes.add_patch(Polygon(rib, facecolor=color))
+        axes.add_patch(Polygon(rib.vertices, facecolor=color))
 
 def ranges(kutt=False):
     # Dette var dei eg brukte for å laga kvadrantanalysen.
@@ -53,9 +52,9 @@ def ranges(kutt=False):
 
 def finn_fil(kandidatar):
     for fil in kandidatar:
-        if os.path.isfile(fil):
+        if fil.exists():
             return fil
-    return Exception("Fila finst ikkje på dei stadene du leita")
+    raise Exception("Fila finst ikkje på dei stadene du leita")
 
 
 def sortClockwise(A):
