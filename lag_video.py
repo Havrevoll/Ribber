@@ -19,20 +19,18 @@ import h5py
 from hjelpefunksjonar import ranges, draw_rect
 from math import hypot
 from rib import Rib
-from loguru import logger
+# from loguru import logger
 
-# filnamn = "../Q40.hdf5" #finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
-
-def lag_video(partikkelfil, filmfil, hdf5_fil, ribs, t_span, fps=20):
+def lag_video(partikkelfil, filmfil, hdf5_fil, ribs, t_span, fps=20, slow=1, diameter_span = (0,20)):
     with open(partikkelfil, 'rb') as f:
         particle_list = pickle.load(f)
 
     start = datetime.datetime.now()
-    sti_animasjon(particle_list, ribs, t_span, hdf5_fil=hdf5_fil, utfilnamn=filmfil, fps=fps)
+    sti_animasjon(particle_list, ribs, t_span, hdf5_fil=hdf5_fil, utfilnamn=filmfil, fps=fps, slow = slow, diameter_span= diameter_span)
     print(f"Brukte {datetime.datetime.now() - start} på å lagra filmen")
 
 # @logger.catch
-def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"),  fps=60, diameter_span=(0,20) ):
+def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"),  fps=60, slow = 1, diameter_span=(0,20) ):
     
     partiklar =  [pa  for pa in partiklar if (pa.diameter > diameter_span[0] and pa.diameter < diameter_span[1])]
 
@@ -214,7 +212,7 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"
     
     #ax.axis('equal')
     # ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,steps),interval=50)
-    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps-int(fps/20)),interval=int(1000/(fps)), blit=False)
+    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps-int(fps/20)),interval=int(slow*1000/(fps)), blit=False)
     # plt.show()
     
     starttid = datetime.datetime.now()
@@ -225,6 +223,49 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"
 
 
 if __name__ == "__main__":
-    with h5py.File("/home/ola/hard/TONSTAD_FOUR_Q20_FOUR CHECK_ribs.hdf5",'r') as f:
-            ribs = [Rib(rib) for rib in np.asarray(f['ribs'])]
-    lag_video("partikkelsimulasjonar/particles_TONSTAD_FOUR_Q20_FOUR CHECK_BDF_1000_1e-01_linear.pickle", "partikkelsimulasjonar/particles_TONSTAD_FOUR_Q20_FOUR CHECK_BDF_1000_1e-01_linear_60fps.mp4", Path("/home/ola/hard/TONSTAD_FOUR_Q20_FOUR CHECK.hdf5"), ribs, (0,100), fps=60)
+    liste = ["TONSTAD_FOUR_Q20_FOUR TRIALONE",
+    "TONSTAD_FOUR_Q20_FOUR CHECK",
+    "TONSTAD_FOUR_Q20_FOUR REPEAT",
+    "TONSTAD_FOUR_Q40_FOUR",
+    "TONSTAD_FOUR_Q40_REPEAT",
+    "TONSTAD_FOUR_Q60_FOUR",
+    "TONSTAD_FOUR_Q60_FOUR REPEAT",
+    "TONSTAD_FOUR_Q80_FOURDTCHANGED",
+    "TONSTAD_FOUR_Q80_FOUR",
+    "TONSTAD_FOUR_Q100_FOUR DT",
+    "TONSTAD_FOUR_Q100_FOUR",
+    "Tonstad_THREE_Q20_THREE",
+    "Tonstad_THREE_Q40_THREE",
+    "Tonstad_THREE_Q40_THREE_EXTRA",
+    "Tonstad_THREE_Q40_THREE FINAL",
+    "Tonstad_THREE_Q60_THREE"
+    # "Tonstad_THREE_Q80_THREE",
+    # "Tonstad_THREE_Q80_THREE_EXTRA",
+    # "Tonstad_THREE_Q80EXTRA2_THREE",
+    # "Tonstad_THREE_Q100_THREE",
+    # "Tonstad_THREE_Q100_THREE_EXTRA",
+    # "Tonstad_THREE_Q100_EXTRA2_THREE",
+    # "Tonstad_THREE_Q100_THREE_EXTRA3",
+    # "TONSTAD_TWO_Q20_TWO",
+    # "TONSTAD_TWO_Q20_TWO2",
+    # "TONSTAD_TWO_Q20_TWO3",
+    # "TONSTAD_TWO_Q40_TWO",
+    # "TONSTAD_TWO_Q60_TWO",
+    # "TONSTAD_TWO_Q80_TWO",
+    # "TONSTAD_TWO_Q100_TWO",
+    # "TONSTAD_TWO_Q120_TWO",
+    # "TONSTAD_TWO_Q140_TWO"
+    ]
+
+    for l in liste:
+        sim = Path(f"./partikkelsimulasjonar/particles_{l}_BDF_1000_1e-01_linear.pickle")
+        filmfil = sim.with_suffix(".mp4")
+        hdf5fil = Path("../").joinpath(l).with_suffix(".hdf5")
+        ribfil = Path(f"../{l}_ribs.hdf5")
+
+        assert sim.exists() and hdf5fil.exists() and ribfil.exists()
+
+        with h5py.File(ribfil,'r') as f:
+                ribs = [Rib(rib) for rib in np.asarray(f['ribs'])]
+        lag_video(sim, filmfil, hdf5fil, ribs, (0.05,0.06), fps=120, slow = 2)
+        break
