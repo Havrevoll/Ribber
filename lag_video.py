@@ -12,11 +12,14 @@ from matplotlib.gridspec import GridSpec
 plt.rcParams["font.family"] = "STIXGeneral"
 plt.rcParams['mathtext.fontset'] = 'stix'
 from matplotlib import animation
+from scipy.interpolate import interp1d
 
 import random
 import h5py
 from hjelpefunksjonar import ranges, draw_rect
 from math import hypot
+from rib import Rib
+from loguru import logger
 
 # filnamn = "../Q40.hdf5" #finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
 
@@ -28,7 +31,8 @@ def lag_video(partikkelfil, filmfil, hdf5_fil, ribs, t_span, fps=20):
     sti_animasjon(particle_list, ribs, t_span, hdf5_fil=hdf5_fil, utfilnamn=filmfil, fps=fps)
     print(f"Brukte {datetime.datetime.now() - start} på å lagra filmen")
 
-def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"),  fps=20, diameter_span=(0,20) ):
+# @logger.catch
+def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"),  fps=60, diameter_span=(0,20) ):
     
     partiklar =  [pa  for pa in partiklar if (pa.diameter > diameter_span[0] and pa.diameter < diameter_span[1])]
 
@@ -47,16 +51,18 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"
     
     steps = (t_max-t_min) * fps
     
+    # t_list = np.arange(t_min*fps,t_max*fps)/fps
     t_list = np.arange(t_min*fps,t_max*fps)/fps
+    t_list_part = np.arange(t_min*20,t_max*20)/20
     
     # piv_range = ranges()
 
     with h5py.File(hdf5_fil, 'r') as dataset:
         (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
     
-        Umx = np.array(dataset['Umx'])[t_min*fps:t_max*fps,:]
+        Umx = np.array(dataset['Umx'])[t_min*20:t_max*20,:]
         Umx_reshape = Umx.reshape((len(Umx),J,I))#[:,piv_range[0],piv_range[1]]
-        Vmx = np.array(dataset['Vmx'])[t_min*fps:t_max*fps,:]
+        Vmx = np.array(dataset['Vmx'])[t_min*20:t_max*20,:]
         Vmx_reshape = Vmx.reshape((len(Vmx),J,I))#[:,piv_range[0],piv_range[1]]
 
         # ribs = np.array(dataset['ribs'])
@@ -69,7 +75,8 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"
             
     V_mag_reshape = np.hypot(Umx_reshape, Vmx_reshape)        
     # V_mag_reshape = np.hypot(U[2], U[3])
-       
+    V_mag_interp = interp1d(range(t_min*fps,t_max*fps,int(fps/20)), V_mag_reshape, axis=0)
+
     myDPI = 300
     fig = plt.figure(dpi=myDPI, figsize=(7.2,4.8))
     gs = GridSpec(2, 2, width_ratios=[2, 1] )
@@ -150,10 +157,13 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"
     filmstart = [datetime.datetime.now()]
 
     def nypkt(i):
-        field.set_data(V_mag_reshape[i,:,:])
+        field.set_data(V_mag_interp(i))
+        # field.set_data(V_mag_reshape[i,:,:])
         # particle.set_data(sti[:,i,1], sti[:,i,2])
         t = t_list[i]
-
+        t_part = t_list_part[np.searchsorted(t_list_part, t)]
+        t_part_0 = min(t_list_part[np.searchsorted(t_list_part, t)-1], t_part)
+        
         caught = []
         uncaught = []
         caught_mass = 0
@@ -162,7 +172,7 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"
         # https://stackoverflow.com/questions/16527930/matplotlib-update-position-of-patches-or-set-xy-for-circles
         for part in partiklar:
             
-            if part.sti_dict[max(round(part.sti_dict['init_time']*100), min(round(t*100), round(part.sti_dict['final_time']*100))) ]['caught']:
+            if part.sti_dict[max(round(part.sti_dict['init_time']*100), min(round(t_part*100), round(part.sti_dict['final_time']*100))) ]['caught']:
                 caught.append(part.diameter)
                 caught_mass += part.mass
             else:
@@ -170,7 +180,12 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"
                 uncaught_mass += part.mass
 
             if t>= part.sti_dict['init_time'] and t <= part.sti_dict['final_time']:
-                part.circle.center = part.sti_dict[round(t*100)]['position'][0:2]
+                
+                if t_part != t_part_0 and t > part.sti_dict['init_time']:
+                    factor = (t - t_part_0)/(t_part - t_part_0)
+                    part.circle.center = np.asarray(part.sti_dict[round(t_part_0*100)]['position'][0:2]) * (1 - factor) + np.asarray(part.sti_dict[round(t_part*100)]['position'][0:2]) * factor
+                else:
+                    part.circle.center = part.sti_dict[round(t_part*100)]['position'][0:2]
                 # part.circle.center = part.sti[i,1], part.sti[i,2]
                 part.annotation.xy = part.circle.center
                 # part.annotation.xy = (np.interp(t,part.sti[:,0],part.sti[:,1], left=-100), np.interp(t,part.sti[:,0],part.sti[:,2], left=-100) )
@@ -179,7 +194,7 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"
                     part.circle.set_visible(True)
                     part.annotation.set_visible(True)
 
-            else:
+            elif part.circle.get_visible():
                 part.circle.set_visible(False)
                 part.annotation.set_visible(False)
 
@@ -199,10 +214,17 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"
     
     #ax.axis('equal')
     # ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,steps),interval=50)
-    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps),interval=int(1000/fps), blit=False)
+    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps-int(fps/20)),interval=int(1000/(fps)), blit=False)
     # plt.show()
     
     starttid = datetime.datetime.now()
     ani.save(utfilnamn)
     print(f"Brukte {datetime.datetime.now()-starttid} på å lagra filmen")
     plt.close()
+
+
+
+if __name__ == "__main__":
+    with h5py.File("/home/ola/hard/TONSTAD_FOUR_Q20_FOUR CHECK_ribs.hdf5",'r') as f:
+            ribs = [Rib(rib) for rib in np.asarray(f['ribs'])]
+    lag_video("partikkelsimulasjonar/particles_TONSTAD_FOUR_Q20_FOUR CHECK_BDF_1000_1e-01_linear.pickle", "partikkelsimulasjonar/particles_TONSTAD_FOUR_Q20_FOUR CHECK_BDF_1000_1e-01_linear_60fps.mp4", Path("/home/ola/hard/TONSTAD_FOUR_Q20_FOUR CHECK.hdf5"), ribs, (0,100), fps=60)
