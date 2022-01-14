@@ -122,9 +122,9 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"
         circle = plt.Circle((-100, -100), part.radius*5, color=color, visible = False)
         ax.add_patch(circle)
         part.circle = circle
-        part.annotation  = ax.annotate("{:.2f} mm".format(part.diameter), xy=(-100,-100),#, visible = False, #np.interp(0,part.sti[:,0],part.sti[:,1]), np.interp(0,part.sti[:,0],part.sti[:,2])), 
-                        xycoords="data", xytext=(random.random()*8,random.random()*8), fontsize=5, textcoords="offset points",
-                        arrowprops=dict(arrowstyle="->", connectionstyle="arc3, rad=0", color=color))
+        # part.annotation  = ax.annotate("{:.2f} mm".format(part.diameter), xy=(-100,-100),#, visible = False, #np.interp(0,part.sti[:,0],part.sti[:,1]), np.interp(0,part.sti[:,0],part.sti[:,2])), 
+        #                 xycoords="data", xytext=(random.random()*8,random.random()*8), fontsize=5, textcoords="offset points",
+        #                 arrowprops=dict(arrowstyle="->", connectionstyle="arc3, rad=0", color=color))
         # print("{} {} {} {}".format(part.atol,part.rtol,part.method, color))
         # gamal xytext: random.uniform(-20,20), random.uniform(-20,20)
         if part.sti_dict[round(part.sti_dict['init_time']*100)]['caught']:
@@ -187,16 +187,16 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"
                 else:
                     part.circle.center = part.sti_dict[round(t_part*100)]['position'][0:2]
                 # part.circle.center = part.sti[i,1], part.sti[i,2]
-                part.annotation.xy = part.circle.center
+                # part.annotation.xy = part.circle.center
                 # part.annotation.xy = (np.interp(t,part.sti[:,0],part.sti[:,1], left=-100), np.interp(t,part.sti[:,0],part.sti[:,2], left=-100) )
                 
                 if not part.circle.get_visible():
                     part.circle.set_visible(True)
-                    part.annotation.set_visible(True)
+                    # part.annotation.set_visible(True)
 
             elif part.circle.get_visible():
                 part.circle.set_visible(False)
-                part.annotation.set_visible(False)
+                # part.annotation.set_visible(False)
 
         uncaught_plot.set_ydata(PSD_plot(np.asarray(uncaught), bins))
         caught_plot.set_ydata(PSD_plot(np.asarray(caught), bins))
@@ -208,9 +208,9 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"
         filmstart[0] = datetime.datetime.now()
 
         circles = [p.circle for p in partiklar]
-        annotations = [p.annotation for p in partiklar]
+        # annotations = [p.annotation for p in partiklar]
 
-        return circles + annotations
+        return circles #+ annotations
     
     #ax.axis('equal')
     # ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,steps),interval=50)
@@ -241,10 +241,10 @@ if __name__ == "__main__":
     "Tonstad_THREE_Q40_THREE_EXTRA",
     "Tonstad_THREE_Q40_THREE FINAL",
     "Tonstad_THREE_Q60_THREE"
-    # "Tonstad_THREE_Q80_THREE",
-    # "Tonstad_THREE_Q80_THREE_EXTRA",
-    # "Tonstad_THREE_Q80EXTRA2_THREE",
-    # "Tonstad_THREE_Q100_THREE",
+    "Tonstad_THREE_Q80_THREE",
+    "Tonstad_THREE_Q80_THREE_EXTRA",
+    "Tonstad_THREE_Q80EXTRA2_THREE",
+    "Tonstad_THREE_Q100_THREE",
     # "Tonstad_THREE_Q100_THREE_EXTRA",
     # "Tonstad_THREE_Q100_EXTRA2_THREE",
     # "Tonstad_THREE_Q100_THREE_EXTRA3",
@@ -275,7 +275,7 @@ if __name__ == "__main__":
                 utfil.parent.mkdir(parents=True)
             if not utfil.exists():
                 print(utfil)
-                lag_video(sim, utfil, hdf5fil, ribs, (0,20), fps=120, slow = 2, diameter_span=span)
+                lag_video(sim, utfil, hdf5fil, ribs, (0,179), fps=120, slow = 2, diameter_span=span)
             
-                if utfil.exists():
-                    subprocess.run(f'''rsync "{utfil.resolve()}" havrevol@login.ansatt.ntnu.no:"{Path("/web/folk/havrevol/partiklar/").joinpath(utfil.parent.name.replace(" ", "_"))}_sorterte/"''', shell=True)
+                # if utfil.exists():
+                #     subprocess.run(f'''rsync "{utfil.resolve()}" havrevol@login.ansatt.ntnu.no:"{Path("/web/folk/havrevol/partiklar/").joinpath(utfil.parent.name.replace(" ", "_"))}_sorterte/"''', shell=True)
