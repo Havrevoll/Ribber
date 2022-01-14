@@ -3,6 +3,7 @@ import pickle
 import numpy as np
 import matplotlib
 from pathlib import Path
+import subprocess
 
 from kornfordeling import PSD_plot
 matplotlib.use("Agg")
@@ -33,7 +34,8 @@ def lag_video(partikkelfil, filmfil, hdf5_fil, ribs, t_span, fps=20, slow=1, dia
 def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"),  fps=60, slow = 1, diameter_span=(0,20) ):
     
     partiklar =  [pa  for pa in partiklar if (pa.diameter > diameter_span[0] and pa.diameter < diameter_span[1])]
-
+    if len(partiklar) == 0:
+        return
     # piv_range = ranges()
     
     # with h5py.File(filnamn, mode='r') as f:
@@ -267,5 +269,13 @@ if __name__ == "__main__":
 
         with h5py.File(ribfil,'r') as f:
                 ribs = [Rib(rib) for rib in np.asarray(f['ribs'])]
-        lag_video(sim, filmfil, hdf5fil, ribs, (0.05,0.06), fps=120, slow = 2)
-        break
+        for span in [(0.05,0.06),(0.06,0.07),(0.08,0.1),(0.1,0.2),(0.2,0.3), (0.3,0.5),(0.5,1),(1,20)]:
+            utfil = filmfil.parent.joinpath(f"{l}").joinpath(f"{span[0]}_{span[1]}.mp4")
+            if not utfil.parent.exists():
+                utfil.parent.mkdir(parents=True)
+            if not utfil.exists():
+                print(utfil)
+                lag_video(sim, utfil, hdf5fil, ribs, (0,20), fps=120, slow = 2, diameter_span=span)
+            
+                if utfil.exists():
+                    subprocess.run(f'''rsync "{utfil.resolve()}" havrevol@login.ansatt.ntnu.no:"{Path("/web/folk/havrevol/partiklar/").joinpath(utfil.parent.name.replace(" ", "_"))}_sorterte/"''', shell=True)
