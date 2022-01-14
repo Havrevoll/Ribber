@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib
 from pathlib import Path
 import subprocess
-
+import ray
 from kornfordeling import PSD_plot
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -22,6 +22,7 @@ from math import hypot
 from rib import Rib
 # from loguru import logger
 
+@ray.remote
 def lag_video(partikkelfil, filmfil, hdf5_fil, ribs, t_span, fps=20, slow=1, diameter_span = (0,20)):
     with open(partikkelfil, 'rb') as f:
         particle_list = pickle.load(f)
@@ -204,7 +205,7 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"
         caught_text.set_text(f"Trapped: {len(caught)}\nMass: {1e6*caught_mass:.2f} mg")
 
         # if t % 10 == 0:
-        print(f"Har laga {t:>6.2f} av filmen, brukar {datetime.datetime.now()- filmstart[0]} på kvart bilete")
+        print(f"Har laga {t:>6.2f} av {utfilnamn}, brukar {datetime.datetime.now()- filmstart[0]} på kvart bilete")
         filmstart[0] = datetime.datetime.now()
 
         circles = [p.circle for p in partiklar]
@@ -259,6 +260,8 @@ if __name__ == "__main__":
     # "TONSTAD_TWO_Q140_TWO"
     ]
 
+    ray.init(num_cpus=4)
+    
     for l in liste:
         sim = Path(f"./partikkelsimulasjonar/particles_{l}_BDF_1000_1e-01_linear.pickle")
         filmfil = sim.with_suffix(".mp4")
@@ -269,13 +272,23 @@ if __name__ == "__main__":
 
         with h5py.File(ribfil,'r') as f:
                 ribs = [Rib(rib) for rib in np.asarray(f['ribs'])]
+    
+        jobs = []
+
         for span in [(0.05,0.06),(0.06,0.07),(0.08,0.1),(0.1,0.2),(0.2,0.3), (0.3,0.5),(0.5,1),(1,20)]:
             utfil = filmfil.parent.joinpath(f"{l}").joinpath(f"{span[0]}_{span[1]}.mp4")
             if not utfil.parent.exists():
                 utfil.parent.mkdir(parents=True)
             if not utfil.exists():
                 print(utfil)
-                lag_video(sim, utfil, hdf5fil, ribs, (0,179), fps=120, slow = 2, diameter_span=span)
+        
+                jobs.append(lag_video.remote(sim, utfil, hdf5fil, ribs, (0,179), fps=120, slow = 2, diameter_span=span))
             
                 # if utfil.exists():
                 #     subprocess.run(f'''rsync "{utfil.resolve()}" havrevol@login.ansatt.ntnu.no:"{Path("/web/folk/havrevol/partiklar/").joinpath(utfil.parent.name.replace(" ", "_"))}_sorterte/"''', shell=True)
+        unready = jobs
+        while len(unready) > 0:
+            ready,unready = ray.wait(unready)
+            ray.get(ready)
+            print("henta ein ready, desse er unready:")
+            print(unready)
