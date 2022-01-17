@@ -21,16 +21,16 @@ rnd_seed=1
 tider = {}
 
 pickle_filer = ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
-"TONSTAD_FOUR_Q20_FOUR CHECK.pickle",
-"TONSTAD_FOUR_Q20_FOUR REPEAT.pickle",
-"TONSTAD_FOUR_Q40_FOUR.pickle",
-"TONSTAD_FOUR_Q40_REPEAT.pickle",
-"TONSTAD_FOUR_Q60_FOUR.pickle",
-"TONSTAD_FOUR_Q60_FOUR REPEAT.pickle",
-"TONSTAD_FOUR_Q80_FOURDTCHANGED.pickle",
-"TONSTAD_FOUR_Q80_FOUR.pickle",
-"TONSTAD_FOUR_Q100_FOUR DT.pickle",
-"TONSTAD_FOUR_Q100_FOUR.pickle",
+# "TONSTAD_FOUR_Q20_FOUR CHECK.pickle",
+# "TONSTAD_FOUR_Q20_FOUR REPEAT.pickle",
+# "TONSTAD_FOUR_Q40_FOUR.pickle",
+# "TONSTAD_FOUR_Q40_REPEAT.pickle",
+# "TONSTAD_FOUR_Q60_FOUR.pickle",
+# "TONSTAD_FOUR_Q60_FOUR REPEAT.pickle",
+# "TONSTAD_FOUR_Q80_FOURDTCHANGED.pickle",
+# "TONSTAD_FOUR_Q80_FOUR.pickle",
+# "TONSTAD_FOUR_Q100_FOUR DT.pickle",
+# "TONSTAD_FOUR_Q100_FOUR.pickle",
 # "Tonstad_THREE_Q20_THREE.pickle",
 # "Tonstad_THREE_Q40_THREE.pickle",
 # "Tonstad_THREE_Q40_THREE_EXTRA.pickle",
@@ -45,13 +45,13 @@ pickle_filer = ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
 # "Tonstad_THREE_Q100_THREE_EXTRA3.pickle",
 # "TONSTAD_TWO_Q20_TWO.pickle",
 # "TONSTAD_TWO_Q20_TWO2.pickle",
-# "TONSTAD_TWO_Q20_TWO3.pickle",
+"TONSTAD_TWO_Q20_TWO3.pickle",
 # "TONSTAD_TWO_Q40_TWO.pickle",
 # "TONSTAD_TWO_Q60_TWO.pickle",
 # "TONSTAD_TWO_Q80_TWO.pickle",
 # "TONSTAD_TWO_Q100_TWO.pickle",
 # "TONSTAD_TWO_Q120_TWO.pickle",
-# "TONSTAD_TWO_Q140_TWO.pickle"
+#"TONSTAD_TWO_Q140_TWO.pickle"
 ]
 
 # logging.basicConfig(filename='simuleringar.log', level=logging.DEBUG, format='%(asctime)s - %(name)s - %(message)s')
@@ -94,13 +94,14 @@ for pickle_namn in pickle_filer:
 
     assert pickle_fil.exists() and pickle_fil.with_suffix(".hdf5").exists()
 
+    talstart = datetime.datetime.now()
     t_span = (0,179)
 
     sim_args = dict(fps = 20, t_span=t_span,
     linear = True, lift = True, addedmass = True, wrap_max = 50,
     method = 'BDF', atol = 1e-1, rtol = 1e-1, 
     verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = True)
-    laga_film = True
+    laga_film = False
 
 
     # for tal in talsamling:
