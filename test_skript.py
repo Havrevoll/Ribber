@@ -14,43 +14,45 @@ import datetime
 from pathlib import Path
 import logging
 import numpy as np
+import h5py
 
 tal = 1000
 rnd_seed=1
 tider = {}
 
 pickle_filer = ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
-"TONSTAD_FOUR_Q20_FOUR CHECK.pickle",
-"TONSTAD_FOUR_Q20_FOUR REPEAT.pickle",
-"TONSTAD_FOUR_Q40_FOUR.pickle",
-"TONSTAD_FOUR_Q40_REPEAT.pickle",
-"TONSTAD_FOUR_Q60_FOUR.pickle",
-"TONSTAD_FOUR_Q60_FOUR REPEAT.pickle",
-"TONSTAD_FOUR_Q80_FOURDTCHANGED.pickle",
-"TONSTAD_FOUR_Q80_FOUR.pickle",
-"TONSTAD_FOUR_Q100_FOUR DT.pickle",
-"TONSTAD_FOUR_Q100_FOUR.pickle",
-"Tonstad_THREE_Q20_THREE.pickle",
-"Tonstad_THREE_Q40_THREE.pickle",
-"Tonstad_THREE_Q40_THREE_EXTRA.pickle",
-"Tonstad_THREE_Q40_THREE FINAL.pickle",
-"Tonstad_THREE_Q60_THREE.pickle",
-"Tonstad_THREE_Q80_THREE.pickle",
-"Tonstad_THREE_Q80_THREE_EXTRA.pickle",
-"Tonstad_THREE_Q80EXTRA2_THREE.pickle",
-"Tonstad_THREE_Q100_THREE.pickle",
-"Tonstad_THREE_Q100_THREE_EXTRA.pickle",
-"Tonstad_THREE_Q100_EXTRA2_THREE.pickle",
-"Tonstad_THREE_Q100_THREE_EXTRA3.pickle",
-"TONSTAD_TWO_Q20_TWO.pickle",
-"TONSTAD_TWO_Q20_TWO2.pickle",
+# "TONSTAD_FOUR_Q20_FOUR CHECK.pickle",
+# "TONSTAD_FOUR_Q20_FOUR REPEAT.pickle",
+# "TONSTAD_FOUR_Q40_FOUR.pickle",
+# "TONSTAD_FOUR_Q40_REPEAT.pickle",
+# "TONSTAD_FOUR_Q60_FOUR.pickle",
+# "TONSTAD_FOUR_Q60_FOUR REPEAT.pickle",
+# "TONSTAD_FOUR_Q80_FOURDTCHANGED.pickle",
+# "TONSTAD_FOUR_Q80_FOUR.pickle",
+# "TONSTAD_FOUR_Q100_FOUR DT.pickle",
+# "TONSTAD_FOUR_Q100_FOUR.pickle",
+# "Tonstad_THREE_Q20_THREE.pickle",
+# "Tonstad_THREE_Q40_THREE.pickle",
+# "Tonstad_THREE_Q40_THREE_EXTRA.pickle",
+# "Tonstad_THREE_Q40_THREE FINAL.pickle",
+# "Tonstad_THREE_Q60_THREE.pickle",
+# "Tonstad_THREE_Q80_THREE.pickle",
+# "Tonstad_THREE_Q80_THREE_EXTRA.pickle",
+# "Tonstad_THREE_Q80EXTRA2_THREE.pickle",
+# "Tonstad_THREE_Q100_THREE.pickle",
+# "Tonstad_THREE_Q100_THREE_EXTRA.pickle",
+# "Tonstad_THREE_Q100_EXTRA2_THREE.pickle",
+# "Tonstad_THREE_Q100_THREE_EXTRA3.pickle",
+# "TONSTAD_TWO_Q20_TWO.pickle",
+# "TONSTAD_TWO_Q20_TWO2.pickle",
 "TONSTAD_TWO_Q20_TWO3.pickle",
-"TONSTAD_TWO_Q40_TWO.pickle",
-"TONSTAD_TWO_Q60_TWO.pickle",
-"TONSTAD_TWO_Q80_TWO.pickle",
-"TONSTAD_TWO_Q100_TWO.pickle",
-"TONSTAD_TWO_Q120_TWO.pickle",
-"TONSTAD_TWO_Q140_TWO.pickle"]
+# "TONSTAD_TWO_Q40_TWO.pickle",
+# "TONSTAD_TWO_Q60_TWO.pickle",
+# "TONSTAD_TWO_Q80_TWO.pickle",
+# "TONSTAD_TWO_Q100_TWO.pickle",
+# "TONSTAD_TWO_Q120_TWO.pickle",
+#"TONSTAD_TWO_Q140_TWO.pickle"
+]
 
 # logging.basicConfig(filename='simuleringar.log', level=logging.DEBUG, format='%(asctime)s - %(name)s - %(message)s')
 
@@ -91,13 +93,14 @@ for pickle_namn in pickle_filer:
 
     assert pickle_fil.exists() and pickle_fil.with_suffix(".hdf5").exists()
 
+    talstart = datetime.datetime.now()
     t_span = (0,179)
 
     sim_args = dict(fps = 20, t_span=t_span,
     linear = True, lift = True, addedmass = True, wrap_max = 50,
     method = 'BDF', atol = 1e-1, rtol = 1e-1, 
     verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = True)
-    laga_film = True
+    laga_film = False
 
 
     # for tal in talsamling:
@@ -106,7 +109,6 @@ for pickle_namn in pickle_filer:
     partikkelfil = Path(f"./partikkelsimulasjonar/particles_{pickle_fil.stem}_{sim_args['method']}_{tal}_{sim_args['atol']:.0e}_{'linear' if sim_args['linear'] else 'NN'}.pickle")
     if not partikkelfil.exists():
 
-        talstart = datetime.datetime.now()
         app_log.info("Skal henta tre.")
         with open(pickle_fil,'rb') as f:
             tre = pickle.load(f)
@@ -121,7 +123,7 @@ for pickle_namn in pickle_filer:
         app_log.info("Berekningane fanst frå før, hentar dei.")
         with open(partikkelfil, 'rb') as f:
             particle_list = pickle.load(f)
-        with open(pickle_fil.with_name(f"{pickle_namn}_ribs.hdf5")) as f:
+        with h5py.File(pickle_fil.with_name(f"{pickle_fil.stem}_ribs.hdf5"),'r') as f:
             ribs = [Rib(rib) for rib in np.asarray(f['ribs'])]
 
     caught = 0

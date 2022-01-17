@@ -70,7 +70,7 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
             # if len(ready) == 0:
             try:
                 
-                sti_dict = ray.get(elem, timeout=(90))
+                sti_dict = ray.get(elem, timeout=(40))
                         
                 assert all([i in sti_dict.keys() for i in np.linspace(round(sti_dict['init_time']*100), round(sti_dict['final_time']*100), round((sti_dict['final_time']-sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {jobs[elem].index} har ein feil i seg, ikkje alle elementa er der"
                 jobs[elem].sti_dict = sti_dict
