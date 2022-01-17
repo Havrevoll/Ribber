@@ -87,6 +87,7 @@ app_log.debug(f"{pickle_filer}")
 
 for pickle_namn in pickle_filer:
 
+    talstart = datetime.datetime.now()
     # pickle_namn = "TONSTAD_FOUR_Q40_REPEAT.pickle"
     # assert pickle_fil.exists()
     pickle_fil = finn_fil([Path("..").joinpath(Path(pickle_namn)), Path("~/hard/").joinpath(Path(pickle_namn)).expanduser(), Path("/mnt/g/pickle/").joinpath(Path(pickle_namn))])
@@ -146,7 +147,7 @@ for pickle_namn in pickle_filer:
     if laga_film:
         film_fil = partikkelfil.with_suffix(".mp4") #Path(f"./filmar/sti_{pickle_fil.stem}_{sim_args['method']}_{len(particle_list)}_{sim_args['atol']:.0e}.mp4")
         if not film_fil.exists():
-            sti_animasjon(particle_list, ribs,t_span=t_span, hdf5_fil = pickle_fil.with_suffix(".hdf5"),  utfilnamn=film_fil, fps=sim_args['fps'])
+            sti_animasjon(particle_list, ribs,t_span=t_span, hdf5_fil = pickle_fil.with_suffix(".hdf5"),  utfilnamn=film_fil, fps=60)
             app_log.info("Brukte  {} s på å laga film".format(datetime.datetime.now() - start_film))
         else:
             app_log.info("Filmen finst jo frå før, hoppar over dette steget.")
