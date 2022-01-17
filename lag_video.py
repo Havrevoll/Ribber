@@ -226,31 +226,31 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"
 
 
 if __name__ == "__main__":
-    liste = ["TONSTAD_FOUR_Q20_FOUR TRIALONE",
-    "TONSTAD_FOUR_Q20_FOUR CHECK",
-    "TONSTAD_FOUR_Q20_FOUR REPEAT",
-    "TONSTAD_FOUR_Q40_FOUR",
-    "TONSTAD_FOUR_Q40_REPEAT",
-    "TONSTAD_FOUR_Q60_FOUR",
-    "TONSTAD_FOUR_Q60_FOUR REPEAT",
-    "TONSTAD_FOUR_Q80_FOURDTCHANGED",
-    "TONSTAD_FOUR_Q80_FOUR",
-    "TONSTAD_FOUR_Q100_FOUR DT",
-    "TONSTAD_FOUR_Q100_FOUR",
-    "Tonstad_THREE_Q20_THREE",
-    "Tonstad_THREE_Q40_THREE",
-    "Tonstad_THREE_Q40_THREE_EXTRA",
-    "Tonstad_THREE_Q40_THREE FINAL",
-    "Tonstad_THREE_Q60_THREE"
+    liste = [#"TONSTAD_FOUR_Q20_FOUR TRIALONE",
+    # "TONSTAD_FOUR_Q20_FOUR CHECK",
+    # "TONSTAD_FOUR_Q20_FOUR REPEAT",
+    # "TONSTAD_FOUR_Q40_FOUR",
+    # "TONSTAD_FOUR_Q40_REPEAT",
+    # "TONSTAD_FOUR_Q60_FOUR",
+    # "TONSTAD_FOUR_Q60_FOUR REPEAT",
+    # "TONSTAD_FOUR_Q80_FOURDTCHANGED",
+    # "TONSTAD_FOUR_Q80_FOUR",
+    # "TONSTAD_FOUR_Q100_FOUR DT",
+    # "TONSTAD_FOUR_Q100_FOUR",
+    # "Tonstad_THREE_Q20_THREE",
+    # "Tonstad_THREE_Q40_THREE",
+    # "Tonstad_THREE_Q40_THREE_EXTRA",
+    # "Tonstad_THREE_Q40_THREE FINAL",
+    "Tonstad_THREE_Q60_THREE",
     "Tonstad_THREE_Q80_THREE",
     "Tonstad_THREE_Q80_THREE_EXTRA",
     "Tonstad_THREE_Q80EXTRA2_THREE",
-    "Tonstad_THREE_Q100_THREE",
+    # "Tonstad_THREE_Q100_THREE",
     # "Tonstad_THREE_Q100_THREE_EXTRA",
     # "Tonstad_THREE_Q100_EXTRA2_THREE",
     # "Tonstad_THREE_Q100_THREE_EXTRA3",
     # "TONSTAD_TWO_Q20_TWO",
-    # "TONSTAD_TWO_Q20_TWO2",
+    "TONSTAD_TWO_Q20_TWO2",
     # "TONSTAD_TWO_Q20_TWO3",
     # "TONSTAD_TWO_Q40_TWO",
     # "TONSTAD_TWO_Q60_TWO",
@@ -262,20 +262,22 @@ if __name__ == "__main__":
 
     ray.init(num_cpus=4)
     
+    jobs = []
     for l in liste:
         sim = Path(f"./partikkelsimulasjonar/particles_{l}_BDF_1000_1e-01_linear.pickle")
         filmfil = sim.with_suffix(".mp4")
         hdf5fil = Path("../").joinpath(l).with_suffix(".hdf5")
         ribfil = Path(f"../{l}_ribs.hdf5")
 
-        assert sim.exists() and hdf5fil.exists() and ribfil.exists()
+        assert sim.exists() , f"{sim}"
+        assert hdf5fil.exists(), f"{hdf5fil}" 
+        assert ribfil.exists(), f"{ribfil}"
 
         with h5py.File(ribfil,'r') as f:
                 ribs = [Rib(rib) for rib in np.asarray(f['ribs'])]
     
-        jobs = []
 
-        for span in [(0.05,0.06),(0.06,0.07),(0.08,0.1),(0.1,0.2),(0.2,0.3), (0.3,0.5),(0.5,1),(1,20)]:
+        for span in [(0.05,0.06),(0.06,0.08),(0.08,0.1),(0.1,0.2),(0.2,0.3), (0.3,0.5),(0.5,1),(1,20)]:
             utfil = filmfil.parent.joinpath(f"{l}").joinpath(f"{span[0]}_{span[1]}.mp4")
             if not utfil.parent.exists():
                 utfil.parent.mkdir(parents=True)
@@ -286,9 +288,9 @@ if __name__ == "__main__":
             
                 # if utfil.exists():
                 #     subprocess.run(f'''rsync "{utfil.resolve()}" havrevol@login.ansatt.ntnu.no:"{Path("/web/folk/havrevol/partiklar/").joinpath(utfil.parent.name.replace(" ", "_"))}_sorterte/"''', shell=True)
-        unready = jobs
-        while len(unready) > 0:
-            ready,unready = ray.wait(unready)
-            ray.get(ready)
-            print("henta ein ready, desse er unready:")
-            print(unready)
+    unready = jobs
+    while len(unready) > 0:
+        ready,unready = ray.wait(unready)
+        ray.get(ready)
+        print("henta ein ready, desse er unready:")
+        print(unready)
