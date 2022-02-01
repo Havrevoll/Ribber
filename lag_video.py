@@ -241,7 +241,7 @@ if __name__ == "__main__":
     # "Tonstad_THREE_Q40_THREE",
     # "Tonstad_THREE_Q40_THREE_EXTRA",
     # "Tonstad_THREE_Q40_THREE FINAL",
-    "Tonstad_THREE_Q60_THREE",
+    # "Tonstad_THREE_Q60_THREE",
     "Tonstad_THREE_Q80_THREE",
     "Tonstad_THREE_Q80_THREE_EXTRA",
     "Tonstad_THREE_Q80EXTRA2_THREE",
@@ -260,7 +260,7 @@ if __name__ == "__main__":
     # "TONSTAD_TWO_Q140_TWO"
     ]
 
-    ray.init(num_cpus=4)
+    ray.init(num_cpus=8)
     
     jobs = []
     for l in liste:
