@@ -259,6 +259,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
         t = step_old[0]
 
     sti_dict['final_time'] = final_time
+    sti_dict['flow_length'] =  ribs[1].get_rib_middle()[0] - left_edge
     
     status_msg = f"Nr. {particle.index} brukte {datetime.datetime.now()-starttid} og kalla funksjonen {nfev} gonger."
     print(f"\x1b[{status_col}m {status_msg} \x1b[0m")    
