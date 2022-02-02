@@ -69,6 +69,8 @@ def f(t, x, particle, tri, ribs):
     gravity_component = (rho_self_density - 1) * g
 
     added_mass_component = 0.5 * rho_self_density * dudt_material 
+
+    pressure_component = rho_self_density * dudt_material
     
     if dudt_material[0] == 0.0 and dudt_material[1] == 0.0:
         addedmass = False
@@ -80,7 +82,7 @@ def f(t, x, particle, tri, ribs):
     # mass på høgre sida, så den må bli flytta over til venstre og delt på resten.
     
     # print("drag_component =",drag_component,", gravity_component = ",gravity_component)        
-    dudt = (drag_component + gravity_component + added_mass_component + lift_component ) / divisor
+    dudt = (drag_component + gravity_component + added_mass_component + pressure_component + lift_component ) / divisor
 
     try:
         if (collision['is_resting_contact'] and particle.resting):# and np.dot(collision['rib_normal'],dudt) <= 0: #Kan ikkje sjekka om partikkelen skal ut frå flata midt i berekninga. Må ha ein event til alt slikt.
