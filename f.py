@@ -37,9 +37,9 @@ def f(t, x, particle, tri, ribs):
     addedmass = particle.addedmass
     collision = particle.collision 
     try:
-        mu = collision['rib'].mu # friksjonskoeffisenten
+        µ = collision['rib'].µ # friksjonskoeffisenten
     except KeyError:
-        mu = 0.5
+        µ = 0.5
     
     dxdt = x[2:]
 
@@ -94,14 +94,14 @@ def f(t, x, particle, tri, ribs):
             dxdt_t = dxdt - dxdt_n
             
             if hypot(dxdt_t[0],dxdt_t[1]) == 0: # < vel_limit -- Tilfellet kvilefriksjon:
-                dudt_friction = -norm(dudt_t) * hypot(dudt_n[0],dudt_n[1])*mu
+                dudt_friction = -norm(dudt_t) * hypot(dudt_n[0],dudt_n[1]) * µ
                 if (hypot(dudt_t[0],dudt_t[1]) > hypot(dudt_friction[0],dudt_friction[1])):
                     dudt = dudt_t + dudt_friction # Må ordna: Viss normalkomponenten peikar oppover, ikkje null ut den då.
                 else:
                     dudt = np.zeros(2)
                     # dxdt = np.zeros(2)
             else: # Tilfellet glidefriksjon:
-                dudt_friction = -norm(dxdt_t)*hypot(dudt_n[0],dudt_n[1])*mu
+                dudt_friction = -norm(dxdt_t)*hypot(dudt_n[0],dudt_n[1]) * µ
                 dudt = dudt_t + dudt_friction
 
     except KeyError:

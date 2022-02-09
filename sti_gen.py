@@ -16,7 +16,7 @@ from rib import Rib
 from particle import Particle
 from pathlib import Path
 from check_collision import check_all_collisions
-from constants import collision_eps
+from constants import ε
 
 import ray
 from ray.exceptions import GetTimeoutError
@@ -42,7 +42,7 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
     random.seed(rnd_seed)
 
     start = datetime.datetime.now()
-    ribs = [Rib(rib, mu = 0.5 if rib_index < 2 else 1) for rib_index, rib in enumerate(tre.ribs)]
+    ribs = [Rib(rib, µ = 0.5 if rib_index < 2 else 1) for rib_index, rib in enumerate(tre.ribs)]
 
     with h5py.File(hdf5_fil, 'r') as f:
         max_y = np.max(np.asarray(f['y']))
@@ -234,7 +234,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
  
             
             step_old[3:] = v_new
-            step_old[1:3] = step_old[1:3] + collision_info['rib_normal'] * collision_eps * 0.5
+            step_old[1:3] = step_old[1:3] + collision_info['rib_normal'] * ε * 0.5
             
         elif (event == "edge"):
             if (particle.wrap_counter <= wrap_max):
@@ -303,13 +303,13 @@ def event_check(t, x, particle, tre, ribs):
     # if collision['is_collision'] and collision['inside']:
     #     return collision['collision_depth']
     if collision['is_collision'] or (collision['is_resting_contact'] and particle.resting == False):
-        return collision['collision_depth'] - collision_eps #0.0
+        return collision['collision_depth'] - ε #0.0
     elif collision['is_leaving']: # Forlet resting contact og kjem i fri flyt igjen.
         return 0.0
 
     if collision['is_resting_contact']:
         return -1.0
-    return collision['collision_depth'] - collision_eps #skulle kanskje vore berre sett til -1.0?
+    return collision['collision_depth'] - ε #skulle kanskje vore berre sett til -1.0?
 
 event_check.counter = 0
 event_check.terminal = True
