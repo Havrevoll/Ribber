@@ -37,18 +37,22 @@ app_log = logging.getLogger(__name__)
 from constants import collision_restitution
 
 @logger.catch
-def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  lift = True, addedmass = True, wrap_max = 50, atol = 1e-1, rtol = 1e-1, 
-    method = 'RK23', laga_film = False, verbose=True, collision_correction=True, hdf5_fil=Path("./"), multi = True):
+def simulering(tal, rnd_seed, fps = 20, t_span = (0,179), linear = True,  lift = True, addedmass = True, wrap_max = 50, atol = 1e-1, rtol = 1e-1, 
+    method = 'RK23', laga_film = False, verbose=True, collision_correction=True, multi = True):
     random.seed(rnd_seed)
 
     start = datetime.datetime.now()
-    ribs = [Rib(rib, µ = 0.5 if rib_index < 2 else 1) for rib_index, rib in enumerate(tre.ribs)]
+    # ribs = [Rib(rib, µ = 0.5 if rib_index < 2 else 1) for rib_index, rib in enumerate(tre.ribs)]
+    ribs = []
+    ribs.append(Rib([[-1.,0.],[-1.,-1.],[1.,-1.],[1.,0.]]))
+    ribs.append(Rib([[5000.,0.],[5000.,-1.],[6000.,-1.],[6000.,0.]]))
+    ribs.append(Rib([[-1.,0.],[6000.,0.],[6000.,-1],[-1.,-1.]]))
+    
 
-    with h5py.File(hdf5_fil, 'r') as f:
-        max_y = np.max(np.asarray(f['y']))
+    max_y = 2000
 
     diameters = get_PSD_part(tal, rnd_seed=rnd_seed).tolist()
-    particle_list = [Particle(float(d), [ribs[0].get_rib_middle()[0],random.uniform(ribs[0].get_rib_middle()[1]+8,max_y), 0, 0], random.uniform(0,50)) for d in diameters]
+    particle_list = [Particle(float(d), [ribs[0].get_rib_middle()[0],random.uniform(ribs[0].get_rib_middle()[1]+8,max_y), 0, 0], random.uniform(0,100)) for d in diameters]
 
     for i, p in enumerate(particle_list):
         p.atol , p.rtol = atol, rtol
@@ -61,8 +65,7 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
     
     if multi:
         ray.init()#dashboard_port=8266,num_cpus=4) 
-        tre_plasma = ray.put(tre)
-        jobs = {remote_lag_sti.remote(ribs, t_span, particle=pa, tre=tre_plasma, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction):pa for pa in particle_list}
+        jobs = {remote_lag_sti.remote(ribs, t_span, particle=pa, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction):pa for pa in particle_list}
 
         not_ready = list(jobs.keys())
         cancelled = []
@@ -84,7 +87,7 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
                 
         if len(cancelled) > 0:
             app_log.debug("Skal ta dei som ikkje klarte BDF")
-            jobs2 = {remote_lag_sti.remote(ribs, t_span, particle=pa, tre=tre_plasma, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction):pa for pa in cancelled}
+            jobs2 = {remote_lag_sti.remote(ribs, t_span, particle=pa, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction):pa for pa in cancelled}
             not_ready = list(jobs2.keys())
             while True:
                 ready, not_ready = ray.wait(not_ready)
@@ -100,18 +103,18 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
         ray.shutdown()
     else:
         for pa in particle_list:
-            if pa.index == 446:
-                pa.sti_dict = lag_sti(ribs, t_span, particle=pa, tre=tre, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction)
+            # if pa.index == 446:
+                pa.sti_dict = lag_sti(ribs, t_span, particle=pa, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction)
                 assert all([i in pa.sti_dict.keys() for i in np.linspace(round(pa.sti_dict['init_time']*100), round(pa.sti_dict['final_time']*100), round((pa.sti_dict['final_time']-pa.sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {pa.index} har ein feil i seg, ikkje alle elementa er der"
 
     return particle_list
 
 
 @ray.remote
-def remote_lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, collision_correction=True):
-    return lag_sti(ribs, t_span, particle, tre, fps=fps, wrap_max = wrap_max, verbose=verbose, collision_correction=collision_correction)
+def remote_lag_sti(ribs, t_span, particle,  fps=20, wrap_max = 0, verbose=True, collision_correction=True):
+    return lag_sti(ribs, t_span, particle, fps=fps, wrap_max = wrap_max, verbose=verbose, collision_correction=collision_correction)
 
-def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, collision_correction=True):
+def lag_sti(ribs, t_span, particle, fps=20, wrap_max = 0, verbose=True, collision_correction=True):
     # stien må innehalda posisjon, fart og tid.
 
     fps_inv = 1/fps
@@ -122,7 +125,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
     # print(type(tre))
     # tre = ray.get(tre)
     
-    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs), events = (event_check,wrap_check,still_check)        )
+    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, ribs), events = (event_check,wrap_check,still_check)        )
  
     step_old = np.concatenate(([particle.init_time], particle.init_position))
     # Step_old og step_new er ein array med [t, x, y, u, v]. 
@@ -237,7 +240,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
             step_old[1:3] = step_old[1:3] + collision_info['rib_normal'] * ε * 0.5
             
         elif (event == "edge"):
-            if (particle.wrap_counter <= wrap_max):
+            if (particle.wrap_counter < wrap_max):
                 step_old = np.copy(step_new)
                 step_old[1] = left_edge
                 edgecollision = check_all_collisions(particle, step_old[1:], ribs)
@@ -292,7 +295,7 @@ def eval_steps(t_span, fps):
         t_min = ceil(t_span[0]*fps)/fps
     return np.linspace( t_min, t_span[1], num = round((t_span[1]-t_min)*fps), endpoint = False )
 
-def event_check(t, x, particle, tre, ribs):
+def event_check(t, x, particle, ribs):
     event_check.counter += 1
     
 
@@ -314,7 +317,7 @@ def event_check(t, x, particle, tre, ribs):
 event_check.counter = 0
 event_check.terminal = True
 
-def wrap_check(t, x, particle, tre, ribs):
+def wrap_check(t, x, particle, ribs):
     right_edge = ribs[1].get_rib_middle()[0]
         #.strftime('%X.%f')
     if (x[0] > right_edge):
@@ -322,7 +325,7 @@ def wrap_check(t, x, particle, tre, ribs):
     return 1.0
 wrap_check.terminal = True
 
-def still_check(t,x, particle, tre,ribs):
+def still_check(t,x, particle, ribs):
     if hypot(x[2],x[3]) < particle.resting_tolerance and hypot(x[2],x[3]) > 0 and particle.resting and not particle.still:
         return 0.0
     # Kvifor har eg denne her? Det er for å dempa farten om den er så bitteliten at han må leggjast til ro. Men det må jo skje berre dersom det er kontakt i tillegg. Så då må eg vel sjekka kollisjon uansett? 
@@ -331,3 +334,5 @@ def still_check(t,x, particle, tre,ribs):
         particle.still = False
     return 1.0
 still_check.terminal = True
+
+
