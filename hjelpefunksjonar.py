@@ -26,12 +26,16 @@ def dobla(a, tal=1):
 def norm(v):
     return np.divide(v , (v**2).sum()**0.5, out=np.zeros_like(v), where=v!=0)
 
-def draw_rect(axes, ribs, color='red'):
+def draw_rect(axes, ribs, color='red', fill = True):
     
         # axes.add_patch(Rectangle((-61.07,-8.816),50.2,7.8,linewidth=2,edgecolor='none',facecolor=color))
         # axes.add_patch(Rectangle((37.6,-8.5),50,7.8,linewidth=2,edgecolor=color,facecolor='none'))
     for rib in ribs:
-        axes.add_patch(Polygon(rib.vertices, facecolor=color))
+        if fill:
+            axes.add_patch(Polygon(rib.vertices, facecolor=color))
+        else:
+            axes.add_patch(Polygon(rib.vertices, facecolor='none', edgecolor = color, linewidth = 1))
+
 
 def ranges(kutt=False):
     # Dette var dei eg brukte for å laga kvadrantanalysen.
