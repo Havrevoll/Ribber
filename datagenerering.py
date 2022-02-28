@@ -84,7 +84,7 @@ def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
         lagra_tre(tre_obj, filnamn_ut)
 
 @ray.remote
-def lag_tre(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, nearest=False, kutt=True, inkluder_ribs = False, kutt_kor = [-35.81,64.19 , -25, 5]):
+def lag_tre(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, nearest=False, kutt=True, inkluder_ribs = False):
     """Lagar eit delaunay- eller kd-tre ut frå t_span og ei hdf5-fil.
 
     Args:
@@ -99,6 +99,56 @@ def lag_tre(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, nearest=False, kutt=True, 
          tuple: Delaunay eller kd-tre, U pluss ev. ribber
     """
 
+    U, txy = generate_U_txy(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, kutt)
+    
+    if (nearest):
+        tree = cKDTree(txy)
+    else:
+        # print(f"Byrjar på delaunay for ({t_min}, {t_max})")
+        # start = datetime.datetime.now()
+        tree = qhull.Delaunay(txy)
+        # print(f"Ferdig med delaunay for ({t_min}, {t_max}, brukte {datetime.datetime.now()-start}")
+        # del start
+    
+    if (inkluder_ribs):
+        
+        v_r, golv_nr, h_r, _, _, _, _, _, _, _, _, _ = get_essential_coordinates(experiment)
+
+        venstre_ribbe = np.zeros((4,2))
+        
+        venstre_ribbe[0] = ribs[v_r+1]
+        venstre_ribbe[1] = ribs[v_r+2]
+        venstre_ribbe[3] = [ribs[v_r+1,0]-50, ribs[v_r+1,1] + (-50) * (ribs[v_r,1] - ribs[v_r+1,1])/(ribs[v_r,0] - ribs[v_r+1,0])]
+        venstre_ribbe[2] = venstre_ribbe[1] + venstre_ribbe[3] - venstre_ribbe[0]
+
+        hogre_ribbe = np.zeros((4,2))
+        hogre_ribbe[0] = ribs[h_r-1]
+        hogre_ribbe[1] = ribs[h_r]
+        hogre_ribbe[2] = [ribs[h_r,0]+50, ribs[h_r,1] + 50 * (ribs[h_r+1,1] - ribs[h_r,1])/(ribs[h_r + 1,0] - ribs[h_r,0])]
+        hogre_ribbe[3] = hogre_ribbe[0] + hogre_ribbe[2] - hogre_ribbe[1]
+
+        golv = np.zeros((4,2))
+        golv[0] = ribs[golv_nr]
+        golv[1] = ribs[golv_nr+1]
+        golv[2] = ribs[golv_nr+1] + np.array([0,-20])
+        golv[3] = ribs[golv_nr] + np.array([0,-20])
+        
+        
+
+        return tree, U, [venstre_ribbe, hogre_ribbe, golv]
+    else:
+        return tree, U
+
+
+# def get_velocity_data(t_span=(0,1), with_gradient = False, one_dimensional = True):
+#     t_min = t_span[0]
+#     t_max = t_span[1]
+#     steps = t_max * fps
+    
+#     piv_range = ranges()
+    
+# def get_txy(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest = False):
+def generate_U_txy(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, kutt=True):
     t_min = t_span[0]
     t_max = t_span[1]
     fps = 20
@@ -114,68 +164,8 @@ def lag_tre(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, nearest=False, kutt=True, 
 
     Umx_reshape = np.copy(Umx.reshape(len(Umx), J, I))
     Vmx_reshape = np.copy(Vmx.reshape(len(Vmx), J, I))
-    # Umx_reshape = np.zeros((len(Umx), J+1,I))
-    # Vmx_reshape = np.zeros((len(Vmx), J+1,I))
-    # x = np.vstack((x,x[0,:]))
-    # y = np.vstack((y,np.full((1,I), -98.81)))
-    
-    # Umx_reshape[:,:J,:] = Umx.reshape((len(Umx),J,I))[:,piv_range[0],piv_range[1]]
-    # Vmx_reshape[:,:J,:] = Vmx.reshape((len(Vmx),J,I))[:,piv_range[0],piv_range[1]]
-    
-    # axis0 = np.take_along_axis(ribs[:,:,0], np.argpartition(ribs[:,:,1],-2),1)[:,-2:].T
-    # axis1= np.take_along_axis(ribs[:,:,1], np.argpartition(ribs[:,:,1],-2),1)[:,-2:].T
-    # for rib in np.stack((axis0,axis1),axis=0).swapaxes(0,2):
-        
 
-
-    if (experiment == "TWO"):
-        v_r = 1
-        golv_nr = 8
-        h_r = 16
-
-        v_r_rad = 64
-        v_r_kol = 56
-        v_r_tjukk = 3
-
-        golv_rad1 = 113
-        golv_rad2 = 114
-        golv_skifte = 55
-
-        h_r_rad = 63
-        h_r_kol = 88
-        h_r_tjukk = 6
-        
-    else:
-        v_r = 1
-        golv_nr = 6
-        h_r = 11
-
-        if (experiment == "THREE"):
-            v_r_rad = 70
-            v_r_kol = 29
-            v_r_tjukk = 6
-
-            golv_rad1 = 122
-            golv_rad2 = 122
-            golv_skifte = 50
-
-            h_r_rad = 69
-            h_r_kol = 80
-            h_r_tjukk = 6
-        else:
-            v_r_rad = 65
-            v_r_kol = 61
-            v_r_tjukk = 6
-
-            golv_rad1 = 123
-            golv_rad2 = 122
-            golv_skifte = 46
-
-            h_r_rad = 65
-            h_r_kol = 80
-            h_r_tjukk = 6
-
-
+    v_r, golv_nr, h_r, v_r_rad, v_r_kol, v_r_tjukk, golv_rad1, golv_rad2, golv_skifte, h_r_rad, h_r_kol, h_r_tjukk = get_essential_coordinates(experiment)
 
     # Venstre ribbe
     x0 = ribs[v_r,0]  #-60.79
@@ -241,53 +231,58 @@ def lag_tre(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, nearest=False, kutt=True, 
     y_lang = y_3d.ravel()[nonan]
         
     txy = np.vstack((t_lang,x_lang,y_lang)).T
-    
-    if (nearest):
-        tree = cKDTree(txy)
+
+    return U, txy
+
+def get_essential_coordinates(experiment):
+    if (experiment == "TWO"):
+        v_r = 1
+        golv_nr = 8
+        h_r = 16
+
+        v_r_rad = 64
+        v_r_kol = 56
+        v_r_tjukk = 3
+
+        golv_rad1 = 113
+        golv_rad2 = 114
+        golv_skifte = 55
+
+        h_r_rad = 63
+        h_r_kol = 88
+        h_r_tjukk = 6
+        
     else:
-        # print(f"Byrjar på delaunay for ({t_min}, {t_max})")
-        # start = datetime.datetime.now()
-        tree = qhull.Delaunay(txy)
-        # print(f"Ferdig med delaunay for ({t_min}, {t_max}, brukte {datetime.datetime.now()-start}")
-        # del start
-    
-    if (inkluder_ribs):
-        #venstre ribbe,
-        venstre_ribbe = np.zeros((4,2))
-        
-        venstre_ribbe[0] = ribs[v_r+1]
-        venstre_ribbe[1] = ribs[v_r+2]
-        venstre_ribbe[3] = [ribs[v_r+1,0]-50, ribs[v_r+1,1] + (-50) * (ribs[v_r,1] - ribs[v_r+1,1])/(ribs[v_r,0] - ribs[v_r+1,0])]
-        venstre_ribbe[2] = venstre_ribbe[1] + venstre_ribbe[3] - venstre_ribbe[0]
+        v_r = 1
+        golv_nr = 6
+        h_r = 11
 
-        hogre_ribbe = np.zeros((4,2))
-        hogre_ribbe[0] = ribs[h_r-1]
-        hogre_ribbe[1] = ribs[h_r]
-        hogre_ribbe[2] = [ribs[h_r,0]+50, ribs[h_r,1] + 50 * (ribs[h_r+1,1] - ribs[h_r,1])/(ribs[h_r + 1,0] - ribs[h_r,0])]
-        hogre_ribbe[3] = hogre_ribbe[0] + hogre_ribbe[2] - hogre_ribbe[1]
+        if (experiment == "THREE"):
+            v_r_rad = 70
+            v_r_kol = 29
+            v_r_tjukk = 6
 
-        golv = np.zeros((4,2))
-        golv[0] = ribs[golv_nr]
-        golv[1] = ribs[golv_nr+1]
-        golv[2] = ribs[golv_nr+1] + np.array([0,-20])
-        golv[3] = ribs[golv_nr] + np.array([0,-20])
-        
-        
+            golv_rad1 = 122
+            golv_rad2 = 122
+            golv_skifte = 50
 
-        return tree, U, [venstre_ribbe, hogre_ribbe, golv]
-    else:
-        return tree, U
+            h_r_rad = 69
+            h_r_kol = 80
+            h_r_tjukk = 6
+        else:
+            v_r_rad = 65
+            v_r_kol = 61
+            v_r_tjukk = 6
 
+            golv_rad1 = 123
+            golv_rad2 = 122
+            golv_skifte = 46
 
-# def get_velocity_data(t_span=(0,1), with_gradient = False, one_dimensional = True):
-#     t_min = t_span[0]
-#     t_max = t_span[1]
-#     steps = t_max * fps
-    
-#     piv_range = ranges()
-    
-# def get_txy(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest = False):
+            h_r_rad = 65
+            h_r_kol = 80
+            h_r_tjukk = 6
 
+    return v_r, golv_nr, h_r, v_r_rad, v_r_kol, v_r_tjukk, golv_rad1, golv_rad2, golv_skifte, h_r_rad, h_r_kol, h_r_tjukk
 
 def lagra_tre(tre, fil):
     with open(fil, 'wb') as f:

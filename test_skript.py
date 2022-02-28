@@ -20,7 +20,7 @@ tal = 1000
 rnd_seed=1
 tider = {}
 
-pickle_filer = ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
+pickle_filer = [#"TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
 # "TONSTAD_FOUR_Q20_FOUR CHECK.pickle",
 # "TONSTAD_FOUR_Q20_FOUR REPEAT.pickle",
 # "TONSTAD_FOUR_Q40_FOUR.pickle",
@@ -45,8 +45,8 @@ pickle_filer = ["TONSTAD_FOUR_Q20_FOUR TRIALONE.pickle",
 # "Tonstad_THREE_Q100_THREE_EXTRA3.pickle",
 # "TONSTAD_TWO_Q20_TWO.pickle",
 # "TONSTAD_TWO_Q20_TWO2.pickle",
-"TONSTAD_TWO_Q20_TWO3.pickle",
-# "TONSTAD_TWO_Q40_TWO.pickle",
+# "TONSTAD_TWO_Q20_TWO3.pickle",
+"TONSTAD_TWO_Q40_TWO.pickle",
 # "TONSTAD_TWO_Q60_TWO.pickle",
 # "TONSTAD_TWO_Q80_TWO.pickle",
 # "TONSTAD_TWO_Q100_TWO.pickle",
@@ -100,14 +100,14 @@ for pickle_namn in pickle_filer:
     sim_args = dict(fps = 20, t_span=t_span,
     linear = True, lift = True, addedmass = True, wrap_max = 50,
     method = 'BDF', atol = 1e-1, rtol = 1e-1, 
-    verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = True)
+    verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = False)
     laga_film = False
 
 
     # for tal in talsamling:
     app_log.info(f"Byrja med {pickle_fil.stem}")
 
-    partikkelfil = Path(f"./partikkelsimulasjonar/particles_{pickle_fil.stem}_{sim_args['method']}_{tal}_{sim_args['atol']:.0e}_{'linear' if sim_args['linear'] else 'NN'}.pickle")
+    partikkelfil = Path(f"./partikkelsimulasjonar/particles_{pickle_fil.stem}_{sim_args['method']}_{tal}_{sim_args['atol']:.0e}_{'linear' if sim_args['linear'] else 'NN'}_slettast.pickle")
     if not partikkelfil.exists():
 
         app_log.info("Skal henta tre.")
@@ -127,21 +127,21 @@ for pickle_namn in pickle_filer:
         with h5py.File(pickle_fil.with_name(f"{pickle_fil.stem}_ribs.hdf5"),'r') as f:
             ribs = [Rib(rib) for rib in np.asarray(f['ribs'])]
 
-    caught = 0
-    caught_mass = 0
-    uncaught=0
-    uncaught_mass = 0
-    for pa in particle_list:
-        if pa.sti_dict[round(pa.sti_dict['final_time']*100)]['caught']:
-            caught += 1
-            caught_mass += pa.mass
-        else:
-            uncaught += 1
-            uncaught_mass += pa.mass
+    # caught = 0
+    # caught_mass = 0
+    # uncaught=0
+    # uncaught_mass = 0
+    # for pa in particle_list:
+    #     if pa.sti_dict[round(pa.sti_dict['final_time']*100)]['caught']:
+    #         caught += 1
+    #         caught_mass += pa.mass
+    #     else:
+    #         uncaught += 1
+    #         uncaught_mass += pa.mass
 
     app_log.info("Brukte  {} s på å simulera.".format(datetime.datetime.now() - talstart))
-    app_log.info(f"Av {len(particle_list)} partiklar vart {caught} fanga, altså {100* caught/len(particle_list):.2f}%, og det er {1e6*caught_mass:.2f} mg")
-    app_log.info(f"Av {len(particle_list)} partiklar vart {uncaught} ikkje fanga, altså {100* uncaught/len(particle_list):.2f}%, og det er {1e6*uncaught_mass:.2f} mg")
+    # app_log.info(f"Av {len(particle_list)} partiklar vart {caught} fanga, altså {100* caught/len(particle_list):.2f}%, og det er {1e6*caught_mass:.2f} mg")
+    # app_log.info(f"Av {len(particle_list)} partiklar vart {uncaught} ikkje fanga, altså {100* uncaught/len(particle_list):.2f}%, og det er {1e6*uncaught_mass:.2f} mg")
 
     start_film = datetime.datetime.now()
     if laga_film:

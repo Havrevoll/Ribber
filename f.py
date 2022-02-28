@@ -50,17 +50,18 @@ def f(t, x, particle, tri, ribs):
     
     Re = hypot(vel[0],vel[1]) * particle.diameter / nu 
     
-    if (Re<1000):
-        try:
+    # if (Re<1000):
+    try:
             # with np.errstate(divide='raise'):
-                cd = 24 / Re * (1+0.15*Re**0.687)
+                # cd = 24 / Re * (1+0.15*Re**0.687)
+            cd = ( (32 / Re)**(1/1.5) + 1)**1.5
             # Cheng (1997) skildrar Cd for kantete og runde steinar. Dette 
             # er kanskje den viktigaste grunnen til at eg bør gjera dette?
             # Ferguson og Church (2004) gjev nokre liknande bidrag, men viser til Cheng.
-        except ZeroDivisionError:
+    except ZeroDivisionError:
             cd = 2e4
-    else:
-        cd = 0.44
+    # else:
+    #     cd = 0.44
     
     # print("Re = ", Re," cd= ", cd)
     rho_self_density = rho / particle.density
@@ -81,8 +82,9 @@ def f(t, x, particle, tri, ribs):
     # divisoren trengst for akselerasjonen av partikkel kjem fram i added 
     # mass på høgre sida, så den må bli flytta over til venstre og delt på resten.
     
-    # print("drag_component =",drag_component,", gravity_component = ",gravity_component)        
     dudt = (drag_component + gravity_component + added_mass_component + pressure_component + lift_component ) / divisor
+
+    print(f"{t};{x};{drag_component};{gravity_component};{added_mass_component - 0.5 * rho_self_density * dudt};{lift_component};{pressure_component};{dudt}",)
 
     try:
         if (collision['is_resting_contact'] and particle.resting):# and np.dot(collision['rib_normal'],dudt) <= 0: #Kan ikkje sjekka om partikkelen skal ut frå flata midt i berekninga. Må ha ein event til alt slikt.
@@ -138,12 +140,13 @@ def get_u(t, x_inn, particle, tre_samla, collision):
     tx = np.concatenate(([t], x_inn[:2]))
     U_p = x_inn[2:]
         
-    dt, dx, dy = 0.01, 0.1, 0.1
+    # dt, dx, dy = 0.01, 0.1, 0.1
+    Δ = 0.01
     
     U_del = tre_samla.get_U(tx)
     tri = tre_samla.get_tri(tx)
     
-    x = np.vstack((tx,tx + np.array([dt,0,0]), tx + np.array([0,dx,0]), tx +np.array([0,0,dy])))
+    x = np.vstack((tx,tx + np.array([Δ,0,0]), tx + np.array([0,Δ,0]), tx +np.array([0,0,Δ])))
         
     kdtre = tre_samla.kdtre
     U_kd = tre_samla.U_kd
@@ -200,9 +203,9 @@ def get_u(t, x_inn, particle, tre_samla, collision):
         pass
                 
     if (addedmass):
-        dUdt = (U_f[:,1] - U_f[:,0]) / dt # Fyrste verdien er dU/dt og andre er dV/dt
-        dUdx = (U_f[:,2] - U_f[:,0]) / dx # Fyrste verdien er dU/dx og andre er dV/dy
-        dUdy = (U_f[:,3] - U_f[:,0]) / dt # Fyrste verdien er dU/dy og andre er dV/dy
+        dUdt = (U_f[:,1] - U_f[:,0]) / Δ # Fyrste verdien er dU/dt og andre er dV/dt
+        dUdx = (U_f[:,2] - U_f[:,0]) / Δ # Fyrste verdien er dU/dx og andre er dV/dy
+        dUdy = (U_f[:,3] - U_f[:,0]) / Δ # Fyrste verdien er dU/dy og andre er dV/dy
 
         # skal finna gradienten i t, u og v-retning for å bruka på added mass.
         # DU/Dt = dU/dt + u * dU/dx + v*dU/dy
