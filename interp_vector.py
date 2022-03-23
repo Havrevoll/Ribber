@@ -9,8 +9,8 @@ import matplotlib as mpl
 from matplotlib.patches import Rectangle
 
 import numpy as np
-from scipy import interpolate
-from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#r179348322575-1
+# from scipy import interpolate
+# from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#r179348322575-1
 from scipy.optimize import fsolve
 import h5py
 import re
