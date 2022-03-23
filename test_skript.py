@@ -15,6 +15,7 @@ from pathlib import Path
 import logging
 import numpy as np
 import h5py
+from constants import multi
 
 tal = 1000
 rnd_seed=1
@@ -100,7 +101,7 @@ for pickle_namn in pickle_filer:
     sim_args = dict(fps = 20, t_span=t_span,
     linear = True, lift = True, addedmass = True, wrap_max = 50,
     method = 'BDF', atol = 1e-1, rtol = 1e-1, 
-    verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = False)
+    verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = multi)
     laga_film = False
 
 

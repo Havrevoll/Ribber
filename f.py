@@ -1,6 +1,8 @@
+# import imp
 import numpy as np
 from math import hypot
 from hjelpefunksjonar import norm
+from constants import g, ρ_p, ρ, ν
 
 nullfart = np.zeros(2)
 
@@ -30,9 +32,9 @@ def f(t, x, particle, tri, ribs):
 
     """
     
-    g = np.array([0, 9.81e3]) # mm/s^2 = 9.81 m/s^2
-    nu = 1 # 1 mm^2/s = 1e-6 m^2/s
-    rho = 1e-6  # kg/mm^3 = 1000 kg/m^3 
+    g = np.array([0, g]) # mm/s^2 = 9.81 m/s^2
+    nu = ν # 1 mm^2/s = 1e-6 m^2/s
+    rho = ρ # kg/mm^3 = 1000 kg/m^3 
  
     addedmass = particle.addedmass
     collision = particle.collision 

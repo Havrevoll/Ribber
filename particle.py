@@ -1,8 +1,9 @@
 from math import pi
+from constants import ρ_p
 
 class Particle:
     #Lag ein tabell med tidspunkt og posisjon for kvar einskild partikkel.
-    def __init__(self, diameter, init_position, init_time=0, density=2.65e-6 ):
+    def __init__(self, diameter, init_position, init_time=0, density=ρ_p ):
         self.diameter= diameter # mm
         self.init_position = init_position # mm
         self.init_time = init_time # s

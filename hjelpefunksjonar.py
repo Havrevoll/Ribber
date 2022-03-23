@@ -34,7 +34,7 @@ def draw_rect(axes, ribs, color='red', fill = True):
         if fill:
             axes.add_patch(Polygon(rib.vertices, facecolor=color))
         else:
-            axes.add_patch(Polygon(rib.vertices, facecolor='none', edgecolor = color, linewidth = 1))
+            axes.add_patch(Polygon(rib.vertices, facecolor='none', edgecolor = color, linewidth = .7))
 
 
 def ranges(kutt=False):
