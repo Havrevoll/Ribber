@@ -91,7 +91,7 @@ for pickle_namn in pickle_filer:
     talstart = datetime.datetime.now()
     # pickle_namn = "TONSTAD_FOUR_Q40_REPEAT.pickle"
     # assert pickle_fil.exists()
-    pickle_fil = finn_fil([Path("..").joinpath(Path(pickle_namn)), Path("~/hard/").joinpath(Path(pickle_namn)).expanduser(), Path("/mnt/g/pickle/").joinpath(Path(pickle_namn))])
+    pickle_fil = finn_fil([Path("data").joinpath(Path(pickle_namn)), Path("~/hard/").joinpath(Path(pickle_namn)).expanduser(), Path("/mnt/g/pickle/").joinpath(Path(pickle_namn))])
 
     assert pickle_fil.exists() and pickle_fil.with_suffix(".hdf5").exists()
 

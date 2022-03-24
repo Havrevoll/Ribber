@@ -13,6 +13,7 @@ import datetime
 import scipy.spatial.qhull as qhull
 from scipy.spatial import cKDTree
 import re
+from pathlib import Path
 
 # import multiprocessing
 
@@ -25,7 +26,7 @@ import ray
 
 # print("pickle fil er ", pickle_fil) 
 
-def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
+def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None, nodims = False):
     
     # a_pool = multiprocessing.Pool()
     
@@ -40,12 +41,19 @@ def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
     ray.init(num_cpus=4)
 
     with h5py.File(filnamn_inn, 'r') as f:
-        Umx = np.array(f['Umx'])#[int(t_min*fps):int(t_max*fps),:]
-        Vmx = np.array(f['Vmx'])#[int(t_min*fps):int(t_max*fps),:]
-        (I,J) = (int(np.array(f['I'])),int(np.array(f['J'])))
-        x = np.array(f['x']).reshape(J,I)
-        y = np.array(f['y']).reshape(J,I)
-        ribs = np.array(f['ribs'])
+        if nodims:
+            U = f.attrs['U']
+            L = f.attrs['L']
+        else:
+            U = 1
+            L = 1
+        Umx = np.asarray(f['Umx']) / U #[int(t_min*fps):int(t_max*fps),:]
+        Vmx = np.asarray(f['Vmx']) / U #[int(t_min*fps):int(t_max*fps),:]
+        I = f.attrs['I']
+        J = f.attrs['J']
+        x = np.asarray(f['x']).reshape(J,I) / L
+        y = np.asarray(f['y']).reshape(J,I) / L
+        ribs = np.array(f['ribs']) / L
 
     u_r = ray.put(Umx)
     v_r = ray.put(Vmx)
@@ -53,11 +61,9 @@ def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
     y_r = ray.put(y)
     ribs_r = ray.put(ribs)
 
-    experiment = re.search("TONSTAD_([A-Z]*)_", filnamn_inn, re.IGNORECASE).group(1)
+    # experiment = re.search("TONSTAD_([A-Z]*)_", filnamn_inn, re.IGNORECASE).group(1)
 
-    jobs = {lag_tre.remote((i/10,(i+1.5)/10), u_r,v_r,x_r,y_r,I,J,ribs_r, experiment):i for i in range(int(t_min)*10,int(t_max)*10+1)}
-
-    # i_0 =  range(int(t_min)*10,int(t_max)*10)
+    jobs = {lag_tre.remote((i/10,(i+1.5)/10), u_r,v_r,x_r,y_r,I,J,ribs_r, L):i for i in range(int(t_min)*10,int(t_max)*10+1)}
 
     trees = {}
 
@@ -66,10 +72,10 @@ def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
         ready, not_ready = ray.wait(not_ready)
         trees[jobs[ready[0]]] = ray.get(ready)[0]
 
-        if len(not_ready)==0:
+        if len(not_ready) == 0:
             break
 
-    kdjob = lag_tre.remote(t_span, u_r,v_r,x_r,y_r,I,J,ribs_r, experiment, nearest=True, kutt= False, inkluder_ribs=True)
+    kdjob = lag_tre.remote(t_span, u_r,v_r,x_r,y_r,I,J,ribs_r, L, nearest=True, kutt= False, inkluder_ribs=True)
     
     kdtre, u, ribs = ray.get(kdjob)
     
@@ -84,7 +90,7 @@ def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
         lagra_tre(tre_obj, filnamn_ut)
 
 @ray.remote
-def lag_tre(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, nearest=False, kutt=True, inkluder_ribs = False):
+def lag_tre(t_span, Umx,Vmx,x,y,I,J,ribs, L, nearest=False, kutt=True, inkluder_ribs = False):
     """Lagar eit delaunay- eller kd-tre ut frå t_span og ei hdf5-fil.
 
     Args:
@@ -99,20 +105,20 @@ def lag_tre(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, nearest=False, kutt=True, 
          tuple: Delaunay eller kd-tre, U pluss ev. ribber
     """
 
-    U, txy = generate_U_txy(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, kutt)
+    U, txy = generate_U_txy(t_span, Umx,Vmx,x,y,I,J,ribs, L, kutt)
     
     if (nearest):
         tree = cKDTree(txy)
     else:
-        # print(f"Byrjar på delaunay for ({t_min}, {t_max})")
-        # start = datetime.datetime.now()
+        print(f"Byrjar på delaunay for ({t_span[0]}, {t_span[1]})")
+        start = datetime.datetime.now()
         tree = qhull.Delaunay(txy)
-        # print(f"Ferdig med delaunay for ({t_min}, {t_max}, brukte {datetime.datetime.now()-start}")
-        # del start
+        print(f"Ferdig med delaunay for ({t_span[0]}, {t_span[1]}, brukte {datetime.datetime.now()-start}")
+        del start
     
     if (inkluder_ribs):
         
-        v_r, golv_nr, h_r, _, _, _, _, _, _, _, _, _ = get_essential_coordinates(experiment)
+        v_r, golv_nr, h_r, _, _, _, _, _, _, _, _, _ = get_essential_coordinates(L)
 
         venstre_ribbe = np.zeros((4,2))
         
@@ -148,7 +154,7 @@ def lag_tre(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, nearest=False, kutt=True, 
 #     piv_range = ranges()
     
 # def get_txy(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest = False):
-def generate_U_txy(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, kutt=True):
+def generate_U_txy(t_span, Umx,Vmx,x,y,I,J,ribs, L, kutt=True):
     t_min = t_span[0]
     t_max = t_span[1]
     fps = 20
@@ -165,7 +171,7 @@ def generate_U_txy(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, kutt=True):
     Umx_reshape = np.copy(Umx.reshape(len(Umx), J, I))
     Vmx_reshape = np.copy(Vmx.reshape(len(Vmx), J, I))
 
-    v_r, golv_nr, h_r, v_r_rad, v_r_kol, v_r_tjukk, golv_rad1, golv_rad2, golv_skifte, h_r_rad, h_r_kol, h_r_tjukk = get_essential_coordinates(experiment)
+    v_r, golv_nr, h_r, v_r_rad, v_r_kol, v_r_tjukk, golv_rad1, golv_rad2, golv_skifte, h_r_rad, h_r_kol, h_r_tjukk = get_essential_coordinates(L)
 
     # Venstre ribbe
     x0 = ribs[v_r,0]  #-60.79
@@ -234,8 +240,8 @@ def generate_U_txy(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, kutt=True):
 
     return U, txy
 
-def get_essential_coordinates(experiment):
-    if (experiment == "TWO"):
+def get_essential_coordinates(L):
+    if (L == 50):
         v_r = 1
         golv_nr = 8
         h_r = 16
@@ -257,7 +263,7 @@ def get_essential_coordinates(experiment):
         golv_nr = 6
         h_r = 11
 
-        if (experiment == "THREE"):
+        if (L == 75):
             v_r_rad = 70
             v_r_kol = 29
             v_r_tjukk = 6
@@ -376,4 +382,8 @@ class tre_objekt:
     # dist, i = tree.query(uvw)
     
     # tree.U = U
+    
+if __name__ == "__main__":
+    filnamn = Path("data/rib25_Q100_1.hdf5")
+    lag_tre_multi((0,179), filnamn_inn=filnamn, filnamn_ut="data/h.pickle", nodims=True)
     
