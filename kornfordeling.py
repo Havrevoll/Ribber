@@ -4,18 +4,33 @@ Created on Sat Jul 10 21:24:39 2021
 
 @author: havrevol
 """
+%matplotlib widget
 import random
 import numpy as np
 from scipy import interpolate
 from math import log2, pi
-import matplotlib
-matplotlib.use("Agg")
+def isnotebook():
+    try:
+        shell = get_ipython().__class__.__name__
+        if shell == 'ZMQInteractiveShell':
+            return True   # Jupyter notebook or qtconsole
+        elif shell == 'TerminalInteractiveShell':
+            return False  # Terminal running IPython
+        else:
+            return False  # Other type (?)
+    except NameError:
+        return False      # Probably standard Python interpreter
+
+if not isnotebook():
+    import matplotlib
+    matplotlib.use("Agg")
 
 from scipy.linalg.special_matrices import kron
 import matplotlib.pyplot as plt
 
 plt.rcParams["font.family"] = "STIXGeneral"
 plt.rcParams['mathtext.fontset'] = 'stix'
+
 
 
 # Skal laga kode for å utvida tabellen med 1000 element mellom kvar verdi.
@@ -33,15 +48,15 @@ def get_PSD_part(tal=1, PSD=None, rnd_seed=1):
                     [12.0,  1.00]])
 
         # PSD = np.array([[0.05,0.00],
-        #             [0.063,0.00],
-        #             [0.075,0.00],
-        #             [0.1,0.03],
-        #             [0.125,0.12],
-        #             [0.15,0.41],
-        #             [0.25,0.97],
-        #             [0.355,0.99],
-        #             [0.5,1.00],
-        #             [0.71,1.00]])
+        #                 [0.063,0.00],
+        #                 [0.075,0.00],
+        #                 [0.1,0.03],
+        #                 [0.125,0.12],
+        #                 [0.15,0.41],
+        #                 [0.25,0.97],
+        #                 [0.355,0.99],
+        #                 [0.5,1.00],
+        #                 [0.71,1.00]])
     
     element = 1000
 
@@ -124,6 +139,7 @@ def save_PSD_plot(part_array, path):
     ax.set_xlabel("d [mm]")
     ax.set_ylabel("% tal partiklar passert")
 
-    fig.savefig(path)
-    plt.close()
+    plt.show()
+    # fig.savefig(path)
+    # plt.close()
 

@@ -6,7 +6,7 @@ from constants import g, ρ_p, ρ, ν
 
 nullfart = np.zeros(2)
 
-def f(t, x, particle, tri, ribs):
+def f(t, x, particle, tri, ribs, L, U):
     """
     Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
     Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
@@ -32,9 +32,9 @@ def f(t, x, particle, tri, ribs):
 
     """
     
-    g = np.array([0, g]) # mm/s^2 = 9.81 m/s^2
+    g = np.array([0, g]) # vanlegvis 9810 mm/s^2 = 9.81 m/s^2
     nu = ν # 1 mm^2/s = 1e-6 m^2/s
-    rho = ρ # kg/mm^3 = 1000 kg/m^3 
+    rho = ρ # 1.0e-6 kg/mm^3 = 1000 kg/m^3 
  
     addedmass = particle.addedmass
     collision = particle.collision 

@@ -38,14 +38,14 @@ from constants import collision_restitution
 
 @logger.catch
 def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  lift = True, addedmass = True, wrap_max = 50, atol = 1e-1, rtol = 1e-1, 
-    method = 'RK23', laga_film = False, verbose=True, collision_correction=True, hdf5_fil=Path("./"), multi = True):
+    method = 'RK23', laga_film = False, verbose=True, collision_correction=True, hdf5_fil=Path("./"), multi = True, L=50, U=1):
     random.seed(rnd_seed)
 
     start = datetime.datetime.now()
     ribs = [Rib(rib, µ = 0.5 if rib_index < 2 else 1) for rib_index, rib in enumerate(tre.ribs)]
 
     with h5py.File(hdf5_fil, 'r') as f:
-        max_y = np.max(np.asarray(f['y']))
+        max_y = np.max(np.asarray(f['y'])/L)
 
     diameters = get_PSD_part(tal, rnd_seed=rnd_seed).tolist()
     particle_list = [Particle(float(d), [ribs[0].get_rib_middle()[0],random.uniform(ribs[0].get_rib_middle()[1]+8,max_y), 0, 0], random.uniform(0,50)) for d in diameters]
@@ -62,7 +62,7 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
     if multi:
         ray.init()#dashboard_port=8266,num_cpus=4) 
         tre_plasma = ray.put(tre)
-        jobs = {remote_lag_sti.remote(ribs, t_span, particle=pa, tre=tre_plasma, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction):pa for pa in particle_list}
+        jobs = {remote_lag_sti.remote(ribs, t_span, particle=pa, tre=tre_plasma, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction, L=L, U=U):pa for pa in particle_list}
 
         not_ready = list(jobs.keys())
         cancelled = []
@@ -108,10 +108,10 @@ def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  l
 
 
 @ray.remote
-def remote_lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, collision_correction=True):
-    return lag_sti(ribs, t_span, particle, tre, fps=fps, wrap_max = wrap_max, verbose=verbose, collision_correction=collision_correction)
+def remote_lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, collision_correction=True, L=50, U=1):
+    return lag_sti(ribs, t_span, particle, tre, fps=fps, wrap_max = wrap_max, verbose=verbose, collision_correction=collision_correction, L=L, U=U)
 
-def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, collision_correction=True):
+def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, collision_correction=True, L=50, U=1):
     # stien må innehalda posisjon, fart og tid.
 
     fps_inv = 1/fps
@@ -122,7 +122,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
     # print(type(tre))
     # tre = ray.get(tre)
     
-    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs), events = (event_check,wrap_check,still_check)        )
+    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs, L, U), events = (event_check,wrap_check,still_check)        )
  
     step_old = np.concatenate(([particle.init_time], particle.init_position))
     # Step_old og step_new er ein array med [t, x, y, u, v]. 
@@ -292,7 +292,7 @@ def eval_steps(t_span, fps):
         t_min = ceil(t_span[0]*fps)/fps
     return np.linspace( t_min, t_span[1], num = round((t_span[1]-t_min)*fps), endpoint = False )
 
-def event_check(t, x, particle, tre, ribs):
+def event_check(t, x, particle, tre, ribs, L, U):
     event_check.counter += 1
     
 
@@ -314,7 +314,7 @@ def event_check(t, x, particle, tre, ribs):
 event_check.counter = 0
 event_check.terminal = True
 
-def wrap_check(t, x, particle, tre, ribs):
+def wrap_check(t, x, particle, tre, ribs, L, U):
     right_edge = ribs[1].get_rib_middle()[0]
         #.strftime('%X.%f')
     if (x[0] > right_edge):
@@ -322,7 +322,7 @@ def wrap_check(t, x, particle, tre, ribs):
     return 1.0
 wrap_check.terminal = True
 
-def still_check(t,x, particle, tre,ribs):
+def still_check(t,x, particle, tre,ribs, L, U):
     if hypot(x[2],x[3]) < particle.resting_tolerance and hypot(x[2],x[3]) > 0 and particle.resting and not particle.still:
         return 0.0
     # Kvifor har eg denne her? Det er for å dempa farten om den er så bitteliten at han må leggjast til ro. Men det må jo skje berre dersom det er kontakt i tillegg. Så då må eg vel sjekka kollisjon uansett? 
