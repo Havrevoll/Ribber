@@ -1,7 +1,28 @@
 # -*- coding: utf-8 -*-
 '''køyr funksjonar som plottingar(fil['vassføringar'])'''
+from IPython import get_ipython
 
+def isnotebook():
+    try:
+        shell = get_ipython().__class__.__name__
+        if shell == 'ZMQInteractiveShell':
+            return True   # Jupyter notebook or qtconsole
+        elif shell == 'TerminalInteractiveShell':
+            return False  # Terminal running IPython
+        else:
+            return False  # Other type (?)
+    except NameError:
+        return False      # Probably standard Python interpreter
+
+if not isnotebook():
+    import matplotlib
+    matplotlib.use("Agg")
+
+
+from pathlib import Path
 import matplotlib.pyplot as plt
+
+from datagenerering import generate_ribs
 plt.rcParams["font.family"] = "STIXGeneral"
 plt.rcParams['mathtext.fontset'] = 'stix'
 from matplotlib import animation, colors
@@ -17,6 +38,8 @@ import re
 import scipy.stats as stats
 
 from hjelpefunksjonar import ranges, draw_rect
+from rib import Rib
+from constants import ρ
 
 # from IPython.display import clear_output
 
@@ -77,12 +100,12 @@ def get_xyuvijribs(dataset):
         tuple: x,y,U,V (alle som 1D-array), I,J (ints) og ribbelista
     """
     with h5py.File(dataset, 'r') as f:
-        Umx = np.array(f['Umx'])
-        Vmx = np.array(f['Vmx'])
-        (I,J) = (int(np.array(f['I'])),int(np.array(f['J'])))
-        x = np.array(f['x'])
-        y = np.array(f['y'])
-        ribs = np.array(f['ribs'])
+        Umx = np.asarray(f['Umx'])
+        Vmx = np.asarray(f['Vmx'])
+        (I,J) = f.attrs['I'], f.attrs['J']
+        x = np.asarray(f['x'])
+        y = np.asarray(f['y'])
+        ribs = np.asarray(f['ribs'])
     
     return x,y,Umx,Vmx,I,J,ribs
         
@@ -533,30 +556,42 @@ def u_plot_all(cases):
     plt.close()
     
 def dbl_average(case):
-    piv_range = ranges()
     # y_range = piv_range[0]
+    x_reshape1,y_reshape1,u_reshape1,v_reshape1,ribs = get_reshape(case)
+
+    with h5py.File(case, 'r') as f:
+        L = f.attrs['L']
+
+    ribs = generate_ribs(ribs, L)
+    ribs = [Rib(rib) for rib in ribs]
+    left_edge = ribs[0].get_rib_middle()[0]
+    right_edge = ribs[1].get_rib_middle()[0]
+    top_edge = np.max(y_reshape1)
+    bottom_edge = ribs[2].vertices[ribs[2].vertices[:,1].argsort()[-2],1]
+
+    # piv_range = ranges()
+    # y_range = np.s_[:]
+    x_range = np.s_[np.abs(x_reshape1[0,:]-(left_edge)).argmin():np.abs(x_reshape1[0,:]-(right_edge)).argmin()]
+    y_range = np.s_[np.abs(y_reshape1[:,0]-(top_edge)).argmin():np.abs(y_reshape1[:,0]-(bottom_edge)).argmin()]
     
-    x_reshape1 = np.array(case['x_reshape1'])
+    piv_range = np.index_exp[y_range,x_range]
+    # x_reshape1 = np.array(case['x_reshape1'])
     x=x_reshape1[piv_range]
-    y_reshape1 = np.array(case['y_reshape1'])
+    # y_reshape1 = np.array(case['y_reshape1'])
     y=y_reshape1[piv_range]
 
 
-    u_profile = np.array(case['u_profile'][piv_range[0]])
-    u_reshape1 = np.array(case['u_reshape1'][piv_range])
-    v_reshape1 = np.array(case['v_reshape1'][piv_range])
+    u_reshape = np.nanmean(u_reshape1,0)[piv_range]
+    v_reshape = np.nanmean(v_reshape1,0)[piv_range]
+    
+    u_profile = np.nanmean(u_reshape,1)
+    v_profile = np.nanmean(v_reshape,1)
+    u_tilde = (u_reshape.T - u_profile).T
+    v_tilde = (v_reshape.T - v_profile).T
     
     # up_sq_bar_reshape1 = np.array(case['up_sq_bar_reshape1'][piv_range])
     # vp_sq_bar_reshape1 = np.array(case['vp_sq_bar_reshape1'][piv_range])
         
-    v_profile = np.nanmean(v_reshape1,1)
-    
-    u_tilde = (u_reshape1.T - u_profile).T
-    
-    v_tilde = (v_reshape1.T - v_profile).T
-    
-    
-
     # u_tilde_sq=u_tilde*u_tilde
     # v_tilde_sq=v_tilde*v_tilde
     
@@ -566,84 +601,93 @@ def dbl_average(case):
     # u_tilde_sq_DA = np.nanmean(u_tilde_sq,1)
     # v_tilde_sq_DA = np.nanmean(v_tilde_sq,1)
     
-    form_stress = u_tilde*v_tilde*1e-3
-    form_stress_DA = np.nanmean(form_stress,1)
+    # form_stress = u_tilde * v_tilde * ρ
+    # form_stress_DA = np.nanmean(form_stress,1)
     
     z = stats.zscore(u_tilde.flatten(),nan_policy='omit').reshape(u_tilde.shape)
     
     outliers = z > 10
     u_tilde[outliers] = np.nan
         
-    vmin =  np.nanmin(form_stress)
-    vmax = np.nanmax(form_stress)
-    norm = MidpointNormalize(vmin=vmin, vmax=vmax, midpoint=0)
+    # vmin =  np.nanmin(form_stress)
+    # vmax = np.nanmax(form_stress)
+    # norm = MidpointNormalize(vmin=vmin, vmax=vmax, midpoint=0)
     myDPI = 300
     
-    fig, axes = plt.subplots(1,2, figsize=(1800/myDPI,1000/myDPI),dpi=myDPI)
+    # fig, axes = plt.subplots(1,2, figsize=(1800/myDPI,1000/myDPI),dpi=myDPI)
     
-    p = axes[0].imshow(form_stress, extent=[x[0,0],x[0,-1], y[-1,0], y[0,0]], cmap='RdGy', norm=norm)
-    draw_rect(axes[0])
-    axes[0].set_xlabel(r'$x$ [mm]')
-    axes[0].set_ylabel(r'$y$ [mm]')
+    # p = axes[0].imshow(form_stress, extent=[x[0,0],x[0,-1], y[-1,0], y[0,0]], cmap='RdGy', norm=norm)
+    # draw_rect(axes[0], ribs)
+    # axes[0].set_xlabel(r'$x$ [mm]')
+    # axes[0].set_ylabel(r'$y$ [mm]')
 
-    cb = fig.colorbar(p, ax=axes[0])
-    cb.set_label(r"$-\rho\tilde{u}\tilde{w}$ [Pa]")    
+    # cb = fig.colorbar(p, ax=axes[0])
+    # cb.set_label(r"$-\rho\tilde{u}\tilde{w}$ [Pa]")    
     
-    axes[1].plot(form_stress_DA,y[:,0])
-    axes[1].set_xlabel(r'$-\rho\langle\tilde{u}\tilde{w}\rangle$ [Pa]')
-    axes[1].set_ylabel(r'$y$ [mm]')
-    axes[1].set_ylim(axes[0].get_ylim())
-    plt.tight_layout()
+    # axes[1].plot(form_stress_DA,y[:,0])
+    # axes[1].set_xlabel(r'$-\rho\langle\tilde{u}\tilde{w}\rangle$ [Pa]')
+    # axes[1].set_ylabel(r'$y$ [mm]')
+    # axes[1].set_ylim(axes[0].get_ylim())
+    # plt.tight_layout()
     
-    filnamn = "spatial_averaged_vel_Q{}.png".format(re.split(r'/',case.name)[-1])
+    # filnamn = f"spatial_averaged_vel_Q{ re.split(r'/',case.name)[-1] }.png"
     
-    fig.savefig(filnamn)
-    plt.close()
+    # fig.savefig(filnamn)
+    # plt.close()
     
     
     
-    fig, ax = plt.subplots(figsize=(2000/myDPI,830/myDPI),dpi=myDPI)
+    # fig, ax = plt.subplots(figsize=(2000/myDPI,830/myDPI),dpi=myDPI)
     
-    ax.imshow(form_stress[50:80,:], extent=[x[0,0],x[0,-1], y[80,0], y[50,0]],cmap='RdGy', norm=norm)
-    draw_rect(ax)
+    # ax.imshow(form_stress[50:80,:], extent=[x[0,0],x[0,-1], y[80,0], y[50,0]],cmap='RdGy', norm=norm)
+    # draw_rect(ax, ribs)
     
-    cb = fig.colorbar(p, ax=ax)
-    cb.set_label(r"$-\rho\langle\tilde{u}\tilde{w}\rangle$ [Pa]")
+    # cb = fig.colorbar(p, ax=ax)
+    # cb.set_label(r"$-\rho\langle\tilde{u}\tilde{w}\rangle$ [Pa]")
     
-    ax.set_xlabel(r'$x$ [mm]')
-    ax.set_ylabel(r'$y$ [mm]')
-    plt.tight_layout()
+    # ax.set_xlabel(r'$x$ [mm]')
+    # ax.set_ylabel(r'$y$ [mm]')
+    # plt.tight_layout()
     
-    filnamn = "spatial_av_vel_near_Q{}.png".format(re.split(r'/',case.name)[-1])
+    # filnamn = "spatial_av_vel_near_Q{}.png".format(re.split(r'/',case.name)[-1])
     
-    fig.savefig(filnamn)
-    plt.close()
+    # fig.savefig(filnamn)
+    # plt.close()
         
+    # ---------- Kvadrant-kart med rundingar ------------------
+
+    # fig, ax  = plt.subplots(figsize=(1000/myDPI,1000/myDPI),dpi=myDPI)
     
-    fig, ax  = plt.subplots(figsize=(1000/myDPI,1000/myDPI),dpi=myDPI)
+    # ax.plot(u_tilde[61,:],v_tilde[61,:],"bo")
+    # ax.plot(u_tilde[58,:],v_tilde[58,:],"ro")
+    # ax.plot(u_tilde[55,:],v_tilde[55,:],"go")
+    # ax.plot(u_tilde[52,:],v_tilde[52,:],"co")
+    # # btw_rib = np.s_[15:48]
+    # # ax.plot(u_tilde[64,btw_rib],v_tilde[64,btw_rib],"bx")
+    # # ax.plot(u_tilde[66,btw_rib],v_tilde[66,btw_rib],"gx")
+    # ax.set_xlabel(r'$\tilde{u}$ [mm/s]')
+    # ax.set_ylabel(r'$\tilde{v}$ [mm/s]')
+    # ax.axis('equal')
+    # ax.axhline(y=0, color='k')
+    # ax.axvline(x=0, color='k')
+    # plt.tight_layout()
     
-    ax.plot(u_tilde[61,:],v_tilde[61,:],"bo")
-    ax.plot(u_tilde[58,:],v_tilde[58,:],"ro")
-    ax.plot(u_tilde[55,:],v_tilde[55,:],"go")
-    ax.plot(u_tilde[52,:],v_tilde[52,:],"co")
-    # btw_rib = np.s_[15:48]
-    # ax.plot(u_tilde[64,btw_rib],v_tilde[64,btw_rib],"bx")
-    # ax.plot(u_tilde[66,btw_rib],v_tilde[66,btw_rib],"gx")
-    ax.set_xlabel(r'$\tilde{u}$ [mm/s]')
-    ax.set_ylabel(r'$\tilde{v}$ [mm/s]')
-    ax.axis('equal')
-    ax.axhline(y=0, color='k')
-    ax.axvline(x=0, color='k')
-    plt.tight_layout()
-    
-    filnamn = "spatial_quadrant_Q{}.png".format(re.split(r'/',case.name)[-1])
-    fig.savefig(filnamn)
-    plt.close()
+    # filnamn = f"spatial_quadrant_{case.stem}.png"
+    # fig.savefig(filnamn)
+    # plt.close()
     
     # k_bar= 0.5 * (up_sq_bar_reshape1 + vp_sq_bar_reshape1)
     
     # k_profile = 0.5 * np.nanmean((up_sq_bar_reshape1 + vp_sq_bar_reshape1),1)
     
+    # --------------- Kvadrant-fargeplott --------------
+
+    tilde_angle = np.arccos(u_tilde / np.sqrt(u_tilde * u_tilde + v_tilde * v_tilde))
+
+    quadrant_colormap = np.asarray([np.sin(tilde_angle+1)*0.5+0.5, np.sin(tilde_angle - 0.3) * 0.37 + 0.45, np.sin(tilde_angle - 2.3)*0.32+0.35])
+
+
+
     qua1 = np.logical_and(u_tilde > 0, v_tilde > 0)
     qua2 = np.logical_and(u_tilde < 0, v_tilde > 0)
     qua3 = np.logical_and(u_tilde < 0, v_tilde < 0)
@@ -666,6 +710,7 @@ def dbl_average(case):
     
     fig, ax  = plt.subplots(figsize=(1000/myDPI,1000/myDPI),dpi=myDPI)
     
+    
     ax.pcolormesh(x, y, qua1, shading='nearest', cmap=cmap1)
     ax.pcolormesh(x, y, qua2, shading='nearest', cmap=cmap2)
     ax.pcolormesh(x, y, qua3, shading='nearest', cmap=cmap3)
@@ -676,7 +721,7 @@ def dbl_average(case):
     ax.plot(np.array([-50]), np.array([11.66]),"go")
     ax.plot(np.array([-50]), np.array([16.07]),"co")
     
-    draw_rect(ax,'black')
+    draw_rect(ax,ribs,color='black')
     
     ax.set_xlabel(r'$x$ [mm]')
     ax.set_ylabel(r'$y$ [mm]')
@@ -684,7 +729,7 @@ def dbl_average(case):
     plt.tight_layout()
 
     
-    filnamn = "spatial_quadrant_map_Q{}.png".format(re.split(r'/',case.name)[-1])
+    filnamn = f"spatial_quadrant_map_{case.stem}.png"
     fig.savefig(filnamn)
     plt.close()
     
@@ -1139,6 +1184,43 @@ def runsTest(l, l_median):
   
     return z 
 
+if __name__ == "__main__":
+    pickle_filer = [
+            "rib25_Q20_1",
+            "rib25_Q20_2",
+            "rib25_Q20_3",
+            "rib25_Q40_1",
+            "rib25_Q40_2",
+            "rib25_Q60_1",
+            "rib25_Q60_2",
+            "rib25_Q80_1",
+            "rib25_Q80_2",
+            "rib25_Q100_1",
+            "rib25_Q100_2",
+            "rib75_Q20_1",
+            "rib75_Q40_1",
+            "rib75_Q40_2",
+            "rib75_Q40_3",
+            "rib75_Q60_1",
+            "rib75_Q80_1",
+            "rib75_Q80_2",
+            "rib75_Q80_3",
+            "rib75_Q100_1",
+            "rib75_Q100_2",
+            "rib75_Q100_3",
+            "rib75_Q100_4",
+            "rib50_Q20_1",
+            "rib50_Q20_2",
+            "rib50_Q20_3",
+            "rib50_Q40_1",
+            "rib50_Q60_1",
+            "rib50_Q80_1",
+            "rib50_Q100_1",
+            "rib50_Q120_1",
+            "rib50_Q140_1"
+        ]
 
-
- 
+    for f in pickle_filer:
+        hdf5_fil = Path("data").joinpath(f).with_suffix(".hdf5")
+        assert hdf5_fil.exists()
+        dbl_average(hdf5_fil)

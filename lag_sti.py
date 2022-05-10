@@ -6,20 +6,17 @@ import matplotlib
 # from ray.core.generated.common_pb2 import _TASKSPEC_OVERRIDEENVIRONMENTVARIABLESENTRY
 matplotlib.use("Agg")
 
-from kornfordeling import get_PSD_part
+
 import numpy as np
 # from scipy import interpolate
 from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#r179348322575-1
 # from hjelpefunksjonar import norm, sortClockwise, finn_fil
 from f import f
-from rib import Rib
-from particle import Particle
-from pathlib import Path
+
 from check_collision import check_all_collisions
 from constants import ε
 
 import ray
-from ray.exceptions import GetTimeoutError
 import datetime
 from math import floor, hypot, ceil
 import random
@@ -36,75 +33,11 @@ app_log = logging.getLogger(__name__)
 
 from constants import collision_restitution
 
-@logger.catch
-def simulering(tal, rnd_seed, tre, fps = 20, t_span = (0,179), linear = True,  lift = True, addedmass = True, wrap_max = 50, atol = 1e-1, rtol = 1e-1, 
-    method = 'RK23', laga_film = False, verbose=True, collision_correction=True, hdf5_fil=Path("./"), multi = True):
-    random.seed(rnd_seed)
+# @logger.catch
+# def simulering(tal, tre, PSD, rnd_seed=1, fps = 20, t_span = (0,179), linear = True,  lift = True, addedmass = True, wrap_max = 50, atol = 1e-1, rtol = 1e-1, 
+#     method = 'RK23', laga_film = False, verbose=True, collision_correction=True, hdf5_fil=Path("./"), multi = True):
 
-    start = datetime.datetime.now()
-    ribs = [Rib(rib, µ = 0.5 if rib_index < 2 else 1) for rib_index, rib in enumerate(tre.ribs)]
-
-    with h5py.File(hdf5_fil, 'r') as f:
-        max_y = np.max(np.asarray(f['y']))
-
-    diameters = get_PSD_part(tal, rnd_seed=rnd_seed).tolist()
-    particle_list = [Particle(float(d), [ribs[0].get_rib_middle()[0],random.uniform(ribs[0].get_rib_middle()[1]+8,max_y), 0, 0], random.uniform(0,50)) for d in diameters]
-
-    for i, p in enumerate(particle_list):
-        p.atol , p.rtol = atol, rtol
-        p.method = method
-        p.linear, p.lift, p.addedmass = linear, lift, addedmass
-        p.init_time = floor(p.init_time *fps)/fps #rettar opp init_tid slik at det blir eit tal som finst i datasettet.
-        p.index = i
-        p.resting_tolerance = 0.0001 if method == "BDF" else 0.01
-
-    
-    if multi:
-        ray.init()#dashboard_port=8266,num_cpus=4) 
-        tre_plasma = ray.put(tre)
-        jobs = {remote_lag_sti.remote(ribs, t_span, particle=pa, tre=tre_plasma, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction):pa for pa in particle_list}
-
-        not_ready = list(jobs.keys())
-        cancelled = []
-        for elem in not_ready:
-            # if len(ready) == 0:
-            try:
-                
-                sti_dict = ray.get(elem, timeout=(40))
-                        
-                assert all([i in sti_dict.keys() for i in np.linspace(round(sti_dict['init_time']*100), round(sti_dict['final_time']*100), round((sti_dict['final_time']-sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {jobs[elem].index} har ein feil i seg, ikkje alle elementa er der"
-                jobs[elem].sti_dict = sti_dict
-                # jobs[ready[0]].sti_dict = sti_dict
-                app_log.info(f"Har kome til partikkel nr. {jobs[elem].index}")
-            except (GetTimeoutError,AssertionError):
-                ray.cancel(elem, force=True)
-                app_log.info(f"Måtte kansellera {jobs[elem].index}, vart visst aldri ferdig.")
-                cancelled.append(jobs[elem])
-                jobs[elem].method = "RK23"
-                
-        if len(cancelled) > 0:
-            app_log.debug("Skal ta dei som ikkje klarte BDF")
-            jobs2 = {remote_lag_sti.remote(ribs, t_span, particle=pa, tre=tre_plasma, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction):pa for pa in cancelled}
-            not_ready = list(jobs2.keys())
-            while True:
-                ready, not_ready = ray.wait(not_ready)
-                sti_dict =  ray.get(ready[0])
-                assert all([i in sti_dict.keys() for i in np.linspace(round(sti_dict['init_time']*100), round(sti_dict['final_time']*100), round((sti_dict['final_time']-sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {jobs[ready[0]].index} har ein feil i seg, ikkje alle elementa er der"
-                jobs2[ready[0]].sti_dict = sti_dict
-
-                app_log.info(f"Dei som står att no er {[jobs2[p].index for p in not_ready] if len(not_ready)<100 else len(not_ready)}")
-                if len(not_ready)==0:
-                    break
-            
-
-        ray.shutdown()
-    else:
-        for pa in particle_list:
-            if pa.index == 446:
-                pa.sti_dict = lag_sti(ribs, t_span, particle=pa, tre=tre, fps = fps, wrap_max=wrap_max, verbose=verbose, collision_correction=collision_correction)
-                assert all([i in pa.sti_dict.keys() for i in np.linspace(round(pa.sti_dict['init_time']*100), round(pa.sti_dict['final_time']*100), round((pa.sti_dict['final_time']-pa.sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {pa.index} har ein feil i seg, ikkje alle elementa er der"
-
-    return particle_list
+#     return particle_list
 
 
 @ray.remote
@@ -161,7 +94,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
     print(f"\x1b[{status_col}m {status_msg} \x1b[0m")
 
     while (t < t_max-2):
-        
+        # ray.util.pdb.set_trace() 
         particle.collision = check_all_collisions(particle, step_old[1:], ribs)
         if particle.collision['is_resting_contact']:
             particle.resting = True
@@ -205,7 +138,7 @@ def lag_sti(ribs, t_span, particle, tre, fps=20, wrap_max = 0, verbose=True, col
             elif (collision_info['is_resting_contact']):# and np.dot(collision_info['rib_normal'],collision_info['closest_rib_normal']) == 1.0 ):
                 if verbose:
                     print("kvilekontakt")
-                if collision_info['rib'].mu == 1:
+                if collision_info['rib'].µ == 1:
                     break
                 rest = 0
                 particle.resting = True
@@ -331,3 +264,6 @@ def still_check(t,x, particle, tre,ribs):
         particle.still = False
     return 1.0
 still_check.terminal = True
+
+
+

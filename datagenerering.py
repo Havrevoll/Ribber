@@ -40,9 +40,13 @@ def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
     ray.init(num_cpus=4)
 
     with h5py.File(filnamn_inn, 'r') as f:
+        U = f.attrs['U']
+        L = f.attrs['L']
+        
+        I = f.attrs['I']
+        J = f.attrs['J']
         Umx = np.array(f['Umx'])#[int(t_min*fps):int(t_max*fps),:]
         Vmx = np.array(f['Vmx'])#[int(t_min*fps):int(t_max*fps),:]
-        (I,J) = (int(np.array(f['I'])),int(np.array(f['J'])))
         x = np.array(f['x']).reshape(J,I)
         y = np.array(f['y']).reshape(J,I)
         ribs = np.array(f['ribs'])
@@ -55,7 +59,7 @@ def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
 
     experiment = re.search("TONSTAD_([A-Z]*)_", filnamn_inn, re.IGNORECASE).group(1)
 
-    jobs = {lag_tre.remote((i/10,(i+1.5)/10), u_r,v_r,x_r,y_r,I,J,ribs_r, experiment):i for i in range(int(t_min)*10,int(t_max)*10+1)}
+    jobs = {lag_tre.remote((i/10,(i+1.5)/10), u_r,v_r,x_r,y_r,I,J,ribs_r, L):i for i in range(int(t_min)*10,int(t_max)*10+1)}
 
     # i_0 =  range(int(t_min)*10,int(t_max)*10)
 
@@ -69,7 +73,7 @@ def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
         if len(not_ready)==0:
             break
 
-    kdjob = lag_tre.remote(t_span, u_r,v_r,x_r,y_r,I,J,ribs_r, experiment, nearest=True, kutt= False, inkluder_ribs=True)
+    kdjob = lag_tre.remote(t_span, u_r,v_r,x_r,y_r,I,J,ribs_r, L, nearest=True, kutt= False, inkluder_ribs=True)
     
     kdtre, u, ribs = ray.get(kdjob)
     
@@ -84,7 +88,7 @@ def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
         lagra_tre(tre_obj, filnamn_ut)
 
 @ray.remote
-def lag_tre(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, nearest=False, kutt=True, inkluder_ribs = False):
+def lag_tre(t_span, Umx,Vmx,x,y,I,J,ribs, L, nearest=False, kutt=True, inkluder_ribs = False):
     """Lagar eit delaunay- eller kd-tre ut frå t_span og ei hdf5-fil.
 
     Args:
@@ -99,7 +103,7 @@ def lag_tre(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, nearest=False, kutt=True, 
          tuple: Delaunay eller kd-tre, U pluss ev. ribber
     """
 
-    U, txy = generate_U_txy(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, kutt)
+    U, txy = generate_U_txy(t_span, Umx,Vmx,x,y,I,J,ribs, L, kutt)
     
     if (nearest):
         tree = cKDTree(txy)
@@ -111,34 +115,36 @@ def lag_tre(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, nearest=False, kutt=True, 
         # del start
     
     if (inkluder_ribs):
-        
-        v_r, golv_nr, h_r, _, _, _, _, _, _, _, _, _ = get_essential_coordinates(experiment)
-
-        venstre_ribbe = np.zeros((4,2))
-        
-        venstre_ribbe[0] = ribs[v_r+1]
-        venstre_ribbe[1] = ribs[v_r+2]
-        venstre_ribbe[3] = [ribs[v_r+1,0]-50, ribs[v_r+1,1] + (-50) * (ribs[v_r,1] - ribs[v_r+1,1])/(ribs[v_r,0] - ribs[v_r+1,0])]
-        venstre_ribbe[2] = venstre_ribbe[1] + venstre_ribbe[3] - venstre_ribbe[0]
-
-        hogre_ribbe = np.zeros((4,2))
-        hogre_ribbe[0] = ribs[h_r-1]
-        hogre_ribbe[1] = ribs[h_r]
-        hogre_ribbe[2] = [ribs[h_r,0]+50, ribs[h_r,1] + 50 * (ribs[h_r+1,1] - ribs[h_r,1])/(ribs[h_r + 1,0] - ribs[h_r,0])]
-        hogre_ribbe[3] = hogre_ribbe[0] + hogre_ribbe[2] - hogre_ribbe[1]
-
-        golv = np.zeros((4,2))
-        golv[0] = ribs[golv_nr]
-        golv[1] = ribs[golv_nr+1]
-        golv[2] = ribs[golv_nr+1] + np.array([0,-20])
-        golv[3] = ribs[golv_nr] + np.array([0,-20])
-        
-        
+        venstre_ribbe, hogre_ribbe, golv = generate_ribs(ribs, L)
 
         return tree, U, [venstre_ribbe, hogre_ribbe, golv]
     else:
         return tree, U
 
+def generate_ribs(ribs, L):
+    v_r, golv_nr, h_r, _, _, _, _, _, _, _, _, _ = get_essential_coordinates(L)
+
+    venstre_ribbe = np.zeros((4,2))
+    
+    venstre_ribbe[0] = ribs[v_r+1]
+    venstre_ribbe[1] = ribs[v_r+2]
+    venstre_ribbe[3] = [ribs[v_r+1,0]-50, ribs[v_r+1,1] + (-50) * (ribs[v_r,1] - ribs[v_r+1,1])/(ribs[v_r,0] - ribs[v_r+1,0])]
+    venstre_ribbe[2] = venstre_ribbe[1] + venstre_ribbe[3] - venstre_ribbe[0]
+
+    hogre_ribbe = np.zeros((4,2))
+    hogre_ribbe[0] = ribs[h_r-1]
+    hogre_ribbe[1] = ribs[h_r]
+    hogre_ribbe[2] = [ribs[h_r,0]+50, ribs[h_r,1] + 50 * (ribs[h_r+1,1] - ribs[h_r,1])/(ribs[h_r + 1,0] - ribs[h_r,0])]
+
+    hogre_ribbe[3] = hogre_ribbe[0] + hogre_ribbe[2] - hogre_ribbe[1]
+
+    golv = np.zeros((4,2))
+    golv[0] = ribs[golv_nr]
+    golv[1] = ribs[golv_nr+1]
+    golv[2] = ribs[golv_nr+1] + np.array([0,-20])
+    golv[3] = ribs[golv_nr] + np.array([0,-20])
+    
+    return venstre_ribbe, hogre_ribbe, golv
 
 # def get_velocity_data(t_span=(0,1), with_gradient = False, one_dimensional = True):
 #     t_min = t_span[0]

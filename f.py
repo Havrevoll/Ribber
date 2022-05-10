@@ -3,6 +3,8 @@ import numpy as np
 from math import hypot
 from hjelpefunksjonar import norm
 from constants import g, ρ_p, ρ, ν
+g = np.array([0, g]) # mm/s^2 = 9.81 m/s^2
+import ray
 
 nullfart = np.zeros(2)
 
@@ -32,7 +34,6 @@ def f(t, x, particle, tri, ribs):
 
     """
     
-    g = np.array([0, g]) # mm/s^2 = 9.81 m/s^2
     nu = ν # 1 mm^2/s = 1e-6 m^2/s
     rho = ρ # kg/mm^3 = 1000 kg/m^3 
  
@@ -86,7 +87,7 @@ def f(t, x, particle, tri, ribs):
     
     dudt = (drag_component + gravity_component + added_mass_component + pressure_component + lift_component ) / divisor
 
-    print(f"{t};{x};{drag_component};{gravity_component};{added_mass_component - 0.5 * rho_self_density * dudt};{lift_component};{pressure_component};{dudt}",)
+    # print(f"{t};{x};{drag_component};{gravity_component};{added_mass_component - 0.5 * rho_self_density * dudt};{lift_component};{pressure_component};{dudt}",)
 
     try:
         if (collision['is_resting_contact'] and particle.resting):# and np.dot(collision['rib_normal'],dudt) <= 0: #Kan ikkje sjekka om partikkelen skal ut frå flata midt i berekninga. Må ha ein event til alt slikt.
