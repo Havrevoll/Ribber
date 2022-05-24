@@ -9,15 +9,8 @@ import pickle
 import numpy as np
 
 # from hjelpefunksjonar import ranges, finn_fil
-import datetime
-import scipy.spatial.qhull as qhull
-from scipy.spatial import cKDTree
-import re
-
-# import multiprocessing
-
-import ray
-
+# import datetime
+# import re
 
 # filnamn = "../two_q40.hdf5" #finn_fil(["D:/Tonstad/utvalde/Q40.hdf5", "C:/Users/havrevol/Q40.hdf5", "D:/Tonstad/Q40.hdf5"])
 
@@ -25,124 +18,29 @@ import ray
 
 # print("pickle fil er ", pickle_fil) 
 
-def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
-    
-    # a_pool = multiprocessing.Pool()
-    
-    t_min = t_span[0]
-    t_max = t_span[1]
-    
-    # i = [(i/10,(i+1.5)/10) for i in range(int(t_min)*10,int(t_max)*10)]
-    
-    # result = a_pool.map(lag_tre, i)
-    # jobs = [lag_tre.remote(span, filnamn_inn) for span in i]
-    
-    ray.init(num_cpus=4)
 
-    with h5py.File(filnamn_inn, 'r') as f:
-        U = f.attrs['U']
-        L = f.attrs['L']
-        
-        I = f.attrs['I']
-        J = f.attrs['J']
-        Umx = np.array(f['Umx'])#[int(t_min*fps):int(t_max*fps),:]
-        Vmx = np.array(f['Vmx'])#[int(t_min*fps):int(t_max*fps),:]
-        x = np.array(f['x']).reshape(J,I)
-        y = np.array(f['y']).reshape(J,I)
-        ribs = np.array(f['ribs'])
-
-    u_r = ray.put(Umx)
-    v_r = ray.put(Vmx)
-    x_r = ray.put(x)
-    y_r = ray.put(y)
-    ribs_r = ray.put(ribs)
-
-    experiment = re.search("TONSTAD_([A-Z]*)_", filnamn_inn, re.IGNORECASE).group(1)
-
-    jobs = {lag_tre.remote((i/10,(i+1.5)/10), u_r,v_r,x_r,y_r,I,J,ribs_r, L):i for i in range(int(t_min)*10,int(t_max)*10+1)}
-
-    # i_0 =  range(int(t_min)*10,int(t_max)*10)
-
-    trees = {}
-
-    not_ready = list(jobs.keys())
-    while True:
-        ready, not_ready = ray.wait(not_ready)
-        trees[jobs[ready[0]]] = ray.get(ready)[0]
-
-        if len(not_ready)==0:
-            break
-
-    kdjob = lag_tre.remote(t_span, u_r,v_r,x_r,y_r,I,J,ribs_r, L, nearest=True, kutt= False, inkluder_ribs=True)
-    
-    kdtre, u, ribs = ray.get(kdjob)
-    
-    ray.shutdown()
-    # trees = dict(zip(i_0, result))
-         
-    tre_obj = tre_objekt(trees, kdtre, u, ribs)
-
-    if filnamn_ut is None:
-        return tre_obj
-    else:
-        lagra_tre(tre_obj, filnamn_ut)
-
-@ray.remote
-def lag_tre(t_span, Umx,Vmx,x,y,I,J,ribs, L, nearest=False, kutt=True, inkluder_ribs = False):
-    """Lagar eit delaunay- eller kd-tre ut frå t_span og ei hdf5-fil.
-
-    Args:
-        t_span (tuple): Tid frå og til
-        filnamn (string): Filnamn på hdf5-fila
-        nearest (bool, optional): lineær?  Defaults to False.
-        kutt (bool, optional): Kutt av data til eit lite område?. Defaults to True.
-        inkluder_ribs (bool, optional): Ta med ribbedata. Defaults to False.
-        kutt_kor (list, optional): Koordinatane til firkanten som skal kuttast. Defaults to [-35.81, 64.19 , -25, 5].
-
-    Returns:
-         tuple: Delaunay eller kd-tre, U pluss ev. ribber
-    """
-
-    U, txy = generate_U_txy(t_span, Umx,Vmx,x,y,I,J,ribs, L, kutt)
-    
-    if (nearest):
-        tree = cKDTree(txy)
-    else:
-        # print(f"Byrjar på delaunay for ({t_min}, {t_max})")
-        # start = datetime.datetime.now()
-        tree = qhull.Delaunay(txy)
-        # print(f"Ferdig med delaunay for ({t_min}, {t_max}, brukte {datetime.datetime.now()-start}")
-        # del start
-    
-    if (inkluder_ribs):
-        venstre_ribbe, hogre_ribbe, golv = generate_ribs(ribs, L)
-
-        return tree, U, [venstre_ribbe, hogre_ribbe, golv]
-    else:
-        return tree, U
-
-def generate_ribs(ribs, L):
+def generate_ribs(ribs, L, rib_width):
     v_r, golv_nr, h_r, _, _, _, _, _, _, _, _, _ = get_essential_coordinates(L)
 
     venstre_ribbe = np.zeros((4,2))
     
-    venstre_ribbe[0] = ribs[v_r+1]
-    venstre_ribbe[1] = ribs[v_r+2]
-    venstre_ribbe[3] = [ribs[v_r+1,0]-50, ribs[v_r+1,1] + (-50) * (ribs[v_r,1] - ribs[v_r+1,1])/(ribs[v_r,0] - ribs[v_r+1,0])]
+    venstre_ribbe[0] = ribs[v_r + 1]
+    venstre_ribbe[1] = ribs[v_r + 2]
+    venstre_ribbe[3] = [ribs[v_r + 1, 0] - rib_width, ribs[v_r + 1, 1] + (-rib_width) * (ribs[v_r,1] - ribs[v_r+1,1])/(ribs[v_r,0] - ribs[v_r+1,0])]
     venstre_ribbe[2] = venstre_ribbe[1] + venstre_ribbe[3] - venstre_ribbe[0]
 
     hogre_ribbe = np.zeros((4,2))
     hogre_ribbe[0] = ribs[h_r-1]
     hogre_ribbe[1] = ribs[h_r]
-    hogre_ribbe[2] = [ribs[h_r,0]+50, ribs[h_r,1] + 50 * (ribs[h_r+1,1] - ribs[h_r,1])/(ribs[h_r + 1,0] - ribs[h_r,0])]
+    hogre_ribbe[2] = [ribs[h_r,0] + rib_width, ribs[h_r,1] + rib_width * (ribs[h_r+1,1] - ribs[h_r,1])/(ribs[h_r + 1,0] - ribs[h_r,0])]
 
     hogre_ribbe[3] = hogre_ribbe[0] + hogre_ribbe[2] - hogre_ribbe[1]
 
     golv = np.zeros((4,2))
     golv[0] = ribs[golv_nr]
     golv[1] = ribs[golv_nr+1]
-    golv[2] = ribs[golv_nr+1] + np.array([0,-20])
-    golv[3] = ribs[golv_nr] + np.array([0,-20])
+    golv[2] = ribs[golv_nr+1] + np.array([0,-rib_width/2])
+    golv[3] = ribs[golv_nr] + np.array([0,-rib_width/2])
     
     return venstre_ribbe, hogre_ribbe, golv
 
@@ -154,7 +52,7 @@ def generate_ribs(ribs, L):
 #     piv_range = ranges()
     
 # def get_txy(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest = False):
-def generate_U_txy(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, kutt=True):
+def generate_U_txy(t_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, kutt=True):
     t_min = t_span[0]
     t_max = t_span[1]
     fps = 20
@@ -171,7 +69,7 @@ def generate_U_txy(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, kutt=True):
     Umx_reshape = np.copy(Umx.reshape(len(Umx), J, I))
     Vmx_reshape = np.copy(Vmx.reshape(len(Vmx), J, I))
 
-    v_r, golv_nr, h_r, v_r_rad, v_r_kol, v_r_tjukk, golv_rad1, golv_rad2, golv_skifte, h_r_rad, h_r_kol, h_r_tjukk = get_essential_coordinates(experiment)
+    v_r, golv_nr, h_r, v_r_rad, v_r_kol, v_r_tjukk, golv_rad1, golv_rad2, golv_skifte, h_r_rad, h_r_kol, h_r_tjukk = get_essential_coordinates(L)
 
     # Venstre ribbe
     x0 = ribs[v_r,0]  #-60.79
@@ -212,7 +110,7 @@ def generate_U_txy(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, kutt=True):
     
     
     if kutt:
-        kutt_kor = [ribs[v_r+1,0]-25, ribs[v_r+1,0]+(ribs[h_r,0] - ribs[v_r+1,0])+25, ribs[v_r+1,1]-24, ribs[v_r+1,1]+6] # [-35.81,64.19 , -25, 5]
+        kutt_kor = [ribs[v_r+1,0]-rib_width/2, ribs[v_r+1,0]+(ribs[h_r,0] - ribs[v_r+1,0]) + rib_width/2, ribs[v_r+1,1]-rib_width/2, ribs[v_r+1,1]+6] # [-35.81,64.19 , -25, 5]
         x1 = x[0,:]
         y1=y[:,0]
 
@@ -240,8 +138,8 @@ def generate_U_txy(t_span, Umx,Vmx,x,y,I,J,ribs, experiment, kutt=True):
 
     return U, txy
 
-def get_essential_coordinates(experiment):
-    if (experiment == "TWO"):
+def get_essential_coordinates(L):
+    if (L == 50):
         v_r = 1
         golv_nr = 8
         h_r = 16
@@ -263,7 +161,7 @@ def get_essential_coordinates(experiment):
         golv_nr = 6
         h_r = 11
 
-        if (experiment == "THREE"):
+        if (L == 75):
             v_r_rad = 70
             v_r_kol = 29
             v_r_tjukk = 6

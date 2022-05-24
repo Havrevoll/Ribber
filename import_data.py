@@ -163,45 +163,46 @@ def save_to_file(path, x,y,u,v,I,J,ribs):
          
 # save_to_file()
 
+if __name__ == "__main__":
 
-eks = { "Tonstad_THREE":['Q100_THREE', 'Q100_THREE_EXTRA', 'Q100_THREE_EXTRA3', 'Q20_THREE', 'Q40_THREE', 'Q40_THREE FINAL', 'Q100_EXTRA2_THREE',
-            'Q40_THREE_EXTRA', 'Q60_THREE', 'Q80EXTRA2_THREE', 'Q80_THREE', 'Q80_THREE_EXTRA'], 
-        "TONSTAD_TWO":['Q100_TWO', 'Q120_TWO', 'Q140_TWO', 'Q20_TWO', 'Q20_TWO2', 'Q20_TWO3', 'Q40_TWO', 'Q60_TWO', 'Q80_TWO'], 
-        "TONSTAD_FOUR":['Q100_FOUR', 'Q100_FOUR DT', 'Q20_FOUR CHECK', 'Q20_FOUR REPEAT', 'Q20_FOUR TRIALONE', 
-            'Q40_FOUR', 'Q40_REPEAT', 'Q60_FOUR', 'Q60_FOUR REPEAT', 'Q80_FOUR', 'Q80_FOURDTCHANGED']}
+    eks = { "Tonstad_THREE":['Q100_THREE', 'Q100_THREE_EXTRA', 'Q100_THREE_EXTRA3', 'Q20_THREE', 'Q40_THREE', 'Q40_THREE FINAL', 'Q100_EXTRA2_THREE',
+                'Q40_THREE_EXTRA', 'Q60_THREE', 'Q80EXTRA2_THREE', 'Q80_THREE', 'Q80_THREE_EXTRA'], 
+            "TONSTAD_TWO":['Q100_TWO', 'Q120_TWO', 'Q140_TWO', 'Q20_TWO', 'Q20_TWO2', 'Q20_TWO3', 'Q40_TWO', 'Q60_TWO', 'Q80_TWO'], 
+            "TONSTAD_FOUR":['Q100_FOUR', 'Q100_FOUR DT', 'Q20_FOUR CHECK', 'Q20_FOUR REPEAT', 'Q20_FOUR TRIALONE', 
+                'Q40_FOUR', 'Q40_REPEAT', 'Q60_FOUR', 'Q60_FOUR REPEAT', 'Q80_FOUR', 'Q80_FOURDTCHANGED']}
 
-# def create_hdf5(eks):
-
-jobs = {}
-
-for e,runs in eks.items():
-    ray.init()
+    # def create_hdf5(eks):
 
     jobs = {}
 
-    for r in runs:
-        folder = Path("../vec").joinpath(e).joinpath(r).joinpath("Analysis")
-        # folder = Path("/mnt/g/Experiments11/").joinpath(e).joinpath(r).joinpath("Analysis")
-        # print(str(folder), len(list(folder.glob("*.TIF")))/2)
-        
-        if (not folder.exists()):
-            raise Exception("{} finst ikkje".format(folder))
+    for e,runs in eks.items():
+        ray.init()
 
-        hdf5_file = Path("..").joinpath("{}_{}.hdf5".format(e,r))
+        jobs = {}
+
+        for r in runs:
+            folder = Path("../vec").joinpath(e).joinpath(r).joinpath("Analysis")
+            # folder = Path("/mnt/g/Experiments11/").joinpath(e).joinpath(r).joinpath("Analysis")
+            # print(str(folder), len(list(folder.glob("*.TIF")))/2)
+            
+            if (not folder.exists()):
+                raise Exception("{} finst ikkje".format(folder))
+
+            hdf5_file = Path("..").joinpath("{}_{}.hdf5".format(e,r))
+            
+            jobs[import_data.remote(folder)] ={'run':r, 'hdf5':hdf5_file}
         
-        jobs[import_data.remote(folder)] ={'run':r, 'hdf5':hdf5_file}
-    
-    print("Går for å henta jobbane i ",e)
-    # for k in jobs:
-    unready = list(jobs.keys())
-    while True:
-        ready, unready = ray.wait(unready)
-        ready = ready[0]
-        hdf5_file = jobs[ready]['hdf5']
-        print("hentar jobben til ",jobs[ready]['run'], hdf5_file)
-        data = ray.get(ready)
-        save_to_file(hdf5_file, *data)
-        
-        if len(unready) == 0:
-            break
-    ray.shutdown()
+        print("Går for å henta jobbane i ",e)
+        # for k in jobs:
+        unready = list(jobs.keys())
+        while True:
+            ready, unready = ray.wait(unready)
+            ready = ready[0]
+            hdf5_file = jobs[ready]['hdf5']
+            print("hentar jobben til ",jobs[ready]['run'], hdf5_file)
+            data = ray.get(ready)
+            save_to_file(hdf5_file, *data)
+            
+            if len(unready) == 0:
+                break
+        ray.shutdown()

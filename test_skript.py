@@ -23,19 +23,50 @@ from math import floor
 import matplotlib
 matplotlib.use("Agg")
 
-tal = 1000
+tal = 200
 rnd_seed = 1
 tider = {}
 
 pickle_filer = [
-    "rib25_Q20_1", "rib25_Q20_2", "rib25_Q20_3", "rib25_Q40_1", "rib25_Q40_2", "rib25_Q60_1", "rib25_Q60_2", "rib25_Q80_1", 
-    "rib25_Q80_2", "rib25_Q100_1", "rib25_Q100_2", "rib75_Q20_1", "rib75_Q40_1", "rib75_Q40_2", "rib75_Q40_3", "rib75_Q60_1", 
-    "rib75_Q80_1", "rib75_Q80_2", "rib75_Q80_3", "rib75_Q100_1", "rib75_Q100_2", "rib75_Q100_3", "rib75_Q100_4", "rib50_Q20_1", 
-    "rib50_Q20_2", "rib50_Q20_3", "rib50_Q40_1", "rib50_Q60_1", "rib50_Q80_1", "rib50_Q100_1", "rib50_Q120_1", "rib50_Q140_1"]
+    # "rib25_Q20_1", 
+    # "rib25_Q20_2", "rib25_Q20_3", 
+    # "rib25_Q40_1", 
+    # "rib25_Q40_2", 
+    # "rib25_Q60_1", 
+    # "rib25_Q60_2", 
+    # "rib25_Q80_1", 
+    # "rib25_Q80_2", 
+    # "rib25_Q100_1", 
+    # "rib25_Q100_2", 
+    # "rib75_Q20_1", "rib75_Q40_1", 
+    # "rib75_Q40_2", "rib75_Q40_3", 
+    # "rib75_Q60_1", "rib75_Q80_1", 
+    # "rib75_Q80_2", "rib75_Q80_3", 
+    # "rib75_Q100_1", 
+    # "rib75_Q100_2", "rib75_Q100_3", "rib75_Q100_4", 
+    # "rib50_Q20_1", 
+    # "rib50_Q20_2", "rib50_Q20_3", 
+    "rib50_Q40_1", 
+    # "rib50_Q60_1", "rib50_Q80_1", "rib50_Q100_1", "rib50_Q120_1", "rib50_Q140_1"
+    ]
+pickle_filer = ["rib50_Q40_1_skalert" ]
 
-graderingsliste = [[10, 12], [9, 10],[8, 9],[7, 8],[6, 7],[5, 6],[4, 5],[3, 4],[2, 3],[1, 2],[0.9, 1],[0.8, 0.9],
+graderingsliste = [
+    [10, 12], 
+    [9, 10],
+    [8, 9],
+    [7, 8],
+    [6, 7],
+    [5, 6],
+    [4, 5],[3, 4],[2, 3],[1, 2],[0.9, 1],[0.8, 0.9],
                     [0.7, 0.8],[0.6, 0.7],[0.5, 0.6],[0.4, 0.5],[0.3, 0.4],[0.2, 0.3],[0.1, 0.2],[0.09, 0.1],
-                    [0.08, 0.09],[0.07, 0.08],[0.06, 0.07],[0.05, 0.06]]
+                    [0.08, 0.09],[0.07, 0.08],[0.06, 0.07],
+                    [0.05, 0.06]]
+
+
+temp = np.array([0.11, 0.13, 0.15, 0.18, 0.21, 0.24, 0.61, 1.27, 2.21, 3.50, 5.02, 6.75, 8.60, 10.64, 12.89, 33.56, 54.38, 74.98, 95.44, 118.31, 140.16, 160.38, 179.30, 197.13])
+graderingsliste = np.vstack((temp[:-1],temp[1:])).T 
+del temp
 
 # logging.basicConfig(filename='simuleringar.log', level=logging.DEBUG, format='%(asctime)s - %(name)s - %(message)s')
 
@@ -95,7 +126,7 @@ for namn in pickle_filer:
     rtol = 1e-1
     verbose = False
     collision_correction = True
-    laga_film = False
+    laga_film = True
     multi = True
 
     for gradering in graderingsliste:
@@ -147,7 +178,8 @@ for namn in pickle_filer:
                     # if len(ready) == 0:
                     try:
 
-                        sti_dict = ray.get(elem, timeout=(40))
+
+                        sti_dict = ray.get(elem, timeout=(20))
 
                         assert all([i in sti_dict.keys() for i in np.linspace(round(sti_dict['init_time']*100), round(sti_dict['final_time']*100), round(
                             (sti_dict['final_time']-sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {jobs[elem].index} har ein feil i seg, ikkje alle elementa er der"
@@ -163,15 +195,15 @@ for namn in pickle_filer:
                         jobs[elem].method = "RK23"
 
                 if len(cancelled) > 0:
-                    app_log.debug("Skal ta dei som ikkje klarte BDF")
+                    app_log.info("Skal ta dei som ikkje klarte BDF")
                     jobs2 = {remote_lag_sti.remote(ribs, t_span, particle=pa, tre=tre_plasma, fps=fps, wrap_max=wrap_max,
-                                                   verbose=verbose, collision_correction=collision_correction): pa for pa in cancelled}
+                                                    verbose=verbose, collision_correction=collision_correction): pa for pa in cancelled} #var cancelled
                     not_ready = list(jobs2.keys())
                     while True:
                         ready, not_ready = ray.wait(not_ready)
                         sti_dict = ray.get(ready[0])
                         assert all([i in sti_dict.keys() for i in np.linspace(round(sti_dict['init_time']*100), round(sti_dict['final_time']*100), round(
-                            (sti_dict['final_time']-sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {jobs[ready[0]].index} har ein feil i seg, ikkje alle elementa er der"
+                            (sti_dict['final_time']-sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {jobs2[ready[0]].index} har ein feil i seg, ikkje alle elementa er der"
                         jobs2[ready[0]].sti_dict = sti_dict
 
                         app_log.info(
@@ -197,9 +229,10 @@ for namn in pickle_filer:
             app_log.info("Berekningane fanst frå før, hentar dei.")
             with open(partikkelfil, 'rb') as f:
                 particle_list = pickle.load(f)
-            with h5py.File(pickle_fil.with_name(f"{pickle_fil.stem}_ribs.hdf5"), 'r') as f:
-                ribs = [Rib(rib) for rib in np.asarray(f['ribs'])]
-
+            # with h5py.File(pickle_fil.with_name(f"{pickle_fil.stem}_ribs.hdf5"), 'r') as f:
+            #     ribs = [Rib(rib) for rib in np.asarray(f['ribs'])]
+            with open(pickle_fil, 'rb') as f:
+                ribs =  [Rib(rib) for rib in pickle.load(f).ribs]
         # caught = 0
         # caught_mass = 0
         # uncaught=0
