@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib
 from pathlib import Path
 import subprocess
-import ray
+# import ray
 from kornfordeling import PSD_plot
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -22,14 +22,14 @@ from math import hypot
 from rib import Rib
 # from loguru import logger
 
-@ray.remote
-def lag_video(partikkelfil, filmfil, hdf5_fil, ribs, t_span, fps=20, slow=1, diameter_span = (0,20)):
-    with open(partikkelfil, 'rb') as f:
-        particle_list = pickle.load(f)
+# @ray.remote
+# def lag_video(partikkelfil, filmfil, hdf5_fil, ribs, t_span, fps=20, slow=1, diameter_span = (0,20)):
+#     with open(partikkelfil, 'rb') as f:
+#         particle_list = pickle.load(f)
 
-    start = datetime.datetime.now()
-    sti_animasjon(particle_list, ribs, t_span, hdf5_fil=hdf5_fil, utfilnamn=filmfil, fps=fps, slow = slow, diameter_span= diameter_span)
-    print(f"Brukte {datetime.datetime.now() - start} på å lagra filmen")
+#     start = datetime.datetime.now()
+#     sti_animasjon(particle_list, ribs, t_span, hdf5_fil=hdf5_fil, utfilnamn=filmfil, fps=fps, slow = slow, diameter_span= diameter_span)
+#     print(f"Brukte {datetime.datetime.now() - start} på å lagra filmen")
 
 # @logger.catch
 def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"),  fps=60, slow = 1, diameter_span=(0,20) ):
@@ -59,7 +59,7 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"
     # piv_range = ranges()
 
     with h5py.File(hdf5_fil, 'r') as dataset:
-        (I,J)=(int(np.array(dataset['I'])),int(np.array(dataset['J'])))
+        (I,J)=dataset.attrs['I'],dataset.attrs['J']
     
         Umx = np.array(dataset['Umx'])[t_min*20:t_max*20,:]
         Umx_reshape = Umx.reshape((len(Umx),J,I))#[:,piv_range[0],piv_range[1]]
@@ -215,82 +215,91 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"
     
     #ax.axis('equal')
     # ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,steps),interval=50)
+    FFwriter = animation.FFMpegWriter(fps=fps, extra_args=['-vcodec','libx265'])
     ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps-int(fps/20)),interval=int(slow*1000/(fps)), blit=False)
     # plt.show()
     
     starttid = datetime.datetime.now()
-    ani.save(utfilnamn)
+    ani.save(utfilnamn, writer=FFwriter)
     print(f"Brukte {datetime.datetime.now()-starttid} på å lagra filmen")
     plt.close()
 
 
 
 if __name__ == "__main__":
-    liste = [#"TONSTAD_FOUR_Q20_FOUR TRIALONE",
-    # "TONSTAD_FOUR_Q20_FOUR CHECK",
-    # "TONSTAD_FOUR_Q20_FOUR REPEAT",
-    # "TONSTAD_FOUR_Q40_FOUR",
-    # "TONSTAD_FOUR_Q40_REPEAT",
-    # "TONSTAD_FOUR_Q60_FOUR",
-    # "TONSTAD_FOUR_Q60_FOUR REPEAT",
-    # "TONSTAD_FOUR_Q80_FOURDTCHANGED",
-    # "TONSTAD_FOUR_Q80_FOUR",
-    # "TONSTAD_FOUR_Q100_FOUR DT",
-    # "TONSTAD_FOUR_Q100_FOUR",
-    # "Tonstad_THREE_Q20_THREE",
-    # "Tonstad_THREE_Q40_THREE",
-    # "Tonstad_THREE_Q40_THREE_EXTRA",
-    # "Tonstad_THREE_Q40_THREE FINAL",
-    # "Tonstad_THREE_Q60_THREE",
-    "Tonstad_THREE_Q80_THREE",
-    "Tonstad_THREE_Q80_THREE_EXTRA",
-    "Tonstad_THREE_Q80EXTRA2_THREE",
-    # "Tonstad_THREE_Q100_THREE",
-    # "Tonstad_THREE_Q100_THREE_EXTRA",
-    # "Tonstad_THREE_Q100_EXTRA2_THREE",
-    # "Tonstad_THREE_Q100_THREE_EXTRA3",
-    # "TONSTAD_TWO_Q20_TWO",
-    "TONSTAD_TWO_Q20_TWO2",
-    # "TONSTAD_TWO_Q20_TWO3",
-    # "TONSTAD_TWO_Q40_TWO",
-    # "TONSTAD_TWO_Q60_TWO",
-    # "TONSTAD_TWO_Q80_TWO",
-    # "TONSTAD_TWO_Q100_TWO",
-    # "TONSTAD_TWO_Q120_TWO",
-    # "TONSTAD_TWO_Q140_TWO"
-    ]
 
-    ray.init(num_cpus=8)
+    with open("partikkelsimulasjonar/particles_rib50_Q40_1_BDF_200_[0.05, 0.06]_1e-01_linear.pickle",'rb') as f: 
+        partiklar = pickle.load(f)
+
+    with open("data/rib50_Q40_1.pickle",'rb') as f: 
+        ribs = [Rib(rib) for rib in pickle.load(f).ribs]
+
+    sti_animasjon(partiklar=partiklar,ribs=ribs,t_span=(0,100),hdf5_fil=Path("data/rib50_Q40_1.hdf5"),utfilnamn="skalert_video.mp4",fps=60, slow=1)
+    # liste = [#"TONSTAD_FOUR_Q20_FOUR TRIALONE",
+    # # "TONSTAD_FOUR_Q20_FOUR CHECK",
+    # # "TONSTAD_FOUR_Q20_FOUR REPEAT",
+    # # "TONSTAD_FOUR_Q40_FOUR",
+    # # "TONSTAD_FOUR_Q40_REPEAT",
+    # # "TONSTAD_FOUR_Q60_FOUR",
+    # # "TONSTAD_FOUR_Q60_FOUR REPEAT",
+    # # "TONSTAD_FOUR_Q80_FOURDTCHANGED",
+    # # "TONSTAD_FOUR_Q80_FOUR",
+    # # "TONSTAD_FOUR_Q100_FOUR DT",
+    # # "TONSTAD_FOUR_Q100_FOUR",
+    # # "Tonstad_THREE_Q20_THREE",
+    # # "Tonstad_THREE_Q40_THREE",
+    # # "Tonstad_THREE_Q40_THREE_EXTRA",
+    # # "Tonstad_THREE_Q40_THREE FINAL",
+    # # "Tonstad_THREE_Q60_THREE",
+    # "Tonstad_THREE_Q80_THREE",
+    # "Tonstad_THREE_Q80_THREE_EXTRA",
+    # "Tonstad_THREE_Q80EXTRA2_THREE",
+    # # "Tonstad_THREE_Q100_THREE",
+    # # "Tonstad_THREE_Q100_THREE_EXTRA",
+    # # "Tonstad_THREE_Q100_EXTRA2_THREE",
+    # # "Tonstad_THREE_Q100_THREE_EXTRA3",
+    # # "TONSTAD_TWO_Q20_TWO",
+    # "TONSTAD_TWO_Q20_TWO2",
+    # # "TONSTAD_TWO_Q20_TWO3",
+    # # "TONSTAD_TWO_Q40_TWO",
+    # # "TONSTAD_TWO_Q60_TWO",
+    # # "TONSTAD_TWO_Q80_TWO",
+    # # "TONSTAD_TWO_Q100_TWO",
+    # # "TONSTAD_TWO_Q120_TWO",
+    # # "TONSTAD_TWO_Q140_TWO"
+    # ]
+
+    # ray.init(num_cpus=8)
     
-    jobs = []
-    for l in liste:
-        sim = Path(f"./partikkelsimulasjonar/particles_{l}_BDF_1000_1e-01_linear.pickle")
-        filmfil = sim.with_suffix(".mp4")
-        hdf5fil = Path("../").joinpath(l).with_suffix(".hdf5")
-        ribfil = Path(f"../{l}_ribs.hdf5")
+    # jobs = []
+    # for l in liste:
+    #     sim = Path(f"./partikkelsimulasjonar/particles_{l}_BDF_1000_1e-01_linear.pickle")
+    #     filmfil = sim.with_suffix(".mp4")
+    #     hdf5fil = Path("../").joinpath(l).with_suffix(".hdf5")
+    #     ribfil = Path(f"../{l}_ribs.hdf5")
 
-        assert sim.exists() , f"{sim}"
-        assert hdf5fil.exists(), f"{hdf5fil}" 
-        assert ribfil.exists(), f"{ribfil}"
+    #     assert sim.exists() , f"{sim}"
+    #     assert hdf5fil.exists(), f"{hdf5fil}" 
+    #     assert ribfil.exists(), f"{ribfil}"
 
-        with h5py.File(ribfil,'r') as f:
-                ribs = [Rib(rib) for rib in np.asarray(f['ribs'])]
+    #     with h5py.File(ribfil,'r') as f:
+    #             ribs = [Rib(rib) for rib in np.asarray(f['ribs'])]
     
 
-        for span in [(0.05,0.06),(0.06,0.08),(0.08,0.1),(0.1,0.2),(0.2,0.3), (0.3,0.5),(0.5,1),(1,20)]:
-            utfil = filmfil.parent.joinpath(f"{l}").joinpath(f"{span[0]}_{span[1]}.mp4")
-            if not utfil.parent.exists():
-                utfil.parent.mkdir(parents=True)
-            if not utfil.exists():
-                print(utfil)
+    #     for span in [(0.05,0.06),(0.06,0.08),(0.08,0.1),(0.1,0.2),(0.2,0.3), (0.3,0.5),(0.5,1),(1,20)]:
+    #         utfil = filmfil.parent.joinpath(f"{l}").joinpath(f"{span[0]}_{span[1]}.mp4")
+    #         if not utfil.parent.exists():
+    #             utfil.parent.mkdir(parents=True)
+    #         if not utfil.exists():
+    #             print(utfil)
         
-                jobs.append(lag_video.remote(sim, utfil, hdf5fil, ribs, (0,179), fps=120, slow = 2, diameter_span=span))
+    #             jobs.append(lag_video.remote(sim, utfil, hdf5fil, ribs, (0,179), fps=120, slow = 2, diameter_span=span))
             
-                # if utfil.exists():
-                #     subprocess.run(f'''rsync "{utfil.resolve()}" havrevol@login.ansatt.ntnu.no:"{Path("/web/folk/havrevol/partiklar/").joinpath(utfil.parent.name.replace(" ", "_"))}_sorterte/"''', shell=True)
-    unready = jobs
-    while len(unready) > 0:
-        ready,unready = ray.wait(unready)
-        ray.get(ready)
-        print("henta ein ready, desse er unready:")
-        print(unready)
+    #             # if utfil.exists():
+    #             #     subprocess.run(f'''rsync "{utfil.resolve()}" havrevol@login.ansatt.ntnu.no:"{Path("/web/folk/havrevol/partiklar/").joinpath(utfil.parent.name.replace(" ", "_"))}_sorterte/"''', shell=True)
+    # unready = jobs
+    # while len(unready) > 0:
+    #     ready,unready = ray.wait(unready)
+    #     ray.get(ready)
+    #     print("henta ein ready, desse er unready:")
+    #     print(unready)
