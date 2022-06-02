@@ -8,4 +8,4 @@ g = 9810.0 # mm/s²
 ρ_p = 2.650e-6 # kg/mm³ for sand
 ρ = 1.0e-6 # kg/mm³ for vatn
 ν = 1 # 1 mm²/s = 1e-6 m²/s viskositeten til vatn
-
+µ=0.85

@@ -9,6 +9,7 @@ import numpy as np
 from matplotlib.patches import Polygon, Rectangle
 
 from pathlib import Path
+from scipy.optimize import root_scalar
 
 from copy import deepcopy
 
@@ -100,3 +101,62 @@ def getIsLess(a, b, center):
     d1 = (a[0] - center[0]) * (a[0] - center[0]) + (a[1] - center[1]) * (a[1] - center[1])
     d2 = (b[0] - center[0]) * (b[0] - center[0]) + (b[1] - center[1]) * (b[1] - center[1])
     return d1 > d2
+
+def create_bins(in_list):
+    in_list = np.asarray(in_list)
+    return np.vstack((in_list[:-1],in_list[1:])).T 
+
+def term_vel(d, Δ=1.65, ν=1.5674, c1=20, c2=1.1, g=9810):
+    """Ferguson & Church 2004
+
+    Args:
+        d (float): partikkeldiameter i mm.
+        Δ (float): dykka eigenvekt [-]. Defaults to 1.65.
+        ν (float): kinematisk viskositet i mm²/s. Defaults to 1.5674.
+        c1 (int, optional): 1. parameter for kornigheit. Defaults to 20.
+        c2 (float, optional): 2. parameter for kornigheit. Defaults to 1.1.
+        g (int, optional): Gravitasjon i mm/s². Defaults to 9810.
+
+    Returns:
+        float: fallsnøggleik i vatn for ein mineralpartikkel
+    """    
+    return Δ * g * d**2/(c1 * ν + (0.75 * c2 * Δ * g * d**3)**0.5)
+    
+def diff(d,u):
+    return (term_vel(d) - u )
+
+def scale_bins(bins,factor):
+    u_m = term_vel(bins)
+    u_p = u_m * factor**0.5
+
+    bins_p = np.zeros(bins.shape)
+
+    for i,(d,u) in enumerate(zip(bins,u_p)):
+        res = root_scalar(diff,bracket=[d,d*1.1*factor],args=(u))
+        bins_p[i] = res.root
+    
+    return bins_p
+
+def f2t(f,scale=1):
+    """Gjer om frame til tid
+
+    Args:
+        f (int): Datasett-nummer (0-3599)
+        scale (int, optional): Skaleringsfaktor, til dømes 20 eller 40? Defaults to 1.
+    
+    Returns:
+        float: tid som tilsvarer frame. Til dømes i skala 1: 1000 -> 50
+    """    
+    return f*0.05*scale**0.5
+
+def t2f(t,scale=1):
+    """Gjer om tid til frame
+
+    Args:
+        t (float): Tidspunkt
+        scale (int, optional): Skaleringsfaktor, til dømes 20 eller 40? Defaults to 1.
+
+    Returns:
+        int: Datasett-nummer (0-3599)
+    """
+    return int(t*20./scale**0.5)

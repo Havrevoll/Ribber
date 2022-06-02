@@ -1,4 +1,5 @@
 
+import datetime
 import h5py
 import pickle
 import numpy as np
@@ -9,32 +10,33 @@ from datagenerering import generate_U_txy, generate_ribs, lagra_tre, tre_objekt
 import scipy.spatial.qhull as qhull
 from scipy.spatial import cKDTree
 
-def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
-    
-    # a_pool = multiprocessing.Pool()
-    
-    t_min = t_span[0]
-    t_max = t_span[1]
-    
-    # i = [(i/10,(i+1.5)/10) for i in range(int(t_min)*10,int(t_max)*10)]
-    
-    # result = a_pool.map(lag_tre, i)
-    # jobs = [lag_tre.remote(span, filnamn_inn) for span in i]
+def lag_tre_multi(f_span, filnamn_inn, filnamn_ut=None, skalering=1):
+    """Lagar eit objekt som kan brukast til interpolering av fartsdata.
+
+    Args:
+        f_span (tuple): Ein tuple med 
+        filnamn_inn (_type_): _description_
+        filnamn_ut (_type_, optional): _description_. Defaults to None.
+        skalering (int, optional): _description_. Defaults to 1.
+
+    Returns:
+        _type_: _description_
+    """  
     
     ray.init(num_cpus=4)
 
     with h5py.File(filnamn_inn, 'r') as f:
-        U = f.attrs['U']
-        L = f.attrs['L']
-        rib_width = f.attrs['rib_width']
+        U = f.attrs['U']*skalering**0.5
+        L = f.attrs['L']*skalering
+        rib_width = f.attrs['rib_width']*skalering
         
         I = f.attrs['I']
         J = f.attrs['J']
-        Umx = np.array(f['Umx'])#[int(t_min*fps):int(t_max*fps),:]
-        Vmx = np.array(f['Vmx'])#[int(t_min*fps):int(t_max*fps),:]
-        x = np.array(f['x']).reshape(J,I)
-        y = np.array(f['y']).reshape(J,I)
-        ribs = np.array(f['ribs'])
+        Umx = np.array(f['Umx'])*skalering**0.5
+        Vmx = np.array(f['Vmx'])*skalering*0.5
+        x = np.array(f['x']).reshape(J,I)*skalering
+        y = np.array(f['y']).reshape(J,I)*skalering
+        ribs = np.array(f['ribs'])*skalering
 
     u_r = ray.put(Umx)
     v_r = ray.put(Vmx)
@@ -42,11 +44,7 @@ def lag_tre_multi(t_span, filnamn_inn, filnamn_ut=None):
     y_r = ray.put(y)
     ribs_r = ray.put(ribs)
 
-    # experiment = re.search("TONSTAD_([A-Z]*)_", filnamn_inn, re.IGNORECASE).group(1)
-
-    jobs = {lag_tre.remote((i/10,(i+1.5)/10), u_r,v_r,x_r,y_r,I,J,ribs_r, L,rib_width):i for i in range(int(t_min)*10,int(t_max)*10+1)}
-
-    # i_0 =  range(int(t_min)*10,int(t_max)*10)
+    jobs = {lag_tre.remote((i/10,(i+1.5)/10), u_r,v_r,x_r,y_r,I,J,ribs_r, L,rib_width):i for i in range(int(f_span[0])*10,int(f_span[1])*10+1)}
 
     trees = {}
 
@@ -93,11 +91,11 @@ def lag_tre(t_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, nearest=False, kutt=True
     if (nearest):
         tree = cKDTree(txy)
     else:
-        # print(f"Byrjar på delaunay for ({t_min}, {t_max})")
-        # start = datetime.datetime.now()
+        print(f"Byrjar på delaunay for ({t_span})")
+        start = datetime.datetime.now()
         tree = qhull.Delaunay(txy)
-        # print(f"Ferdig med delaunay for ({t_min}, {t_max}, brukte {datetime.datetime.now()-start}")
-        # del start
+        print(f"Ferdig med delaunay for ({t_span}, brukte {datetime.datetime.now()-start}")
+        del start
     
     if (inkluder_ribs):
         venstre_ribbe, hogre_ribbe, golv = generate_ribs(ribs, L, rib_width)

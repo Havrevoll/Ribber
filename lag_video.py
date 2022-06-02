@@ -216,7 +216,7 @@ def sti_animasjon(partiklar, ribs, t_span, hdf5_fil, utfilnamn=Path("stiQ40.mp4"
     #ax.axis('equal')
     # ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(1,steps),interval=50)
     FFwriter = animation.FFMpegWriter(fps=fps, extra_args=['-vcodec','libx265'])
-    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps-int(fps/20)),interval=int(slow*1000/(fps)), blit=False)
+    ani = animation.FuncAnimation(fig, nypkt, frames=np.arange(0,steps-int(fps/20)),interval=(slow*1000/(fps)), blit=False)
     # plt.show()
     
     starttid = datetime.datetime.now()

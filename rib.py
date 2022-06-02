@@ -1,8 +1,9 @@
 import numpy as np
 from hjelpefunksjonar import norm, sortClockwise
+from constants import µ
 
 class Rib:
-    def __init__(self, coords, µ=0.5):
+    def __init__(self, coords, µ=µ):
         self.vertices = sortClockwise(np.array(coords))
         
         self.normals = [norm(np.cross(self.vertices[1]-self.vertices[0],np.array([0,0,-1]))[:2]),
