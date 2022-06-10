@@ -20,7 +20,7 @@ import numpy as np
 
 
 def generate_ribs(ribs, L, rib_width):
-    v_r, golv_nr, h_r, _, _, _, _, _, _, _, _, _ = get_essential_coordinates(L)
+    v_r, golv_nr, h_r, _, _, _, _, _, _, _, _, _ = get_essential_coordinates(L,rib_width)
 
     venstre_ribbe = np.zeros((4,2))
     
@@ -59,7 +59,7 @@ def generate_U_txy(f_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, kutt=True):
     Umx_reshape = np.copy(Umx.reshape(len(Umx), J, I))
     Vmx_reshape = np.copy(Vmx.reshape(len(Vmx), J, I))
 
-    v_r, golv_nr, h_r, v_r_rad, v_r_kol, v_r_tjukk, golv_rad1, golv_rad2, golv_skifte, h_r_rad, h_r_kol, h_r_tjukk = get_essential_coordinates(L)
+    v_r, golv_nr, h_r, v_r_rad, v_r_kol, v_r_tjukk, golv_rad1, golv_rad2, golv_skifte, h_r_rad, h_r_kol, h_r_tjukk = get_essential_coordinates(L,rib_width)
 
     # Venstre ribbe
     x0 = ribs[v_r,0]  #-60.79
@@ -128,8 +128,9 @@ def generate_U_txy(f_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, kutt=True):
 
     return U, txy
 
-def get_essential_coordinates(L):
-    if (L == 50):
+def get_essential_coordinates(L,rib_width):
+    skala = rib_width/50
+    if (L == 50*skala):
         v_r = 1
         golv_nr = 8
         h_r = 16
@@ -151,7 +152,7 @@ def get_essential_coordinates(L):
         golv_nr = 6
         h_r = 11
 
-        if (L == 75):
+        if (L == 75*skala):
             v_r_rad = 70
             v_r_kol = 29
             v_r_tjukk = 6
