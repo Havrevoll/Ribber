@@ -1,14 +1,14 @@
 # import imp
 import numpy as np
 from math import hypot
-from hjelpefunksjonar import norm
+from hjelpefunksjonar import norm, t2f
 from constants import g, ρ_p, ρ, ν
 g = np.array([0, g]) # mm/s^2 = 9.81 m/s^2
-import ray
+# import ray
 
 nullfart = np.zeros(2)
 
-def f(t, x, particle, tri, ribs):
+def f(t, x, particle, tri, ribs, fps):
     """
     Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
     Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
@@ -34,9 +34,6 @@ def f(t, x, particle, tri, ribs):
 
     """
     
-    nu = ν # 1 mm^2/s = 1e-6 m^2/s
-    rho = ρ # kg/mm^3 = 1000 kg/m^3 
- 
     addedmass = particle.addedmass
     collision = particle.collision 
     try:
@@ -46,12 +43,12 @@ def f(t, x, particle, tri, ribs):
     
     dxdt = x[2:]
 
-    U_f, dudt_material, U_top_bottom = get_u(t, x, particle, tri, collision= collision)
+    U_f, dudt_material, U_top_bottom = get_u(t, x, particle, tri, collision= collision, fps=fps)
     
     vel = U_f - dxdt # relativ snøggleik
     # vel_ang = atan2(vel[1], vel[0])
     
-    Re = hypot(vel[0],vel[1]) * particle.diameter / nu 
+    Re = hypot(vel[0],vel[1]) * particle.diameter / ν
     
     # if (Re<1000):
     try:
@@ -67,7 +64,7 @@ def f(t, x, particle, tri, ribs):
     #     cd = 0.44
     
     # print("Re = ", Re," cd= ", cd)
-    rho_self_density = rho / particle.density
+    rho_self_density = ρ / particle.density
     
     drag_component =  3/4 * cd / particle.diameter * rho_self_density * abs(vel)*vel
     gravity_component = (rho_self_density - 1) * g
@@ -116,7 +113,7 @@ def f(t, x, particle, tri, ribs):
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
-def get_u(t, x_inn, particle, tre_samla, collision):
+def get_u(t, x_inn, particle, tre_samla, collision, fps):
     '''
     https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
 
@@ -140,15 +137,16 @@ def get_u(t, x_inn, particle, tre_samla, collision):
     radius = particle.radius
     lift, addedmass, linear = particle.lift, particle.addedmass, particle.linear
 
-    tx = np.concatenate(([t], x_inn[:2]))
+    tx = np.concatenate(([t2f(t, fps)], x_inn[:2]))
     U_p = x_inn[2:]
         
     # dt, dx, dy = 0.01, 0.1, 0.1
     Δ = 0.01
     
-    U_del = tre_samla.get_U(tx)
-    tri = tre_samla.get_tri(tx)
-    
+    # U_del = tre_samla.get_U(tx)
+    # tri = tre_samla.get_tri(tx)
+    tri, U_del = tre_samla.get_tri_og_U(tx)
+
     x = np.vstack((tx,tx + np.array([Δ,0,0]), tx + np.array([0,Δ,0]), tx +np.array([0,0,Δ])))
         
     kdtre = tre_samla.kdtre

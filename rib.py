@@ -18,6 +18,15 @@ class Rib:
     def get_rib_middle(self):
         return np.sum(self.vertices, axis=0)/len(self.vertices)
 
+    def get_rib_dimensions(self):
+        shortest = np.inf
+        longest = 0
+        for i,v  in enumerate(self.vertices):
+            lengd = ((self.vertices[i]-self.vertices[i-1])**2).sum()**0.5
+            shortest = min(lengd, shortest)
+            longest = max(lengd, longest)
+
+        return shortest,longest
     # def __init__(self, origin, width, height):
     #     # Bør kanskje ha informasjon om elastisiteten ved kollisjonar òg?
     #     self.origin = np.array(origin)

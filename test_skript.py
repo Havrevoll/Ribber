@@ -17,7 +17,7 @@ import numpy as np
 import logging
 from pathlib import Path
 import datetime
-from hjelpefunksjonar import finn_fil,create_bins, scale_bins
+from hjelpefunksjonar import finn_fil,create_bins, scale_bins, f2t, t2f
 from lag_video import sti_animasjon
 import pickle
 from math import floor, sqrt
@@ -121,10 +121,11 @@ for namn in pickle_filer:
         assert hdf5_fil.exists()
 
         talstart = datetime.datetime.now()
-        t_span = (0, 179)
+        f_span = (0,3599)
+        t_span = (f2t(f_span[0],scale=skalering), f2t(f_span[0],scale=skalering))
 
         # sim_args = dict(fps = 20, t_span=t_span, linear = True, lift = True, addedmass = True, wrap_max = 50, method = 'BDF', atol = 1e-1, rtol = 1e-1, verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = multi)
-        fps = 20/sqrt(skalering)
+        # fps = 20/sqrt(skalering)
         linear = True
         lift = True
         addedmass = True
@@ -132,6 +133,7 @@ for namn in pickle_filer:
         method = 'BDF'
         atol = 1e-1
         rtol = 1e-1
+        # Denne tråden forklarer litt om korleis ein skal setja atol og rtol: https://stackoverflow.com/questions/67389644/floating-point-precision-of-scipy-solve-ivp
         verbose = False
         collision_correction = True
         laga_film = True
@@ -146,15 +148,20 @@ for namn in pickle_filer:
             partikkelfil = Path( f"./partikkelsimulasjonar/particles_{pickle_fil.stem}_{method}_{tal}_{gradering}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}.pickle")
             if not partikkelfil.exists():
 
-                app_log.info("Skal henta tre.")
+                app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")
                 if pickle_fil.exists():
+                    app_log.info(f"Ja, det finst, hentar det.")
                     with open(pickle_fil, 'rb') as f:
                         tre = pickle.load(f)
                     app_log.info("Ferdig å henta tre.")
                 else:
+                    app_log.info(f"Det finst ikkje, må laga det.")
                     from lag_tre import lag_tre_multi
-                    tre = lag_tre_multi(t_span,filnamn_inn = hdf5_fil, skalering=skalering)
+                    tre = lag_tre_multi(f_span,filnamn_inn = hdf5_fil, skalering=skalering)
+                    app_log.info(f"Ferdig å laga, skal lagra det.")
+
                     lagra_tre(tre,pickle_fil)
+                    app_log.info(f"Ferdig å lagra det.")
                 # ribs = [Rib(rib) for rib in tre.ribs]
                 # particle_list = simulering(tal, tre, PSD=np.asarray([[gradering[0],0], [gradering[1],1]]), **sim_args)
 
@@ -167,33 +174,32 @@ for namn in pickle_filer:
                 with h5py.File(hdf5_fil, 'r') as f:
                     max_y = np.max(np.asarray(f['y'])*skalering)
 
-                diameters = get_PSD_part(tal, PSD=np.asarray(
-                    [[gradering[0], 0], [gradering[1], 1]]), rnd_seed=rnd_seed).tolist()
-                particle_list = [Particle(float(d), [ribs[0].get_rib_middle()[0], random.uniform(
-                    ribs[0].get_rib_middle()[1]+8, max_y), 0, 0], random.uniform(0, 50 *sqrt(skalering))) for d in diameters]
+                # Her blir partiklane laga:
+                diameters = get_PSD_part(tal, PSD=np.asarray([[gradering[0], 0], [gradering[1], 1]]), rnd_seed=rnd_seed).tolist()
+                particle_list = [Particle(float(d), [ribs[0].get_rib_middle()[0], random.uniform(ribs[0].get_rib_middle()[1]+ribs[0].get_rib_dimensions()[0], max_y), 0, 0], random.randrange(0, 1000 )) for d in diameters]
 
                 for i, p in enumerate(particle_list):
                     p.atol, p.rtol = atol, rtol
                     p.method = method
                     p.linear, p.lift, p.addedmass = linear, lift, addedmass
                     # rettar opp init_tid slik at det blir eit tal som finst i datasettet.
-                    p.init_time = floor(p.init_time * fps)/fps
+                    # p.init_time = floor(p.init_time * fps)/fps
                     p.index = i
                     p.resting_tolerance = 0.0001 if method == "BDF" else 0.01
+                    p.scale = skalering
 
                 if multi:
                     ray.init()  # dashboard_port=8266,num_cpus=4)
                     tre_plasma = ray.put(tre)
-                    jobs = {remote_lag_sti.remote(ribs, t_span, particle=pa, tre=tre_plasma, fps=fps, wrap_max=wrap_max,
-                                                verbose=verbose, collision_correction=collision_correction): pa for pa in particle_list}
+                    lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre_plasma, skalering=skalering, wrap_max=wrap_max,
+                                            verbose=verbose, collision_correction=collision_correction)
+                    jobs = {remote_lag_sti.remote(particle=pa, **lag_sti_args): pa for pa in particle_list}
 
                     not_ready = list(jobs.keys())
                     cancelled = []
                     for elem in not_ready:
                         # if len(ready) == 0:
                         try:
-
-
                             sti_dict = ray.get(elem, timeout=(2))
 
                             assert all([i in sti_dict.keys() for i in np.linspace(round(sti_dict['init_time']*100), round(sti_dict['final_time']*100), round(
@@ -211,8 +217,7 @@ for namn in pickle_filer:
 
                     if len(cancelled) > 0:
                         app_log.info("Skal ta dei som ikkje klarte BDF")
-                        jobs2 = {remote_lag_sti.remote(ribs, t_span, particle=pa, tre=tre_plasma, fps=fps, wrap_max=wrap_max,
-                                                        verbose=verbose, collision_correction=collision_correction): pa for pa in cancelled} #var cancelled
+                        jobs2 = {remote_lag_sti.remote(particle=pa, **lag_sti_args): pa for pa in cancelled} #var cancelled
                         not_ready = list(jobs2.keys())
                         while True:
                             ready, not_ready = ray.wait(not_ready)
@@ -228,10 +233,11 @@ for namn in pickle_filer:
 
                     ray.shutdown()
                 else:
+                    lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre, skalering=skalering, wrap_max=wrap_max,
+                                            verbose=verbose, collision_correction=collision_correction)
                     for pa in particle_list:
                         # if pa.index == 19:
-                            pa.sti_dict = lag_sti(ribs, t_span, particle=pa, tre=tre, fps=fps, wrap_max=wrap_max,
-                                                verbose=verbose, collision_correction=collision_correction)
+                            pa.sti_dict = lag_sti(particle = pa, **lag_sti_args)
                             assert all([i in pa.sti_dict.keys() for i in np.linspace(round(pa.sti_dict['init_time']*100), round(pa.sti_dict['final_time']*100), round(
                                 (pa.sti_dict['final_time']-pa.sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {pa.index} har ein feil i seg, ikkje alle elementa er der"
 

@@ -4,6 +4,7 @@ Created on Tue Jul  6 12:31:23 2021
 
 @author: havrevol
 """
+import random
 import numpy as np
 # import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon, Rectangle
@@ -159,4 +160,15 @@ def t2f(t,scale=1):
     Returns:
         int: Datasett-nummer (0-3599)
     """
-    return int(t*20./scale**0.5)
+    return t*20./scale**0.5
+
+def status_colors():
+    while True:
+        # style = random.randint(0,4)
+        text_color = random.randint(30,38)+ 60*random.randint(0,1)
+        background = random.randint(40,48) 
+        combined = (text_color, background)
+        bad = [(30,40),(30,48),(31,41), (32,42), (33,43), (34,44),(35,44),(35,45),(36,46),(37,47),(35,41),(36,42),(37,43),(31,45),(32,46),(33,47),(90,44),(92,42),(93,43),(93,47),(93,47),(96,41),(96,42),(96,45),(97,43),(97,47),(98,43)]
+        if (combined not in bad):
+            break
+    return f"{str()};{str(text_color)};{str(background)}"

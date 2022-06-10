@@ -44,23 +44,13 @@ def generate_ribs(ribs, L, rib_width):
     
     return venstre_ribbe, hogre_ribbe, golv
 
-# def get_velocity_data(t_span=(0,1), with_gradient = False, one_dimensional = True):
-#     t_min = t_span[0]
-#     t_max = t_span[1]
-#     steps = t_max * fps
-    
-#     piv_range = ranges()
-    
-# def get_txy(t_span=(0,1), dataset = h5py.File(filnamn, 'r'), nearest = False):
-def generate_U_txy(t_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, kutt=True):
-    t_min = t_span[0]
-    t_max = t_span[1]
-    fps = 20
-    Umx = Umx[int(t_min*fps):int(t_max*fps),:]
-    Vmx = Vmx[int(t_min*fps):int(t_max*fps),:]
+def generate_U_txy(f_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, kutt=True):
+    f_min = f_span[0]
+    f_max = f_span[1]
+    # fps = 20
+    Umx = Umx[f_min:f_max,:]
+    Vmx = Vmx[f_min:f_max,:]
 
-    # piv_range = ranges(kutt)
-    
     x = np.copy(x)
     y = np.copy(y)
     
@@ -127,7 +117,7 @@ def generate_U_txy(t_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, kutt=True):
     
     U = np.array([Umx_lang[nonan], Vmx_lang[nonan]])
         
-    t_3d,y_3d,x_3d = np.meshgrid(np.arange(t_min*fps,t_max*fps)/fps, y[:,0], x[0,:], indexing='ij')
+    t_3d,y_3d,x_3d = np.meshgrid(np.arange(f_min,f_max), y[:,0], x[0,:], indexing='ij')
     y_3d[...] = y
     x_3d[...] = x
     t_lang = t_3d.ravel()[nonan]
@@ -200,6 +190,14 @@ def lagra_tre(tre, fil):
 
 class tre_objekt:
     def __init__(self, delaunay, kdtre, U_kd, ribs):
+        """Eit objekt med relevant informasjon
+
+        Args:
+            delaunay (dict):  delaunay er ein dict med mange tuple returnert frå lag_tre: (tree, U)
+            kdtre (_type_): _description_
+            U_kd (_type_): _description_
+            ribs (_type_): _description_
+        """
         self.tre = delaunay
         for t in self.tre:
             if type(self.tre[t]) is list:
@@ -218,14 +216,19 @@ class tre_objekt:
         # return delaunay.find_simplex(x)
     
     def get_U(self,x):
-        t = x[0]
-        i = int(t*10)
-        return self.tre[i][1]
+        # t = x[0]
+        # i = int(t*10)
+
+        return self.tre[x[0]][1]
     
     def get_tri(self,x):
-        t = x[0]
-        i = int(t*10)
-        return  self.tre[i][0]
+        # t = x[0]
+        # i = int(t*10)
+        # return  self.tre[i][0]
+        return  self.tre[x[0]][0]
+    
+    def get_tri_og_U(self,x):
+        return self.tre[int(x[0])]
     
     
 # def get_vel_snippets(t_span):
