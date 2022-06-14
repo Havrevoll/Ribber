@@ -121,7 +121,7 @@ for namn in pickle_filer:
         assert hdf5_fil.exists()
 
         talstart = datetime.datetime.now()
-        f_span = (0,3599)
+        f_span = (0,3598)
         t_span = (f2t(f_span[0],scale=skalering), f2t(f_span[0],scale=skalering))
 
         # sim_args = dict(fps = 20, t_span=t_span, linear = True, lift = True, addedmass = True, wrap_max = 50, method = 'BDF', atol = 1e-1, rtol = 1e-1, verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = multi)
@@ -136,8 +136,8 @@ for namn in pickle_filer:
         # Denne tråden forklarer litt om korleis ein skal setja atol og rtol: https://stackoverflow.com/questions/67389644/floating-point-precision-of-scipy-solve-ivp
         verbose = False
         collision_correction = True
-        laga_film = True
-        multi = False
+        laga_film = False
+        multi = True
 
         graderingsliste = create_bins(scale_bins(np.asarray(graderingar),skalering))
 
@@ -222,8 +222,7 @@ for namn in pickle_filer:
                         while True:
                             ready, not_ready = ray.wait(not_ready)
                             sti_dict = ray.get(ready[0])
-                            assert all([i in sti_dict.keys() for i in np.linspace(round(sti_dict['init_time']*100), round(sti_dict['final_time']*100), round(
-                                (sti_dict['final_time']-sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {jobs2[ready[0]].index} har ein feil i seg, ikkje alle elementa er der"
+                            assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {jobs2[ready[0]].index} har ein feil i seg, ikkje alle elementa er der"
                             jobs2[ready[0]].sti_dict = sti_dict
 
                             app_log.info(

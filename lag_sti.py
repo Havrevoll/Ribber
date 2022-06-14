@@ -12,7 +12,7 @@ from check_collision import check_all_collisions
 from constants import ε
 import ray
 import datetime
-from math import floor, hypot, ceil
+from math import floor, hypot, ceil, isclose
 import random
 import logging
 from loguru import logger
@@ -122,7 +122,7 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
                     print("Forlet overflata")
                 particle.resting = False
             else:
-                app_log.warning(f"Noko feil i kollisjonsinfo for partikkel nr. {particle.index} etter berekninga med t0 {t} og sluttid {final_time}. Det kan sjå ut til at event er collision men det vart ikkje registrert nokon kollisjon.")
+                app_log.warning(f"Noko feil i kollisjonsinfo for partikkel nr. {particle.index} etter berekninga med f₀={frame} og sluttid {final_time}. Det kan sjå ut til at event er collision men det vart ikkje registrert nokon kollisjon.")
                 break
 
             #Gjer alt som skal til for å endra retningen og posisjonen på partikkelen
@@ -130,7 +130,7 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
             
             # assert 'relative_velocity' in collision_info, f"Noko feil i kollisjonsinfo for partikkel nr. {particle.index} etter berekninga med t0 {t} og sluttid {final_time}"
             if 'relative_velocity' not in collision_info:
-                app_log.warning(f"Noko feil i kollisjonsinfo for partikkel nr. {particle.index} etter berekninga med t0 {t} og sluttid {final_time}")
+                app_log.warning(f"Noko feil i kollisjonsinfo for partikkel nr. {particle.index} etter berekninga med f₀={frame} og sluttid {final_time}")
                 break
             
             n = collision_info['rib_normal']
@@ -178,7 +178,7 @@ def rk_3 (f, t, y0, solver_args, skalering):
     assert t[1] > t[0]
     
     solver_args['t_eval'] = eval_steps(t, skalering)
-    resultat = solve_ivp(f, (f2t(t[0], skalering), f2t(t[1],skalering)), y0, dense_output=True, **solver_args)
+    resultat = solve_ivp(f, (f2t(t[0], skalering), f2t(t[1],skalering)), y0, dense_output=True,  **solver_args)
     # t_eval = [t[1]],
     # har teke ut max_ste=0.02, for det vart aldri aktuelt, ser det ut til.  method=solver_args['method'], args=solver_args['args'],
     # assert resultat.success == True
@@ -195,7 +195,11 @@ def rk_3 (f, t, y0, solver_args, skalering):
         return [], np.column_stack((resultat.t, np.asarray(resultat.y).T)), "finish", resultat.nfev #np.concatenate(([resultat.t[-1]], resultat.y[:,-1]))
 
 def eval_steps(t_span, skalering):
-    return np.asarray([f2t(i,skalering) for i in range(ceil(t_span[0]),t_span[1])])[1:]
+    if isclose(t_span[0],round(t_span[0])):
+        return np.asarray([f2t(i,skalering) for i in range(ceil(t_span[0]),t_span[1])])[1:]
+    else:
+        return np.asarray([f2t(i,skalering) for i in range(ceil(t_span[0]),t_span[1])])
+
     # if floor(t_span[0] * 1000000) % floor((1/fps) * 1000000) == 0:
     #     t_min = ceil(round(t_span[0]+1/fps,5)*fps)/fps
     # else:

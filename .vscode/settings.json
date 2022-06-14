@@ -1,4 +1,6 @@
 {
     "editor.fontSize": 11,
-    "terminal.integrated.fontSize": 11
+    "terminal.integrated.fontSize": 11,
+    "debug.console.fontSize": 12,
+    "window.zoomLevel": -0.5
 }

@@ -8,7 +8,7 @@ g = np.array([0, g]) # mm/s^2 = 9.81 m/s^2
 
 nullfart = np.zeros(2)
 
-def f(t, x, particle, tri, ribs, fps):
+def f(t, x, particle, tri, ribs, skalering):
     """
     Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
     Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
@@ -43,7 +43,7 @@ def f(t, x, particle, tri, ribs, fps):
     
     dxdt = x[2:]
 
-    U_f, dudt_material, U_top_bottom = get_u(t, x, particle, tri, collision= collision, fps=fps)
+    U_f, dudt_material, U_top_bottom = get_u(t, x, particle, tri, collision= collision, skalering=skalering)
     
     vel = U_f - dxdt # relativ snøggleik
     # vel_ang = atan2(vel[1], vel[0])
@@ -113,7 +113,7 @@ def f(t, x, particle, tri, ribs, fps):
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
-def get_u(t, x_inn, particle, tre_samla, collision, fps):
+def get_u(t, x_inn, particle, tre_samla, collision, skalering):
     '''
     https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
 
@@ -137,7 +137,7 @@ def get_u(t, x_inn, particle, tre_samla, collision, fps):
     radius = particle.radius
     lift, addedmass, linear = particle.lift, particle.addedmass, particle.linear
 
-    tx = np.concatenate(([t2f(t, fps)], x_inn[:2]))
+    tx = np.concatenate(([t2f(t, skalering)], x_inn[:2]))
     U_p = x_inn[2:]
         
     # dt, dx, dy = 0.01, 0.1, 0.1
