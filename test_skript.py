@@ -65,7 +65,8 @@ pickle_filer = [
 #                     [0.08, 0.09],[0.07, 0.08],[0.06, 0.07],
 #                     [0.05, 0.06]]
 
-graderingar = [0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,12]
+graderingar = [#0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3, 
+0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,12]
 # original_graderingsliste= create_bins(graderingar)
 
 
@@ -202,8 +203,7 @@ for namn in pickle_filer:
                         try:
                             sti_dict = ray.get(elem, timeout=(2))
 
-                            assert all([i in sti_dict.keys() for i in np.linspace(round(sti_dict['init_time']*100), round(sti_dict['final_time']*100), round(
-                                (sti_dict['final_time']-sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {jobs[elem].index} har ein feil i seg, ikkje alle elementa er der"
+                            assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {jobs2[ready[0]].index} har ein feil i seg, ikkje alle elementa er der"
                             jobs[elem].sti_dict = sti_dict
                             # jobs[ready[0]].sti_dict = sti_dict
                             app_log.info(
