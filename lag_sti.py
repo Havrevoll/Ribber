@@ -178,7 +178,7 @@ def rk_3 (f, t, y0, solver_args, skalering):
     assert t[1] > t[0]
     
     solver_args['t_eval'] = eval_steps(t, skalering)
-    resultat = solve_ivp(f, (f2t(t[0], skalering), f2t(t[1],skalering)), y0, dense_output=True,  **solver_args)
+    resultat = solve_ivp(f, (f2t(t[0], skalering), f2t(t[1],skalering)), y0, dense_output=True, vectorized=True, **solver_args)
     # t_eval = [t[1]],
     # har teke ut max_ste=0.02, for det vart aldri aktuelt, ser det ut til.  method=solver_args['method'], args=solver_args['args'],
     # assert resultat.success == True
