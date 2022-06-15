@@ -237,8 +237,7 @@ for namn in pickle_filer:
                     for pa in particle_list:
                         # if pa.index == 19:
                             pa.sti_dict = lag_sti(particle = pa, **lag_sti_args)
-                            assert all([i in pa.sti_dict.keys() for i in np.linspace(round(pa.sti_dict['init_time']*100), round(pa.sti_dict['final_time']*100), round(
-                                (pa.sti_dict['final_time']-pa.sti_dict['init_time'])*20)+1).astype(int)]), f"Partikkel nr. {pa.index} har ein feil i seg, ikkje alle elementa er der"
+                            assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {jobs2[ready[0]].index} har ein feil i seg, ikkje alle elementa er der"
 
                 for pa in particle_list:
                     assert hasattr(pa,'sti_dict')
