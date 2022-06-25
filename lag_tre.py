@@ -109,7 +109,7 @@ def lag_tre(f_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, nearest=False, kutt=True
 if __name__ == "__main__":
     filnamn_inn = "data/rib50_Q40_1.hdf5"
     skalering = 40
-    f_span = (0,2)
+    f_span = (867,869)
     kutt = True
     with h5py.File(filnamn_inn, 'r') as f:
         U = f.attrs['U']*skalering**0.5
@@ -125,5 +125,6 @@ if __name__ == "__main__":
         ribs = np.array(f['ribs'])*skalering
     U, txy = generate_U_txy(f_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, kutt)
     venstre_ribbe, hogre_ribbe, golv = generate_ribs(ribs, L, rib_width)
+    tree = qhull.Delaunay(txy)
     
 #     tre = lag_tre((0,2), Umx,Vmx,x,y,I,J,ribs, L, rib_width)

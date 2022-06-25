@@ -228,9 +228,19 @@ class tre_objekt:
         # return  self.tre[i][0]
         return  self.tre[x[0]][0]
     
-    def get_tri_og_U(self,x):
-        return self.tre[int(x[0])]
+    def get_tri_og_U(self,t):
+        return self.tre[int(t)]
     
+    def get_kd_U(self, tx):
+        while True:
+                try:
+                    self.U_kd[:,self.kdtre.query(np.swapaxes(tx, -2,-1))[1]]
+                    break
+                except IndexError:
+                    tx[np.abs(tx)>1e100] /= 1e10
+                    
+                
+        return self.U_kd[:,self.kdtre.query(np.swapaxes(tx, -2,-1))[1]] #, nullfart, np.zeros((2,2))
     
 # def get_vel_snippets(t_span):
 #     t_min = t_span[0]

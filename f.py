@@ -1,12 +1,9 @@
-# import imp
 import numpy as np
 from math import hypot
 from hjelpefunksjonar import norm, t2f
 from constants import g, ρ_p, ρ, ν
-g = np.array([0, g]) # mm/s^2 = 9.81 m/s^2
+g = np.array([[0], [g]]) # mm/s^2 = 9.81 m/s^2
 # import ray
-
-nullfart = np.zeros(2)
 
 # class RealisticInfoArray(np.ndarray):
 
@@ -52,20 +49,20 @@ def f(t, x, particle, tri, ribs, skalering):
     
     addedmass = particle.addedmass
     collision = particle.collision 
+    number_of_vectors = x.shape[1]
     try:
         µ = collision['rib'].µ # friksjonskoeffisenten
     except KeyError:
         µ = 0.5
     
-    x = x.reshape(4,)
     dxdt = x[2:]
 
     U_f, dudt_material, U_top_bottom = get_u(t, x, particle, tri, collision= collision, skalering=skalering)
     
     vel = U_f - dxdt # relativ snøggleik
     # vel_ang = atan2(vel[1], vel[0])
-    
-    Re = hypot(vel[0],vel[1]) * particle.diameter / ν
+    assert len(vel) == 2
+    Re = np.hypot(vel[0],vel[1]) * particle.diameter / ν
     
     # if (Re<1000):
     try:
@@ -90,10 +87,10 @@ def f(t, x, particle, tri, ribs, skalering):
 
     pressure_component = rho_self_density * dudt_material
     
-    if dudt_material[0] == 0.0 and dudt_material[1] == 0.0:
+    if np.all(dudt_material == 0.0 ):
         addedmass = False
 
-    lift_component = 3/4 * 0.5 / particle.diameter * rho_self_density * (U_top_bottom[:,0]*U_top_bottom[:,0] - U_top_bottom[:,1]*U_top_bottom[:,1]) * norm(drag_component) @ np.array([[0, 1],[-1, 0]])
+    lift_component = np.array([[0, -1],[1, 0]]) @ ( 3/4 * 0.5 / particle.diameter * rho_self_density * np.diff(np.square(U_top_bottom), axis=1).reshape(2,number_of_vectors) * norm(drag_component) )
     
     divisor = 1 + 0.5 * rho_self_density * addedmass
     # divisoren trengst for akselerasjonen av partikkel kjem fram i added 
@@ -132,65 +129,70 @@ def f(t, x, particle, tri, ribs, skalering):
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
 def get_u(t, x_inn, particle, tre_samla, collision, skalering):
     '''
+    get_u skal i praksis vera ein funksjon: [t,x,y]→ ( [u,v], [dudt_material,dvdt_material], [[u_top, u_bottom],[v_top, v_bottom]] ) Så når x_inn er ein vektor med fleire koordinatar: 
+    tx = np.array([f₀, f₁, f₂, f₃],
+                  [x₀, x₁, x₂, x₃], 
+                  [y₀, y₁, y₂, y₃]])
+    så må U_f = np.array([[u₀, u₁, u₂, u₃], 
+                          [v₀, v₁, v₂, v₃]])
     https://stackoverflow.com/questions/20915502/speedup-scipy-griddata-for-multiple-interpolations-between-two-irregular-grids    
 
     Parameters
     ----------
-    tri : spatial.qhull.Delaunay
-        Eit tre med data.
-    U : Tuple
-        Fartsdata i ei lang remse med same storleik som tri. Det er (U,V,dU/dt,dV/dt), altså gradienten i kvart punkt og kvar tid.
-    x : Array of float64
-        Eit punkt i tid og rom som du vil finna farten i.
-    linear : Bool
-        Skal det interpolerast lineært eller næraste nabo?
+    t : float
+        tida i tid, ikkje frames (vert gjort om inne her)
+    x_inn : Array of float 64
+        heile arrayen med posisjon og fart: [x,y,u,v] presentert i ein vertikal vektor med ein eller fleire vektorar bortover.
+    particle : Particle.particle
+        Den gjeldande partikkelen.
+    tre_samla : datagenerering.tre_objekt
+        Eit tre med ein dict med delaunay-trea (ein for kvart tidssteg) og tilhøyrande fartsdata, eit kd-tre og tilhøyrande fartsdata, samt ribber.
+    collision : dict
+        kollisjonsdata
+    skalering : int
+        skalering, til dømes 1, 20, 40, 100 eller til og med 1000
 
     Returns
     -------
     Tuple
-        DESCRIPTION.
+        U_f, dudt_material, U_top_bottom
 
     '''    
     radius = particle.radius
     lift, addedmass, linear = particle.lift, particle.addedmass, particle.linear
+    frame = t2f(t,skalering)
+    number_of_vectors = x_inn.shape[-1] #Dette er talet på vektorar pga vectorized i solve_ivp. Vanlegvis 1, men kan vera fleire, t.d. 4.
 
-    tx = np.concatenate(([t2f(t, skalering)], x_inn[:2]))
-    U_p = x_inn[2:]
+    tx = np.concatenate((np.broadcast_to([frame],(1,number_of_vectors)), x_inn[:2]),axis=-2)
         
     # dt, dx, dy = 0.01, 0.1, 0.1
     Δ = 0.01
     
     # U_del = tre_samla.get_U(tx)
     # tri = tre_samla.get_tri(tx)
-    tri, U_del = tre_samla.get_tri_og_U(tx)
+    tri, U_del = tre_samla.get_tri_og_U(frame)
 
-    x = np.vstack((tx,tx + np.array([Δ,0,0]), tx + np.array([0,Δ,0]), tx +np.array([0,0,Δ])))
+    x = np.stack((tx,tx + np.asarray([[Δ],[0],[0]]), tx + np.asarray([[0],[Δ],[0]]), tx +np.asarray([[0],[0],[Δ]])))
         
     kdtre = tre_samla.kdtre
     U_kd = tre_samla.U_kd
     
     get_u.counter +=1
     
-    if(linear):
+    if (linear and np.all(tx >= tri.min_bound.reshape(3,1)) and np.all(tx <= tri.max_bound.reshape(3,1))):
         d=3
         # simplex = tri.find_simplex(x)
-        simplex = np.tile(tri.find_simplex(x[0]), 4)
+        # simplex = np.tile(tri.find_simplex(np.swapaxes(tx)), 4)
+        # simplex = np.broadcast_to(tri.find_simplex(np.swapaxes(tx, -2,-1)).reshape(tx.shape[-1],1),(4,tx.shape[-1],1))
+        simplex = np.broadcast_to(tri.find_simplex(np.swapaxes(tx, -2,-1)).reshape(number_of_vectors,1),(4,number_of_vectors,1))
         
         if (np.any(simplex==-1)):
             get_u.utanfor += 1
             addedmass = False
             linear = False
             lift = False
-
-            while True:
-                try:
-                    U_kd[:,kdtre.query(x[0])[1]]
-                    break
-                except IndexError:
-                    x[np.abs(x)>1e100] /= 1e10
-                    
                 
-            U_f = U_kd[:,kdtre.query(x[0])[1]] #, nullfart, np.zeros((2,2))
+            U_f = tre_samla.get_kd_U(tx)
             # Gjer added mass og lyftekrafta lik null, sidan den ikkje er viktig her.
         else:  
             vertices = np.take(tri.simplices, simplex, axis=0)
@@ -204,7 +206,7 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
             # U_f = np.einsum('ijn,ij->n', np.take(U_del, vertices, axis=0), wts)
             U_f = np.einsum('jni,ni->jn', np.take(U_del,vertices,axis=1),wts)
     else:
-        U_f = U_kd[:,kdtre.query(x[0])[1]]#, nullfart, np.zeros((2,2))
+        U_f = tre_samla.get_kd_U(tx) # U_f har shape (2,1) dersom tx.shape == (3,1)
         addedmass = False
         linear = False
         lift = False
@@ -230,11 +232,11 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
         
         dudt_material = dUdt + U_f[0,0] * dUdx + U_f[1,0] * dUdy
     else:
-        dudt_material = nullfart
+        dudt_material = np.zeros((2,number_of_vectors))
 
     if (lift):
         # skal finna farten i passande punkt over og under partikkelen for lyftekraft
-        U_rel = U_f[:, 0] - U_p
+        U_rel = U_f[:, 0] - x_inn[2:]
         
         particle_top =    x_inn[0:2] + radius * norm(U_rel) @ np.array([[0, 1],[-1, 0]])
         particle_bottom = x_inn[0:2] + radius * norm(U_rel) @ np.array([[0, -1],[1, 0]])
@@ -265,9 +267,9 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
             else:
                 break
                 
-        U_top_bottom = np.einsum('jni,ni->jn', np.take(U_del, part_vertices, axis=1), part_wts)
+        U_top_bottom = np.einsum('jni,ni->nj', np.take(U_del, part_vertices, axis=1), part_wts)
     else:
-        U_top_bottom = np.zeros((2,2))
+        U_top_bottom = np.zeros((2,2,number_of_vectors))
     
     if (linear):
         U_f = U_f[:,0]

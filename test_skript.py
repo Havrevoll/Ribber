@@ -66,7 +66,8 @@ pickle_filer = [
 #                     [0.05, 0.06]]
 
 graderingar = [#0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3, 
-0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,12]
+#0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 
+7, 8, 9, 10,12]
 # original_graderingsliste= create_bins(graderingar)
 
 
@@ -138,7 +139,7 @@ for namn in pickle_filer:
         verbose = False
         collision_correction = True
         laga_film = False
-        multi = True
+        multi = False
 
         graderingsliste = create_bins(scale_bins(np.asarray(graderingar),skalering))
 
@@ -177,7 +178,7 @@ for namn in pickle_filer:
 
                 # Her blir partiklane laga:
                 diameters = get_PSD_part(tal, PSD=np.asarray([[gradering[0], 0], [gradering[1], 1]]), rnd_seed=rnd_seed).tolist()
-                particle_list = [Particle(float(d), [ribs[0].get_rib_middle()[0], random.uniform(ribs[0].get_rib_middle()[1]+ribs[0].get_rib_dimensions()[0], max_y), 0, 0], random.randrange(0, 1000 )) for d in diameters]
+                particle_list = [Particle(diameter=float(d), init_position=[ribs[0].get_rib_middle()[0], random.uniform(ribs[0].get_rib_middle()[1]+ribs[0].get_rib_dimensions()[0], max_y), 0, 0], init_time = random.randrange(0, 1000 )) for d in diameters]
 
                 for i, p in enumerate(particle_list):
                     p.atol, p.rtol = atol, rtol
