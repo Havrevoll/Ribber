@@ -100,7 +100,7 @@ def generate_U_txy(f_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, kutt=True):
     
     
     if kutt:
-        kutt_kor = [ribs[v_r+1,0]-rib_width/2, ribs[v_r+1,0]+(ribs[h_r,0] - ribs[v_r+1,0]) + rib_width/2, ribs[v_r+1,1]-rib_width/2, ribs[v_r+1,1]+6] # [-35.81,64.19 , -25, 5]
+        kutt_kor = [ribs[v_r+1,0]-rib_width/2, ribs[v_r+1,0]+(ribs[h_r,0] - ribs[v_r+1,0]) + rib_width/2, ribs[v_r+1,1]-rib_width/2, ribs[v_r+1,1] + 10 * rib_width * 0.02] # [-35.81,64.19 , -25, 5]
         x1 = x[0,:]
         y1=y[:,0]
 
@@ -129,7 +129,7 @@ def generate_U_txy(f_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, kutt=True):
     return U, txy
 
 def get_essential_coordinates(L,rib_width):
-    skala = rib_width/50
+    skala = round(rib_width/50)
     if (L == 50*skala):
         v_r = 1
         golv_nr = 8

@@ -159,7 +159,7 @@ for namn in pickle_filer:
                 else:
                     app_log.info(f"Det finst ikkje, må laga det.")
                     from lag_tre import lag_tre_multi
-                    tre = lag_tre_multi(f_span,filnamn_inn = hdf5_fil, skalering=skalering)
+                    tre = lag_tre_multi((f_span[0],f_span[1]+1),filnamn_inn = hdf5_fil, skalering=skalering)
                     app_log.info(f"Ferdig å laga, skal lagra det.")
 
                     lagra_tre(tre,pickle_fil)
@@ -238,7 +238,7 @@ for namn in pickle_filer:
                     for pa in particle_list:
                         # if pa.index == 19:
                             pa.sti_dict = lag_sti(particle = pa, **lag_sti_args)
-                            assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {jobs2[ready[0]].index} har ein feil i seg, ikkje alle elementa er der"
+                            assert all([i in pa.sti_dict for i in range(pa.sti_dict['init_time'], pa.sti_dict['final_time']+1)]), f"Partikkel nr. {jobs2[ready[0]].index} har ein feil i seg, ikkje alle elementa er der"
 
                 for pa in particle_list:
                     assert hasattr(pa,'sti_dict')

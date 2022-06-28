@@ -1,8 +1,7 @@
 
 import datetime
-from fcntl import F_SEAL_GROW
 import h5py
-import pickle
+# import pickle
 import numpy as np
 
 import ray
@@ -34,7 +33,7 @@ def lag_tre_multi(f_span, filnamn_inn, filnamn_ut=None, skalering=1):
         I = f.attrs['I']
         J = f.attrs['J']
         Umx = np.array(f['Umx'])*skalering**0.5
-        Vmx = np.array(f['Vmx'])*skalering*0.5
+        Vmx = np.array(f['Vmx'])*skalering**0.5
         x = np.array(f['x']).reshape(J,I)*skalering
         y = np.array(f['y']).reshape(J,I)*skalering
         ribs = np.array(f['ribs'])*skalering
