@@ -65,8 +65,8 @@ pickle_filer = [
 #                     [0.08, 0.09],[0.07, 0.08],[0.06, 0.07],
 #                     [0.05, 0.06]]
 
-graderingar = [#0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3, 
-#0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 
+graderingar = [0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3, 
+0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 
 7, 8, 9, 10,12]
 # original_graderingsliste= create_bins(graderingar)
 
@@ -133,8 +133,8 @@ for namn in pickle_filer:
         addedmass = True
         wrap_max = 50
         method = 'BDF'
-        atol = 1e-1
         rtol = 1e-1
+        atol = 1e-1*skalering
         # Denne tråden forklarer litt om korleis ein skal setja atol og rtol: https://stackoverflow.com/questions/67389644/floating-point-precision-of-scipy-solve-ivp
         verbose = False
         collision_correction = True
@@ -236,7 +236,7 @@ for namn in pickle_filer:
                     lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre, skalering=skalering, wrap_max=wrap_max,
                                             verbose=verbose, collision_correction=collision_correction)
                     for pa in particle_list:
-                        # if pa.index == 19:
+                        if pa.index == 2:
                             pa.sti_dict = lag_sti(particle = pa, **lag_sti_args)
                             assert all([i in pa.sti_dict for i in range(pa.sti_dict['init_time'], pa.sti_dict['final_time']+1)]), f"Partikkel nr. {jobs2[ready[0]].index} har ein feil i seg, ikkje alle elementa er der"
 
