@@ -139,7 +139,7 @@ for namn in pickle_filer:
         verbose = False
         collision_correction = True
         laga_film = False
-        multi = False
+        multi = True
 
         graderingsliste = create_bins(scale_bins(np.asarray(graderingar),skalering))
 
