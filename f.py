@@ -216,10 +216,10 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
 
     try:
         if (collision['is_resting_contact']):
-            if U_f.shape == (2,):
-                U_f = U_f - collision['rib_normal'] * np.dot(collision['rib_normal'],U_f) # projeksjon av dudt på normalvektoren
+            if U_f.shape == (2,1): # Skal sjekka om det er frå delaunay eller kd-tre, trur eg. Minnest ikkje heilt.
+                U_f = U_f - collision['rib_normal'][:,None] * np.einsum('i,in->n',collision['rib_normal'], U_f) # projeksjon av dudt på normalvektoren
             else:
-                U_f = U_f - np.asarray([collision['rib_normal']]).T * np.dot(collision['rib_normal'],U_f) # projeksjon av dudt på normalvektoren
+                U_f = U_f - collision['rib_normal'][:,None] * np.einsum('i,ipn->np',collision['rib_normal'], U_f) # projeksjon av dudt på normalvektoren
     except KeyError:
         pass
                 
