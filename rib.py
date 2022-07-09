@@ -6,10 +6,10 @@ class Rib:
     def __init__(self, coords, µ=µ):
         self.vertices = sortClockwise(np.array(coords))
         
-        self.normals = [norm(np.cross(self.vertices[1]-self.vertices[0],np.array([0,0,-1]))[:2]),
-                        norm(np.cross(self.vertices[2]-self.vertices[1],np.array([0,0,-1]))[:2]), 
-                        norm(np.cross(self.vertices[3]-self.vertices[2], np.array([0,0,-1]))[:2]),
-                        norm(np.cross(self.vertices[0]-self.vertices[3],np.array([0,0,-1]))[:2]) ]
+        self.normals = [norm(np.cross(self.vertices[1]-self.vertices[0],np.array([0,0,-1]))[:2,None]),
+                        norm(np.cross(self.vertices[2]-self.vertices[1],np.array([0,0,-1]))[:2,None]), 
+                        norm(np.cross(self.vertices[3]-self.vertices[2], np.array([0,0,-1]))[:2,None]),
+                        norm(np.cross(self.vertices[0]-self.vertices[3],np.array([0,0,-1]))[:2,None]) ]
         
                         # Må sjekka om punkta skal gå mot eller med klokka. 
                         # Nett no går dei MED klokka. Normals skal peika UT.
@@ -19,6 +19,9 @@ class Rib:
         return np.sum(self.vertices, axis=0)/len(self.vertices)
 
     def get_rib_dimensions(self):
+        lengder = np.sqrt(np.square(np.roll(self.vertices,shift=-1,axis=0) - self.vertices).sum( axis=1 ))
+        return np.min(lengder), np.max(lengder)
+
         shortest = np.inf
         longest = 0
         for i,v  in enumerate(self.vertices):

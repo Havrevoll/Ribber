@@ -133,7 +133,7 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
                 app_log.warning(f"Noko feil i kollisjonsinfo for partikkel nr. {particle.index} etter berekninga med f₀={frame} og sluttid {final_time}")
                 break
             
-            n = collision_info['rib_normal']
+            n = collision_info['rib_normal'][:,0]
             v = step_new[3:]
             v_rel = collision_info['relative_velocity'] # v_rel er relativ fart i normalkomponentretning, jf. formel 8-3 i baraff ("notesg.pdf")
             v_new = v - (rest + 1) * v_rel * n
@@ -141,7 +141,7 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
  
             
             step_old[3:] = v_new
-            step_old[1:3] = step_old[1:3] + collision_info['rib_normal'] * ε * 0.5
+            step_old[1:3] = step_old[1:3] + collision_info['rib_normal'][:,0] * ε * 0.5
             
         elif (event == "edge"):
             if (particle.wrap_counter <= wrap_max):
@@ -149,7 +149,7 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
                 step_old[1] = left_edge
                 edgecollision = check_all_collisions(particle, step_old[1:], ribs)
                 if edgecollision['is_collision'] or edgecollision['is_resting_contact'] or edgecollision['is_leaving']:
-                    step_old[1:3] = step_old[1:3] + edgecollision['rib_normal']*edgecollision['collision_depth']
+                    step_old[1:3] = step_old[1:3] + edgecollision['rib_normal'][:,0]*edgecollision['collision_depth']
 
                 particle.wrap_counter += 1
             else:

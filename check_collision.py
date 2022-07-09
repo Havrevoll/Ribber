@@ -48,7 +48,7 @@ def check_collision(particle, data, rib):
     
     for i in range(len(vertices)):
         v = position - vertices[i]
-        projection = np.dot(v, normals[i])
+        projection = np.dot(v, normals[i][:,0])
         if (projection > 0):
             # if the center of circle is outside of rectangle
             bestDistance = projection
@@ -111,26 +111,26 @@ def check_collision(particle, data, rib):
             else:
                 #//the center of circle is in face region of face[nearestEdge]
                 if (bestDistance < particle.radius):
-                    radiusVec = normals[nearestEdge] * particle.radius
+                    radiusVec = normals[nearestEdge][:,0] * particle.radius
                     collision_info = dict(collision_depth = particle.radius - bestDistance, rib_normal = normals[nearestEdge], particle_collision_point = position - radiusVec, inside = inside)
                 else:
                     return dict(is_collision =  False, collision_depth = particle.radius - bestDistance, is_resting_contact = False, is_leaving = False, inside = inside)
     else:
         #     //the center of circle is inside of rectangle
-        radiusVec = normals[nearestEdge] * particle.radius
+        radiusVec = normals[nearestEdge][:,0] * particle.radius
 
         return dict(is_collision = True, is_resting_contact = False, is_leaving = False, rib = rib, collision_depth = particle.radius - bestDistance, rib_normal = normals[nearestEdge], particle_collision_point = position - radiusVec, inside = inside)
         # Måtte laga denne returen så han ikkje byrja å rekna ut relativ fart når partikkelen uansett er midt inne i ribba.
 
     # Rekna ut relativ fart i retning av normalkomponenten, jamfør Baraff (2001) formel 8-3.
-    n = collision_info['rib_normal']
+    n = collision_info['rib_normal'][:,0]
     v = np.array(data[2:])
     v_rel = np.dot(n,v)
     collision_info['relative_velocity'] = v_rel
     collision_info['rib'] = rib
     # collision_info['closest_rib_normal'] = normals[nearestEdge]
 
-    if (abs(v_rel) < vel_limit and round(np.dot(n, normals[nearestEdge]),3)==1.0 ):
+    if (abs(v_rel) < vel_limit and round(np.dot(n, normals[nearestEdge][:,0]),3)==1.0 ):
         collision_info['is_resting_contact'] = True
     else:
         collision_info['is_resting_contact'] = False

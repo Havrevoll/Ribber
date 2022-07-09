@@ -103,8 +103,8 @@ def f(t, x, particle, tri, ribs, skalering):
     try:
         if (collision['is_resting_contact'] and particle.resting):# and np.dot(collision['rib_normal'],dudt) <= 0: #Kan ikkje sjekka om partikkelen skal ut frå flata midt i berekninga. Må ha ein event til alt slikt.
             #akselerasjonen, dudt
-            dudt_n = collision['rib_normal'] * np.dot(collision['rib_normal'],dudt) # projeksjon av dudt på normalvektoren
-            dxdt_n = collision['rib_normal'] * np.dot(collision['rib_normal'],dxdt)
+            dudt_n = collision['rib_normal'] * np.dot(collision['rib_normal'][:,0],dudt) # projeksjon av dudt på normalvektoren
+            dxdt_n = collision['rib_normal'] * np.dot(collision['rib_normal'][:,0],dxdt)
             
             dudt_t = dudt - dudt_n
             dxdt_t = dxdt - dxdt_n
@@ -216,10 +216,10 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
 
     try:
         if (collision['is_resting_contact']):
-            if U_f.shape == (2,1): # Skal sjekka om det er frå delaunay eller kd-tre, trur eg. Minnest ikkje heilt.
-                U_f = U_f - collision['rib_normal'][:,None] * np.einsum('i,in->n',collision['rib_normal'], U_f) # projeksjon av dudt på normalvektoren
+            if U_f.shape == (2,1): # Skal sjekka om det er frå delaunay eller kd-tre. Er det frå kd-tre, er U_f.shape == (2,1) og er det lineær interpolasjon er U_f.shape == (2,4,1)
+                U_f = U_f - collision['rib_normal']* np.einsum('ij,in->n',collision['rib_normal'], U_f) # tangentialkomponenten er lik U_f - normalkomponenten. Normalkomponenten er lik n * dot(U_f,n), for dot(U_f,n) = |U_f|cos(α), som er lik projeksjonen av U_f på normalvektoren, der projeksjonen er hosliggjande katet og U_f er hypotenusen.
             else:
-                U_f = U_f - collision['rib_normal'][:,None] * np.einsum('i,ipn->np',collision['rib_normal'], U_f) # projeksjon av dudt på normalvektoren
+                U_f = U_f - collision['rib_normal'][:,None] * np.einsum('ij,ipn->pn',collision['rib_normal'], U_f) # 
     except KeyError:
         pass
                 
