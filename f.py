@@ -66,13 +66,12 @@ def f(t, x, particle, tri, ribs, skalering):
     
     # if (Re<1000):
     try:
-            # with np.errstate(divide='raise'):
-                # cd = 24 / Re * (1+0.15*Re**0.687)
+        with np.errstate(divide='raise'):
             cd = ( (32 / Re)**(1/1.5) + 1)**1.5
             # Cheng (1997) skildrar Cd for kantete og runde steinar. Dette 
             # er kanskje den viktigaste grunnen til at eg bør gjera dette?
             # Ferguson og Church (2004) gjev nokre liknande bidrag, men viser til Cheng.
-    except ZeroDivisionError:
+    except (ZeroDivisionError, FloatingPointError):
             cd = 2e4
     # else:
     #     cd = 0.44

@@ -63,7 +63,7 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
     
     des4 = ">6.2f"
 
-    status_msg = f"Nr {particle.index}, {particle.diameter:.2f} mm x₀=[{particle.init_position[0]:{des4}}, {particle.init_position[1]:{des4}}], f₀={particle.init_time} ⇒ t₀={f2t(particle.init_time,skalering):.3f}"
+    status_msg = f"Nr {particle.index}, {particle.diameter:.2f} mm x₀=[{particle.init_position[0]:{des4}}, {particle.init_position[1]:{des4}}], f₀={particle.init_time} ⇒ t₀={f2t(particle.init_time,skalering):.3f} med {particle.method}"
     print(f"\x1b[{status_col}m {status_msg} \x1b[0m")
 
     while (frame < frame_max and not isclose(frame,frame_max)):
