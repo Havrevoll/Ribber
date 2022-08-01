@@ -66,8 +66,8 @@ def f(t, x, particle, tri, ribs, skalering):
     
     # if (Re<1000):
     try:
-        with np.errstate(divide='raise'):
-            cd = ( (32 / Re)**(1/1.5) + 1)**1.5
+        # with np.errstate(divide='raise'):
+            cd = ( (32 / (Re+.001))**(1/1.5) + 1)**1.5
             # Cheng (1997) skildrar Cd for kantete og runde steinar. Dette 
             # er kanskje den viktigaste grunnen til at eg bør gjera dette?
             # Ferguson og Church (2004) gjev nokre liknande bidrag, men viser til Cheng.
@@ -108,15 +108,15 @@ def f(t, x, particle, tri, ribs, skalering):
             dudt_t = dudt - dudt_n
             dxdt_t = dxdt - dxdt_n
             
-            if hypot(dxdt_t[0],dxdt_t[1]) == 0: # < vel_limit -- Tilfellet kvilefriksjon:
-                dudt_friction = -norm(dudt_t) * hypot(dudt_n[0],dudt_n[1]) * µ
-                if (hypot(dudt_t[0],dudt_t[1]) > hypot(dudt_friction[0],dudt_friction[1])):
+            if np.any(np.hypot(dxdt_t[0],dxdt_t[1]) == 0): # < vel_limit -- Tilfellet kvilefriksjon:
+                dudt_friction = -norm(dudt_t) * np.hypot(dudt_n[0],dudt_n[1]) * µ
+                if np.any(np.hypot(dudt_t[0],dudt_t[1]) > np.hypot(dudt_friction[0],dudt_friction[1])):
                     dudt = dudt_t + dudt_friction # Må ordna: Viss normalkomponenten peikar oppover, ikkje null ut den då.
                 else:
-                    dudt = np.zeros(2)
+                    dudt = np.zeros_like(dudt_t)
                     # dxdt = np.zeros(2)
             else: # Tilfellet glidefriksjon:
-                dudt_friction = -norm(dxdt_t)*hypot(dudt_n[0],dudt_n[1]) * µ
+                dudt_friction = -norm(dxdt_t)*np.hypot(dudt_n[0],dudt_n[1]) * µ
                 dudt = dudt_t + dudt_friction
 
     except KeyError:
