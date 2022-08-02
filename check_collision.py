@@ -33,7 +33,7 @@ def check_collision(particle, data, rib):
     dict
         Ein dict med fylgjande data: (boolean, collisionInfo, rib). 
     """
-    
+    assert data.shape == (4,)
     position = data[0:2]        
     inside = True
     bestDistance = -99999
@@ -80,13 +80,13 @@ def check_collision(particle, data, rib):
                 return {'is_collision':False, 'collision_depth': particle.radius - dis, 'is_resting_contact':False, 'is_leaving':False}#, 'rib':rib}
                 # (False, collisionInfo, rib) # må vel endra til (bool, depth, normal, start)
             
-            normal = norm(v1)
+            normal = norm(np.reshape(v1,(2,1)))
             
             radiusVec = normal*particle.radius*(-1)
             
             # sender informasjon til collisioninfo:                    
             collision_info = dict(collision_depth=particle.radius - dis, rib_normal=normal, particle_collision_point = position + radiusVec, inside = inside)
-            
+                        
         else:
             # //the center of circle is in corner region of mVertex[nearestEdge+1]
     
@@ -98,13 +98,14 @@ def check_collision(particle, data, rib):
             
             if (dot < 0):
                 dis = np.sqrt(v1.dot(v1))
-                                    
+                                   
                 # //compare the distance with radium to decide collision
         
                 if (dis > particle.radius):
                     return {'is_collision':False, 'collision_depth': particle.radius - dis, 'is_resting_contact':False, 'is_leaving':False}#, 'rib':rib}
+                    # (False, collisionInfo, rib) # må vel endra til (bool, depth, normal, start)
 
-                normal = norm(v1)
+                normal = norm(np.reshape(v1,(2,1)))
                 radiusVec = normal * particle.radius*(-1)
                 
                 collision_info = dict(collision_depth=particle.radius - dis, rib_normal = normal, particle_collision_point = position + radiusVec, inside = inside)
@@ -116,7 +117,7 @@ def check_collision(particle, data, rib):
                 else:
                     return dict(is_collision =  False, collision_depth = particle.radius - bestDistance, is_resting_contact = False, is_leaving = False, inside = inside)
     else:
-        #     //the center of circle is inside of rectangle
+        # the center of circle is inside of rectangle
         radiusVec = normals[nearestEdge][:,0] * particle.radius
 
         return dict(is_collision = True, is_resting_contact = False, is_leaving = False, rib = rib, collision_depth = particle.radius - bestDistance, rib_normal = normals[nearestEdge], particle_collision_point = position - radiusVec, inside = inside)
