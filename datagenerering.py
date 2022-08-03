@@ -100,9 +100,11 @@ def generate_U_txy(f_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, kutt=True):
     
     
     if kutt:
-        kutt_kor = [ribs[v_r+1,0]-rib_width/2, ribs[v_r+1,0]+(ribs[h_r,0] - ribs[v_r+1,0]) + rib_width/2, ribs[v_r+1,1]-rib_width/2, ribs[v_r+1,1] + 10 * rib_width * 0.02] # [-35.81,64.19 , -25, 5]
+        # kutt_kor = [ribs[v_r+1,0]-rib_width/2, ribs[v_r+1,0]+(ribs[h_r,0] - ribs[v_r+1,0]) + rib_width/2, ribs[v_r+1,1]-rib_width/2, ribs[v_r+1,1] + 10 * rib_width * 0.02] 
+        generated_ribs = generate_ribs(ribs,L,rib_width)
+        kutt_kor = [(generated_ribs[0].sum(axis=0)/len(generated_ribs[0]))[0], (generated_ribs[1].sum(axis=0)/len(generated_ribs[1]))[0], ribs[v_r+1,1]-rib_width/2, ribs[v_r+1,1] + 10 * rib_width * 0.02] 
         x1 = x[0,:]
-        y1=y[:,0]
+        y1 = y[:,0]
 
         Umx_reshape = Umx_reshape[:,:,(x1 >kutt_kor[0]) & (x1 < kutt_kor[1] )][:,((y1 > kutt_kor[2]) & (y1 < kutt_kor[3])),:]
         Vmx_reshape = Vmx_reshape[:,:,(x1 >kutt_kor[0]) & (x1 < kutt_kor[1] )][:,((y1 > kutt_kor[2]) & (y1 < kutt_kor[3])),:]
