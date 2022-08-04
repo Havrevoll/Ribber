@@ -215,10 +215,10 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
 
     try:
         if (collision['is_resting_contact']):
-            if U_f.shape == (2,1): # Skal sjekka om det er frå delaunay eller kd-tre. Er det frå kd-tre, er U_f.shape == (2,1) og er det lineær interpolasjon er U_f.shape == (2,4,1)
+            if U_f.shape == (2,number_of_vectors): # Skal sjekka om det er frå delaunay eller kd-tre. Er det frå kd-tre, er U_f.shape == (2,1) og er det lineær interpolasjon er U_f.shape == (2,4,1)
                 U_f = U_f - collision['rib_normal']* np.einsum('ij,in->n',collision['rib_normal'], U_f) # tangentialkomponenten er lik U_f - normalkomponenten. Normalkomponenten er lik n * dot(U_f,n), for dot(U_f,n) = |U_f|cos(α), som er lik projeksjonen av U_f på normalvektoren, der projeksjonen er hosliggjande katet og U_f er hypotenusen.
             else:
-                U_f = U_f - collision['rib_normal'][:,None] * np.einsum('ij,ipn->pn',collision['rib_normal'], U_f) # 
+                U_f = U_f - collision['rib_normal'][:,None] * np.einsum('ij,ipn->pn',collision['rib_normal'], U_f) #
     except KeyError:
         pass
                 
