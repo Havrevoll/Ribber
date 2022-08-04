@@ -66,13 +66,12 @@ def f(t, x, particle, tri, ribs, skalering):
     
     # if (Re<1000):
     try:
-            # with np.errstate(divide='raise'):
-                # cd = 24 / Re * (1+0.15*Re**0.687)
-            cd = ( (32 / Re)**(1/1.5) + 1)**1.5
+        # with np.errstate(divide='raise'):
+            cd = ( (32 / (Re+.001))**(1/1.5) + 1)**1.5
             # Cheng (1997) skildrar Cd for kantete og runde steinar. Dette 
             # er kanskje den viktigaste grunnen til at eg bør gjera dette?
             # Ferguson og Church (2004) gjev nokre liknande bidrag, men viser til Cheng.
-    except ZeroDivisionError:
+    except (ZeroDivisionError, FloatingPointError):
             cd = 2e4
     # else:
     #     cd = 0.44
@@ -103,21 +102,21 @@ def f(t, x, particle, tri, ribs, skalering):
     try:
         if (collision['is_resting_contact'] and particle.resting):# and np.dot(collision['rib_normal'],dudt) <= 0: #Kan ikkje sjekka om partikkelen skal ut frå flata midt i berekninga. Må ha ein event til alt slikt.
             #akselerasjonen, dudt
-            dudt_n = collision['rib_normal'] * np.dot(collision['rib_normal'],dudt) # projeksjon av dudt på normalvektoren
-            dxdt_n = collision['rib_normal'] * np.dot(collision['rib_normal'],dxdt)
+            dudt_n = collision['rib_normal'] * np.dot(collision['rib_normal'][:,0],dudt) # projeksjon av dudt på normalvektoren
+            dxdt_n = collision['rib_normal'] * np.dot(collision['rib_normal'][:,0],dxdt)
             
             dudt_t = dudt - dudt_n
             dxdt_t = dxdt - dxdt_n
             
-            if hypot(dxdt_t[0],dxdt_t[1]) == 0: # < vel_limit -- Tilfellet kvilefriksjon:
-                dudt_friction = -norm(dudt_t) * hypot(dudt_n[0],dudt_n[1]) * µ
-                if (hypot(dudt_t[0],dudt_t[1]) > hypot(dudt_friction[0],dudt_friction[1])):
+            if np.any(np.hypot(dxdt_t[0],dxdt_t[1]) == 0): # < vel_limit -- Tilfellet kvilefriksjon:
+                dudt_friction = -norm(dudt_t) * np.hypot(dudt_n[0],dudt_n[1]) * µ
+                if np.any(np.hypot(dudt_t[0],dudt_t[1]) > np.hypot(dudt_friction[0],dudt_friction[1])):
                     dudt = dudt_t + dudt_friction # Må ordna: Viss normalkomponenten peikar oppover, ikkje null ut den då.
                 else:
-                    dudt = np.zeros(2)
+                    dudt = np.zeros_like(dudt_t)
                     # dxdt = np.zeros(2)
             else: # Tilfellet glidefriksjon:
-                dudt_friction = -norm(dxdt_t)*hypot(dudt_n[0],dudt_n[1]) * µ
+                dudt_friction = -norm(dxdt_t)*np.hypot(dudt_n[0],dudt_n[1]) * µ
                 dudt = dudt_t + dudt_friction
 
     except KeyError:
@@ -155,10 +154,10 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
     Returns
     -------
     Tuple
-        U_f, dudt_material, U_top_bottom
+        U_f.shape = (), dudt_material, U_top_bottom
 
     '''    
-    radius = particle.radius
+  
     lift, addedmass, linear = particle.lift, particle.addedmass, particle.linear
     frame = t2f(t,skalering)
     number_of_vectors = x_inn.shape[-1] #Dette er talet på vektorar pga vectorized i solve_ivp. Vanlegvis 1, men kan vera fleire, t.d. 4.
@@ -184,7 +183,7 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
         # simplex = tri.find_simplex(x)
         # simplex = np.tile(tri.find_simplex(np.swapaxes(tx)), 4)
         # simplex = np.broadcast_to(tri.find_simplex(np.swapaxes(tx, -2,-1)).reshape(tx.shape[-1],1),(4,tx.shape[-1],1))
-        simplex = np.broadcast_to(tri.find_simplex(np.swapaxes(tx, -2,-1)).reshape(number_of_vectors,1),(4,number_of_vectors,1))
+        simplex = np.broadcast_to(tri.find_simplex(np.swapaxes(tx, -2,-1)),(4,number_of_vectors)) #kan kanskje ta vekk reshape? Sjekk når det er fleire vektorar i ein.
         
         if (np.any(simplex==-1)):
             get_u.utanfor += 1
@@ -197,14 +196,15 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
         else:  
             vertices = np.take(tri.simplices, simplex, axis=0)
             temp = np.take(tri.transform, simplex, axis=0)
-                    
-            delta = x - temp[:,d]
-            bary = np.einsum('njk,nk->nj', temp[:,:d, :], delta)
-            wts = np.hstack((bary, 1 - bary.sum(axis=1, keepdims=True)))
+                    # https://en.wikipedia.org/wiki/Barycentric_coordinate_system#Barycentric_coordinates_on_tetrahedra
+
+            delta = x - temp[:,:,d,:].swapaxes(1,2)
+            bary = np.einsum('pnjk,pkn->pjn', temp[:,:,:d,:], delta)
+            wts = np.concatenate((bary, 1 - bary.sum(axis=1, keepdims=True)),axis=1)
             
             # U_f = np.einsum('nij,ni->nj', np.take(np.column_stack(U_del),vertices,axis=0),wts)
             # U_f = np.einsum('ijn,ij->n', np.take(U_del, vertices, axis=0), wts)
-            U_f = np.einsum('jni,ni->jn', np.take(U_del,vertices,axis=1),wts)
+            U_f = np.einsum('vpnj,pjn->vpn', np.take(U_del,vertices,axis=1),wts)
     else:
         U_f = tre_samla.get_kd_U(tx) # U_f har shape (2,1) dersom tx.shape == (3,1)
         addedmass = False
@@ -215,10 +215,10 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
 
     try:
         if (collision['is_resting_contact']):
-            if U_f.shape == (2,):
-                U_f = U_f - collision['rib_normal'] * np.dot(collision['rib_normal'],U_f) # projeksjon av dudt på normalvektoren
+            if U_f.shape == (2,1): # Skal sjekka om det er frå delaunay eller kd-tre. Er det frå kd-tre, er U_f.shape == (2,1) og er det lineær interpolasjon er U_f.shape == (2,4,1)
+                U_f = U_f - collision['rib_normal']* np.einsum('ij,in->n',collision['rib_normal'], U_f) # tangentialkomponenten er lik U_f - normalkomponenten. Normalkomponenten er lik n * dot(U_f,n), for dot(U_f,n) = |U_f|cos(α), som er lik projeksjonen av U_f på normalvektoren, der projeksjonen er hosliggjande katet og U_f er hypotenusen.
             else:
-                U_f = U_f - np.array([collision['rib_normal']]).T * np.dot(collision['rib_normal'],U_f) # projeksjon av dudt på normalvektoren
+                U_f = U_f - collision['rib_normal'][:,None] * np.einsum('ij,ipn->pn',collision['rib_normal'], U_f) # 
     except KeyError:
         pass
                 
@@ -238,11 +238,13 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
         # skal finna farten i passande punkt over og under partikkelen for lyftekraft
         U_rel = U_f[:, 0] - x_inn[2:]
         
-        particle_top =    x_inn[0:2] + radius * norm(U_rel) @ np.array([[0, 1],[-1, 0]])
-        particle_bottom = x_inn[0:2] + radius * norm(U_rel) @ np.array([[0, -1],[1, 0]])
+        # particle_top =    x_inn[0:2] + np.asarray([[0, -1],[1, 0]]) @ (particle.radius * norm(U_rel) )
+        # particle_bottom = x_inn[0:2] + np.asarray([[0, 1],[-1, 0]]) @ (particle.radius * norm(U_rel) )
         
-        part = np.array([[t, particle_top[0], particle_top[1]], [t, particle_bottom[0], particle_bottom[1]] ])
-        
+        particle_top_and_bottom = x_inn[0:2] + np.stack( (np.asarray([[0, -1],[1, 0]]) @ (particle.radius * norm(U_rel) ) ,  #Topp 
+                                                            np.asarray([[0, 1],[-1, 0]]) @ (particle.radius * norm(U_rel) )) ) # botn
+
+        part = np.concatenate((np.broadcast_to([frame],(2,1,number_of_vectors)), particle_top_and_bottom),axis=1)
         
         part_simplex = simplex[:2]
         part_vertices = vertices[:2]
@@ -250,13 +252,14 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
 
         simplex_prob = 0
         while (True):
-            part_delta = part - part_temp[:,d] #avstanden til referansepunktet i simpleksen.
-            part_bary = np.einsum('njk,nk->nj', part_temp[:,:d, :], part_delta) 
-            part_wts = np.hstack((part_bary, 1 - part_bary.sum(axis=1, keepdims=True)))
+            part_delta = part - part_temp[:,:,d,:].swapaxes(1,2) #avstanden til referansepunktet i simpleksen.
+            part_bary = np.einsum('pnjk,pkn->pjn', part_temp[:,:,:d, :], part_delta) 
+            part_wts = np.concatenate((part_bary, 1 - part_bary.sum(axis=1, keepdims=True)),axis=1)
         
-            if (np.any(part_wts < -0.02)):
-                part_simplex = tri.find_simplex(part)
+            if (np.any(part_wts < -0.02) and  np.all(part >= tri.min_bound.reshape(3,1)) and np.all(part <= tri.max_bound.reshape(3,1))):
+                part_simplex = tri.find_simplex(part.swapaxes(-2,-1))
                 if np.any(part_simplex == -1):
+                    print("denne staden skulle eg aldri ha kome til, for eg har alt sjekka om eg er utanfor med å ta part > tri.min_bound....")
                     break
                 part_vertices = np.take(tri.simplices, part_simplex, axis=0)
                 part_temp = np.take(tri.transform, part_simplex, axis=0)
@@ -267,7 +270,7 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
             else:
                 break
                 
-        U_top_bottom = np.einsum('jni,ni->nj', np.take(U_del, part_vertices, axis=1), part_wts)
+        U_top_bottom = np.einsum('vpnj,pjn->vpn', np.take(U_del, part_vertices, axis=1), part_wts)
     else:
         U_top_bottom = np.zeros((2,2,number_of_vectors))
     

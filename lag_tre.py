@@ -106,6 +106,8 @@ def lag_tre(f_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, nearest=False, kutt=True
 
 
 if __name__ == "__main__":
+    # Dette er det som skjer i "lag_tre_multi":
+
     filnamn_inn = "data/rib50_Q40_1.hdf5"
     skalering = 40
     f_span = (867,869)
@@ -122,8 +124,12 @@ if __name__ == "__main__":
         x = np.array(f['x']).reshape(J,I)*skalering
         y = np.array(f['y']).reshape(J,I)*skalering
         ribs = np.array(f['ribs'])*skalering
+
+    # Herifrå er det det som skjer i "lag_tre":
     U, txy = generate_U_txy(f_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, kutt)
-    venstre_ribbe, hogre_ribbe, golv = generate_ribs(ribs, L, rib_width)
+
     tree = qhull.Delaunay(txy)
+    
+    venstre_ribbe, hogre_ribbe, golv = generate_ribs(ribs, L, rib_width)
     
 #     tre = lag_tre((0,2), Umx,Vmx,x,y,I,J,ribs, L, rib_width)

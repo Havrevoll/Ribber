@@ -43,7 +43,7 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
     # Step_old og step_new er ein array med [t, x, y, u, v]. 
     
     # sti.append(step_old)
-    sti_dict[particle.init_time] = dict(position = particle.init_position, loops = 0, caught = False)
+    sti_dict[particle.init_time] = dict(position = particle.init_position, loops = 0, caught = False, time=particle.init_time)
     sti_dict['init_time'] = particle.init_time
     
     final_time = particle.init_time
@@ -63,7 +63,7 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
     
     des4 = ">6.2f"
 
-    status_msg = f"Nr {particle.index}, {particle.diameter:.2f} mm x₀=[{particle.init_position[0]:{des4}}, {particle.init_position[1]:{des4}}], f₀={particle.init_time} ⇒ t₀={f2t(particle.init_time,skalering):.3f}"
+    status_msg = f"Nr {particle.index}, {particle.diameter:.2f} mm x₀=[{particle.init_position[0]:{des4}}, {particle.init_position[1]:{des4}}], f₀={particle.init_time} ⇒ t₀={f2t(particle.init_time,skalering):.3f} med {particle.method}"
     print(f"\x1b[{status_col}m {status_msg} \x1b[0m")
 
     while (frame < frame_max and not isclose(frame,frame_max)):
@@ -82,7 +82,7 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
 
         for index, step in enumerate(backcatalog):
             step[0] = t2f(step[0],skalering)
-            sti_dict[round(step[0])] = dict(position = step[1:], loops = particle.wrap_counter, caught = True if (step[2] < ribs[1].get_rib_middle()[1] or (step[2:]**2).sum()**0.5 < 0.1) else False, time=f2t(step[0],skalering))
+            sti_dict[round(step[0])] = dict(position = step[1:], loops = particle.wrap_counter, caught = True if (step[2] < ribs[1].get_rib_middle()[1]) or (np.sqrt(np.square(step[2:]).sum()) < 0.1) else False, time=f2t(step[0],skalering))
             final_time = round(step[0])
             if np.all(index+1 < len(backcatalog) and backcatalog[index+1:,3:] == 0) and event == 'finish': 
                 break
@@ -133,7 +133,7 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
                 app_log.warning(f"Noko feil i kollisjonsinfo for partikkel nr. {particle.index} etter berekninga med f₀={frame} og sluttid {final_time}")
                 break
             
-            n = collision_info['rib_normal']
+            n = collision_info['rib_normal'][:,0]
             v = step_new[3:]
             v_rel = collision_info['relative_velocity'] # v_rel er relativ fart i normalkomponentretning, jf. formel 8-3 i baraff ("notesg.pdf")
             v_new = v - (rest + 1) * v_rel * n
@@ -141,7 +141,7 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
  
             
             step_old[3:] = v_new
-            step_old[1:3] = step_old[1:3] + collision_info['rib_normal'] * ε * 0.5
+            step_old[1:3] = step_old[1:3] + collision_info['rib_normal'][:,0] * ε * 0.5
             
         elif (event == "edge"):
             if (particle.wrap_counter <= wrap_max):
@@ -149,7 +149,7 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
                 step_old[1] = left_edge
                 edgecollision = check_all_collisions(particle, step_old[1:], ribs)
                 if edgecollision['is_collision'] or edgecollision['is_resting_contact'] or edgecollision['is_leaving']:
-                    step_old[1:3] = step_old[1:3] + edgecollision['rib_normal']*edgecollision['collision_depth']
+                    step_old[1:3] = step_old[1:3] + edgecollision['rib_normal'][:,0]*edgecollision['collision_depth']
 
                 particle.wrap_counter += 1
             else:
