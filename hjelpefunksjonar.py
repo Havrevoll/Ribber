@@ -172,3 +172,9 @@ def status_colors():
         if (combined not in bad):
             break
     return f"{str()};{str(text_color)};{str(background)}"
+
+def deepcopy_sti_dict(gamal):
+    ny = dict(init_time = gamal["init_time"], final_time = gamal["final_time"], flow_length = gamal["flow_length"])
+    for i in range(ny['init_time'], ny['final_time']+1):
+        ny[i] = dict(position = deepcopy(gamal[i]['position']), loops = gamal[i]['loops'], caught = gamal[i]['caught'], time = gamal[i]['time'])
+    return ny

@@ -43,7 +43,7 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
     # Step_old og step_new er ein array med [t, x, y, u, v]. 
     
     # sti.append(step_old)
-    sti_dict[particle.init_time] = dict(position = particle.init_position, loops = 0, caught = False)
+    sti_dict[particle.init_time] = dict(position = particle.init_position, loops = 0, caught = False, time=particle.init_time)
     sti_dict['init_time'] = particle.init_time
     
     final_time = particle.init_time
@@ -82,7 +82,7 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
 
         for index, step in enumerate(backcatalog):
             step[0] = t2f(step[0],skalering)
-            sti_dict[round(step[0])] = dict(position = step[1:], loops = particle.wrap_counter, caught = True if (step[2] < ribs[1].get_rib_middle()[1] or (step[2:]**2).sum()**0.5 < 0.1) else False, time=f2t(step[0],skalering))
+            sti_dict[round(step[0])] = dict(position = step[1:], loops = particle.wrap_counter, caught = True if (step[2] < ribs[1].get_rib_middle()[1]) or (np.sqrt(np.square(step[2:]).sum()) < 0.1) else False, time=f2t(step[0],skalering))
             final_time = round(step[0])
             if np.all(index+1 < len(backcatalog) and backcatalog[index+1:,3:] == 0) and event == 'finish': 
                 break
