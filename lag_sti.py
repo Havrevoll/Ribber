@@ -22,7 +22,7 @@ app_log = logging.getLogger(__name__)
 
 from constants import collision_restitution
 
-@ray.remote
+@ray.remote(max_retries=0)
 def remote_lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):
     return lag_sti(ribs, f_span, particle, tre, skalering=skalering, wrap_max = wrap_max, verbose=verbose, collision_correction=collision_correction)
 

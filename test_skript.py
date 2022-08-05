@@ -193,7 +193,7 @@ for namn in pickle_filer:
                 del i,p
 
                 if multi:
-                    ray.init()  # dashboard_port=8266,num_cpus=4)
+                    ray.init(local_mode=False)  # dashboard_port=8266,num_cpus=4)
                     tre_plasma = ray.put(tre)
                     lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre_plasma, skalering=skalering, wrap_max=wrap_max,
                                             verbose=verbose, collision_correction=collision_correction)
@@ -207,7 +207,7 @@ for namn in pickle_filer:
                     for elem in index_list:
                         try:
                             app_log.info(f"Har kome til partikkel nr. {elem}")
-                            sti_dict = ray.get(index_list[elem]['job'], timeout=(2))
+                            sti_dict = ray.get(index_list[elem]['job'], timeout=(1))
 
                             assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {elem} er ufullstendig"
                             index_list[elem]['particle'] = sti_dict
@@ -238,7 +238,7 @@ for namn in pickle_filer:
                             assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {jobs[ready[0]]} er ufullstendig"
                             index_list[jobs.pop(ready[0])].pop('job')
 
-                            app_log.info(f"Dei som står att no er {[jobs[p].index for p in not_ready] if len(not_ready)<100 else len(not_ready)}")
+                            app_log.info(f"Dei som står att no er {[index_list[jobs[p]]['particle'].index for p in not_ready] if len(not_ready)<100 else len(not_ready)}")
                             if len(not_ready) == 0:
                                 break
 
