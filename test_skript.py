@@ -144,6 +144,7 @@ for namn in pickle_filer:
         graderingsliste = create_bins(scale_bins(np.asarray(graderingar),skalering))
 
         for gradering in graderingsliste:
+            graderingstart = datetime.datetime.now()
             pickle_fil = Path("data").joinpath(Path(pickle_namn))
             app_log.info(f"Byrja med {namn}, gradering {gradering}")
 
@@ -210,7 +211,7 @@ for namn in pickle_filer:
                             sti_dict = ray.get(index_list[elem]['job'], timeout=(1))
 
                             assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {elem} er ufullstendig"
-                            index_list[elem]['particle'] = sti_dict
+                            index_list[elem]['particle'].sti_dict = sti_dict
 
                         except (GetTimeoutError, AssertionError):
                             ray.cancel(index_list[elem]['job'], force=True)
@@ -236,6 +237,8 @@ for namn in pickle_filer:
                             # ny_sti_dict = deepcopy_sti_dict(sti_dict)
 
                             assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {jobs[ready[0]]} er ufullstendig"
+                            
+                            index_list[jobs[ready[0]]]['particle'].sti_dict = sti_dict
                             index_list[jobs.pop(ready[0])].pop('job')
 
                             app_log.info(f"Dei som står att no er {[index_list[jobs[p]]['particle'].index for p in not_ready] if len(not_ready)<100 else len(not_ready)}")
@@ -252,7 +255,7 @@ for namn in pickle_filer:
                             assert all([i in pa.sti_dict for i in range(pa.sti_dict['init_time'], pa.sti_dict['final_time']+1)]), f"Partikkel nr. {pa.index} er ufullstendig"
 
                 for pa in particle_list:
-                    assert hasattr(pa,'sti_dict')
+                    assert hasattr(pa,'sti_dict'), f"problem i {pa.index}"
                 with open(partikkelfil, 'wb') as f:
                     pickle.dump(particle_list, f)
                 del tre
@@ -276,8 +279,7 @@ for namn in pickle_filer:
             #         uncaught += 1
             #         uncaught_mass += pa.mass
 
-            app_log.info("Brukte  {} s på å simulera.".format(
-                datetime.datetime.now() - talstart))
+            app_log.info(f"Brukte  {datetime.datetime.now() - graderingstart} s på å simulera. Til saman er brukt {datetime.datetime.now()-talstart}.")
             # app_log.info(f"Av {len(particle_list)} partiklar vart {caught} fanga, altså {100* caught/len(particle_list):.2f}%, og det er {1e6*caught_mass:.2f} mg")
             # app_log.info(f"Av {len(particle_list)} partiklar vart {uncaught} ikkje fanga, altså {100* uncaught/len(particle_list):.2f}%, og det er {1e6*uncaught_mass:.2f} mg")
 
