@@ -173,8 +173,8 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
 
     x = np.stack((tx,tx + np.asarray([[Δ],[0],[0]]), tx + np.asarray([[0],[Δ],[0]]), tx +np.asarray([[0],[0],[Δ]])))
         
-    kdtre = tre_samla.kdtre
-    U_kd = tre_samla.U_kd
+    # kdtre = tre_samla.kdtre
+    # U_kd = tre_samla.U_kd
     
     get_u.counter +=1
     

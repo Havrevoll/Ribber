@@ -4,10 +4,11 @@ Created on Wed Jul  7 09:22:39 2021
 
 @author: havrevol
 """
+from multiprocessing import Pool
 from datagenerering import lagra_tre
-from lag_sti import lag_sti, remote_lag_sti  # ,Particle
-from ray.exceptions import GetTimeoutError
-import ray
+from lag_sti import lag_sti#, remote_lag_sti  # ,Particle
+# from ray.exceptions import GetTimeoutError
+# import ray
 import random
 from kornfordeling import get_PSD_part
 from particle import Particle
@@ -20,8 +21,10 @@ import datetime
 from hjelpefunksjonar import finn_fil,create_bins, scale_bins, f2t
 from lag_video import sti_animasjon
 import pickle
-from math import floor, sqrt
+# from math import floor, sqrt
 import matplotlib
+
+from tre_client import tre_client
 matplotlib.use("Agg")
 
 
@@ -65,8 +68,9 @@ pickle_filer = [
 #                     [0.08, 0.09],[0.07, 0.08],[0.06, 0.07],
 #                     [0.05, 0.06]]
 
-graderingar = [0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3, 
-0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 
+graderingar = [#0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3, 
+#0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 
+4, 5, 6, 
 7, 8, 9, 10,12]
 # original_graderingsliste= create_bins(graderingar)
 
@@ -106,7 +110,7 @@ app_log.debug(f"{pickle_filer}")
 
 
 for namn in pickle_filer:
-    for skalering in [40,100,1000]:  
+    for skalering in [40]: # 100, 1000  
         if skalering == 1:
             pickle_namn = Path(namn).with_suffix(".pickle")
         else:
@@ -139,7 +143,7 @@ for namn in pickle_filer:
         verbose = False
         collision_correction = True
         laga_film = False
-        multi = True
+        multi = False
 
         graderingsliste = create_bins(scale_bins(np.asarray(graderingar),skalering))
 
@@ -150,28 +154,29 @@ for namn in pickle_filer:
             partikkelfil = Path( f"./partikkelsimulasjonar/particles_{pickle_fil.stem}_{method}_{tal}_{gradering}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}.pickle")
             if not partikkelfil.exists():
 
-                app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")
-                if pickle_fil.exists():
-                    app_log.info(f"Ja, det finst, hentar det.")
-                    with open(pickle_fil, 'rb') as f:
-                        tre = pickle.load(f)
-                    app_log.info("Ferdig å henta tre.")
-                else:
-                    app_log.info(f"Det finst ikkje, må laga det.")
-                    from lag_tre import lag_tre_multi
-                    tre = lag_tre_multi((f_span[0],f_span[1]+1),filnamn_inn = hdf5_fil, skalering=skalering)
-                    app_log.info(f"Ferdig å laga, skal lagra det.")
+                # app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")
+                # if pickle_fil.exists():
+                #     app_log.info(f"Ja, det finst, hentar det.")
+                #     with open(pickle_fil, 'rb') as f:
+                #         tre = pickle.load(f)
+                #     app_log.info("Ferdig å henta tre.")
+                # else:
+                #     app_log.info(f"Det finst ikkje, må laga det.")
+                #     from lag_tre import lag_tre_multi
+                #     tre = lag_tre_multi((f_span[0],f_span[1]+1),filnamn_inn = hdf5_fil, skalering=skalering)
+                #     app_log.info(f"Ferdig å laga, skal lagra det.")
 
-                    lagra_tre(tre,pickle_fil)
-                    app_log.info(f"Ferdig å lagra det.")
+                #     lagra_tre(tre,pickle_fil)
+                #     app_log.info(f"Ferdig å lagra det.")
                 # ribs = [Rib(rib) for rib in tre.ribs]
                 # particle_list = simulering(tal, tre, PSD=np.asarray([[gradering[0],0], [gradering[1],1]]), **sim_args)
 
                 random.seed(rnd_seed)
+                tre = tre_client.get_tre_client(5010)
 
                 start = datetime.datetime.now()
                 ribs = [Rib(rib, µ=0.85 if rib_index < 2 else 1)
-                        for rib_index, rib in enumerate(tre.ribs)]
+                        for rib_index, rib in enumerate(tre.get_ribs())]
 
                 with h5py.File(hdf5_fil, 'r') as f:
                     max_y = np.max(np.asarray(f['y'])*skalering)
@@ -180,7 +185,6 @@ for namn in pickle_filer:
                 # Her blir partiklane laga:
                 diameters = get_PSD_part(tal, PSD=np.asarray([[gradering[0], 0], [gradering[1], 1]]), rnd_seed=rnd_seed).tolist()
                 particle_list = [Particle(diameter=float(d), init_position=[ribs[0].get_rib_middle()[0], random.uniform(ribs[0].get_rib_middle()[1]+ribs[0].get_rib_dimensions()[0], max_y), 0, 0], init_time = random.randrange(0, 1000 )) for d in diameters]
-
                 for i, p in enumerate(particle_list):
                     p.atol, p.rtol = atol, rtol
                     p.method = method
@@ -190,65 +194,71 @@ for namn in pickle_filer:
                     p.index = i
                     p.resting_tolerance = 0.0001 if method == "BDF" else 0.01
                     p.scale = skalering
+                    p.ribs = ribs
                 del i,p
 
                 if multi:
-                    ray.init()  # dashboard_port=8266,num_cpus=4)
-                    tre_plasma = ray.put(tre)
-                    lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre_plasma, skalering=skalering, wrap_max=wrap_max,
-                                            verbose=verbose, collision_correction=collision_correction)
 
-                    # jobs = {remote_lag_sti.remote(particle=pa, **lag_sti_args): pa for pa in particle_list}
-                    index_list = {pa.index:{'job':remote_lag_sti.remote(particle=pa, **lag_sti_args),'particle':pa} for pa in particle_list}
+                    with Pool(processes=8) as pool:
+                        stiar = pool.map(lag_sti,  particle_list[:4] )
+                    [setattr(pa, 'sti_dict', sti) for sti, pa in zip(stiar,particle_list)]
+                        
+                    # ray.init()  # dashboard_port=8266,num_cpus=4)
+                    # tre_plasma = ray.put(tre)
+                    #lag_sti_args = dict(ribs =ribs, f_span=f_span, skalering=skalering, wrap_max=wrap_max,
+                                            #verbose=verbose, collision_correction=collision_correction)
 
-                    # not_ready = list(jobs.keys())
-                    #Kan eg lata vera å laga ei liste av jobs.keys() og heller berre bruka det som iterator?
-                    cancelled = []
-                    for elem in index_list:
-                        try:
-                            app_log.info(f"Har kome til partikkel nr. {elem}")
-                            sti_dict = ray.get(index_list[elem]['job'], timeout=(2))
+                    # # jobs = {remote_lag_sti.remote(particle=pa, **lag_sti_args): pa for pa in particle_list}
+                    # index_list = {pa.index:{'job':remote_lag_sti.remote(particle=pa, **lag_sti_args),'particle':pa} for pa in particle_list}
 
-                            assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {elem} er ufullstendig"
-                            index_list[elem]['particle'] = sti_dict
+                    # # not_ready = list(jobs.keys())
+                    # #Kan eg lata vera å laga ei liste av jobs.keys() og heller berre bruka det som iterator?
+                    # cancelled = []
+                    # for elem in index_list:
+                    #     try:
+                    #         app_log.info(f"Har kome til partikkel nr. {elem}")
+                    #         sti_dict = ray.get(index_list[elem]['job'], timeout=(2))
 
-                        except (GetTimeoutError, AssertionError):
-                            ray.cancel(index_list[elem]['job'], force=True)
-                            app_log.info(f"Måtte kansellera nr. {elem}, vart visst aldri ferdig.")
-                            cancelled.append(elem)
-                            index_list[elem]['particle'].method = "RK23"
-                        index_list[elem].pop('job')
-                    del elem
+                    #         assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {elem} er ufullstendig"
+                    #         index_list[elem]['particle'] = sti_dict
 
-                    if len(cancelled) > 0:
-                        app_log.info("Skal ta dei som ikkje klarte BDF")
-                        not_ready = []
-                        jobs = {}
-                        for i in cancelled:
-                            index_list[i]['job'] = remote_lag_sti.remote(particle=index_list[i]['particle'], **lag_sti_args)
-                            not_ready.append(index_list[i]['job'])
-                            jobs[index_list[i]['job']] = i
-                        del i
-                        while True:
-                            ready, not_ready = ray.wait(not_ready)
-                            sti_dict = ray.get(ready[0])
-                            app_log.info(f"Fekk nr. {jobs[ready[0]]} som var klar.")
-                            # ny_sti_dict = deepcopy_sti_dict(sti_dict)
+                    #     except (GetTimeoutError, AssertionError):
+                    #         ray.cancel(index_list[elem]['job'], force=True)
+                    #         app_log.info(f"Måtte kansellera nr. {elem}, vart visst aldri ferdig.")
+                    #         cancelled.append(elem)
+                    #         index_list[elem]['particle'].method = "RK23"
+                    #     index_list[elem].pop('job')
+                    # del elem
 
-                            assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {jobs[ready[0]]} er ufullstendig"
-                            index_list[jobs.pop(ready[0])].pop('job')
+                    # if len(cancelled) > 0:
+                    #     app_log.info("Skal ta dei som ikkje klarte BDF")
+                    #     not_ready = []
+                    #     jobs = {}
+                    #     for i in cancelled:
+                    #         index_list[i]['job'] = remote_lag_sti.remote(particle=index_list[i]['particle'], **lag_sti_args)
+                    #         not_ready.append(index_list[i]['job'])
+                    #         jobs[index_list[i]['job']] = i
+                    #     del i
+                    #     while True:
+                    #         ready, not_ready = ray.wait(not_ready)
+                    #         sti_dict = ray.get(ready[0])
+                    #         app_log.info(f"Fekk nr. {jobs[ready[0]]} som var klar.")
+                    #         # ny_sti_dict = deepcopy_sti_dict(sti_dict)
 
-                            app_log.info(f"Dei som står att no er {[jobs[p].index for p in not_ready] if len(not_ready)<100 else len(not_ready)}")
-                            if len(not_ready) == 0:
-                                break
+                    #         assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {jobs[ready[0]]} er ufullstendig"
+                    #         index_list[jobs.pop(ready[0])].pop('job')
 
-                    ray.shutdown()
+                    #         app_log.info(f"Dei som står att no er {[jobs[p].index for p in not_ready] if len(not_ready)<100 else len(not_ready)}")
+                    #         if len(not_ready) == 0:
+                    #             break
+
+                    # ray.shutdown()
                 else:
                     lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre, skalering=skalering, wrap_max=wrap_max,
                                             verbose=verbose, collision_correction=collision_correction)
-                    for pa in particle_list:
-                        if pa.index == 2:
-                            pa.sti_dict = lag_sti(particle = pa, **lag_sti_args)
+                    for pa in particle_list[:4]:
+                        # if pa.index == 2:
+                            pa.sti_dict = lag_sti(particle = pa)#, **lag_sti_args)
                             assert all([i in pa.sti_dict for i in range(pa.sti_dict['init_time'], pa.sti_dict['final_time']+1)]), f"Partikkel nr. {pa.index} er ufullstendig"
 
                 for pa in particle_list:

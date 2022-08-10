@@ -3,6 +3,8 @@
 
 import h5py
 import matplotlib
+
+from tre_client import tre_client
 # from ray.core.generated.common_pb2 import _TASKSPEC_OVERRIDEENVIRONMENTVARIABLESENTRY
 matplotlib.use("Agg")
 import numpy as np
@@ -22,17 +24,18 @@ app_log = logging.getLogger(__name__)
 
 from constants import collision_restitution
 
-@ray.remote
-def remote_lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):
-    return lag_sti(ribs, f_span, particle, tre, skalering=skalering, wrap_max = wrap_max, verbose=verbose, collision_correction=collision_correction)
+# @ray.remote
+# def remote_lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):
+#     return lag_sti(ribs, f_span, particle, tre, skalering=skalering, wrap_max = wrap_max, verbose=verbose, collision_correction=collision_correction)
 
-def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):
+def lag_sti(particle, f_span=(0,3598), skalering=40, wrap_max = 50, verbose=False, collision_correction=True):
     # stien må innehalda posisjon, fart og tid.
-
+    ribs = particle.ribs
     # fps_inv = 1/fps
     # sti = []
     sti_dict = {}
-
+    # tre = particle.tre
+    tre = tre_client.get_tre_client(5010)
     # sti_komplett = []
     # print(type(tre))
     # tre = ray.get(tre)
@@ -86,7 +89,7 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
             final_time = round(step[0])
             if np.all(index+1 < len(backcatalog) and backcatalog[index+1:,3:] == 0) and event == 'finish': 
                 break
-
+        
         if verbose:
             if (event != "finish"):
                 backcatalog = backcatalog + [step_new]
