@@ -17,7 +17,7 @@ import numpy as np
 import logging
 from pathlib import Path
 import datetime
-from hjelpefunksjonar import finn_fil,create_bins, scale_bins, f2t
+from hjelpefunksjonar import auto_garbage_collect, finn_fil,create_bins, scale_bins, f2t
 from lag_video import sti_animasjon
 import pickle
 from math import floor, sqrt
@@ -106,7 +106,7 @@ app_log.debug(f"{pickle_filer}")
 
 
 for namn in pickle_filer:
-    for skalering in [40,100,1000]:  
+    for skalering in [100,1000]:  
         if skalering == 1:
             pickle_namn = Path(namn).with_suffix(".pickle")
         else:
@@ -194,7 +194,7 @@ for namn in pickle_filer:
                 del i,p
 
                 if multi:
-                    ray.init(local_mode=False)  # dashboard_port=8266,num_cpus=4)
+                    ray.init(local_mode=False,include_dashboard=False, log_to_driver=False,logging_level="error")  # dashboard_port=8266,num_cpus=4)
                     tre_plasma = ray.put(tre)
                     lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre_plasma, skalering=skalering, wrap_max=wrap_max,
                                             verbose=verbose, collision_correction=collision_correction)
@@ -244,6 +244,8 @@ for namn in pickle_filer:
                             app_log.info(f"Dei som står att no er {[index_list[jobs[p]]['particle'].index for p in not_ready] if len(not_ready)<100 else len(not_ready)}")
                             if len(not_ready) == 0:
                                 break
+
+                            auto_garbage_collect()
 
                     ray.shutdown()
                 else:
