@@ -75,7 +75,7 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
         try:
             step_new, backcatalog, event, nfev_ny = rk_3(f, (frame,frame_max), step_old[1:], solver_args, skalering=skalering)
         except Exception as e:
-            raise Exception(f"Feil, med partikkel {particle.index} og tida t0 {frame}").with_traceback(e.__traceback__)
+            raise Exception(f"Feil, med partikkel {particle.index}, diameter {particle.diameter} og tida f0 {frame}").with_traceback(e.__traceback__)
 
         nfev += nfev_ny
         # sti = sti + backcatalog

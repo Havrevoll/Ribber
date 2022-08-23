@@ -21,7 +21,7 @@ g = np.array([[0], [g]]) # mm/s^2 = 9.81 m/s^2
 #         if obj is None: return
 #         self.delkrefter = getattr(obj, 'info', None)
 
-def f(t, x, particle, tri, ribs, skalering):
+def f(t, x, particle, tri, ribs, skalering, separated = False):
     """
     Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
     Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
@@ -32,7 +32,7 @@ def f(t, x, particle, tri, ribs, skalering):
     Parameters
     ----------
     t : double
-        Tidspunktet for funksjonen.
+        Tidspunktet for funksjonen. Ikkje frame, men tid. Må vera slik sidan tida vert multiplisert med posisjonen ute i solve_ivp-funksjonen.
     x : tuple
         Ein tuple med koordinatane og farten, altså (x0, y0, u0, v0).
     tri : spatial.qhull.Delaunay
@@ -121,8 +121,11 @@ def f(t, x, particle, tri, ribs, skalering):
 
     except KeyError:
         pass
-
-    return np.concatenate((dxdt,dudt))
+    
+    if not separated:
+        return np.concatenate((dxdt,dudt))
+    else:
+        return dict(drag = drag_component, gravity = gravity_component, added_mass = added_mass_component - 0.5 * rho_self_density * dudt, pressure = pressure_component, lift_component = lift_component, dudt = dudt, dxdt=dxdt)
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit

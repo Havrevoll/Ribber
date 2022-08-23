@@ -23,7 +23,7 @@ def lag_tre_multi(f_span, filnamn_inn, filnamn_ut=None, skalering=1):
         _type_: _description_
     """  
     
-    ray.init(num_cpus=4)
+    ray.init(num_cpus=4)#,local_mode=True,include_dashboard=False
 
     with h5py.File(filnamn_inn, 'r') as f:
         U = f.attrs['U']*skalering**0.5
