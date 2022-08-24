@@ -93,13 +93,13 @@ data_dir = Path("./data")
 if not data_dir.exists():
     os.makedirs(data_dir)
 else:
-    assert data_dir.isdir()
+    assert data_dir.is_dir()
 
 sim_dir = Path("./partikkelsimulasjonar")
 if not sim_dir.exists():
     os.makedirs(sim_dir)
 else:
-    assert sim_dir.isdir()
+    assert sim_dir.is_dir()
 
 for namn in pickle_filer:
     hdf5_fil = data_dir.joinpath(namn).with_suffix(".hdf5")
@@ -245,7 +245,7 @@ for namn in pickle_filer:
                     lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre, skalering=skalering, wrap_max=wrap_max,
                                             verbose=verbose, collision_correction=collision_correction)
                     for pa in particle_list:
-                        if pa.index == 2:
+                        if pa.index == 108:
                             pa.sti_dict = lag_sti(particle = pa, **lag_sti_args)
                             assert all([i in pa.sti_dict for i in range(pa.sti_dict['init_time'], pa.sti_dict['final_time']+1)]), f"Partikkel nr. {pa.index} er ufullstendig"
 
