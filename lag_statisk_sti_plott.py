@@ -1,15 +1,19 @@
 import matplotlib
 
 from hjelpefunksjonar import f2t
+
 matplotlib.use("Agg")
 
-import numpy as np
 import pickle
+
 import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.patches import Polygon
+
+from check_collision import check_all_collisions
 from f import f
 from rib import Rib
-from check_collision import check_all_collisions
-from matplotlib.patches import Polygon
+
 plt.rcParams["font.family"] = "STIXGeneral"
 plt.rcParams['mathtext.fontset'] = 'stix'
 

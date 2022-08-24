@@ -3,24 +3,27 @@
 
 import h5py
 import matplotlib
-# from ray.core.generated.common_pb2 import _TASKSPEC_OVERRIDEENVIRONMENTVARIABLESENTRY
+
 matplotlib.use("Agg")
+import datetime
+import logging
+import random
+from math import ceil, floor, hypot, isclose
+
 import numpy as np
-from scipy.integrate import solve_ivp  # https://docs.scipy.org/doc/scipy/reference/generated/scipy.integrate.solve_ivp.html#r179348322575-1
-from f import f
+import ray
+from loguru import logger
+from scipy.integrate import solve_ivp
+
 from check_collision import check_all_collisions
 from constants import ε
-import ray
-import datetime
-from math import floor, hypot, ceil, isclose
-import random
-import logging
-from loguru import logger
+from f import f
 from hjelpefunksjonar import f2t, status_colors, t2f
 
 app_log = logging.getLogger(__name__)
 
 from constants import collision_restitution
+
 
 @ray.remote(max_retries=0)
 def remote_lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):

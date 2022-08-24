@@ -4,25 +4,26 @@ Created on Wed Jul  7 09:22:39 2021
 
 @author: havrevol
 """
-from datagenerering import lagra_tre
-from lag_sti import lag_sti, remote_lag_sti  # ,Particle
-from ray.exceptions import GetTimeoutError
-import ray
+import datetime
+import logging
+import os
+import pickle
 import random
-from kornfordeling import get_PSD_part
-from particle import Particle
-from rib import Rib
+from pathlib import Path
+import requests
+
 import h5py
 import numpy as np
-import logging
-from pathlib import Path
-import datetime
-from hjelpefunksjonar import finn_fil,create_bins, scale_bins, f2t
+import ray
+from ray.exceptions import GetTimeoutError
+
+from datagenerering import lagra_tre
+from hjelpefunksjonar import create_bins, f2t, scale_bins
+from kornfordeling import get_PSD_part
+from lag_sti import lag_sti, remote_lag_sti
 from lag_video import sti_animasjon
-import pickle
-from math import floor, sqrt
-import matplotlib
-matplotlib.use("Agg")
+from particle import Particle
+from rib import Rib
 
 
 tal = 200
@@ -51,27 +52,10 @@ pickle_filer = [
     "rib50_Q40_1", 
     # "rib50_Q60_1", "rib50_Q80_1", "rib50_Q100_1", "rib50_Q120_1", "rib50_Q140_1"
     ]
-# pickle_filer = ["rib50_Q40_1_skalert" ]
-
-# graderingsliste = [
-#     [10, 12], 
-#     [9, 10],
-#     [8, 9],
-#     [7, 8],
-#     [6, 7],
-#     [5, 6],
-#     [4, 5],[3, 4],[2, 3],[1, 2],[0.9, 1],[0.8, 0.9],
-#                     [0.7, 0.8],[0.6, 0.7],[0.5, 0.6],[0.4, 0.5],[0.3, 0.4],[0.2, 0.3],[0.1, 0.2],[0.09, 0.1],
-#                     [0.08, 0.09],[0.07, 0.08],[0.06, 0.07],
-#                     [0.05, 0.06]]
 
 graderingar = [0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3, 
 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 
 7, 8, 9, 10,12]
-# original_graderingsliste= create_bins(graderingar)
-
-
-
 
 # logging.basicConfig(filename='simuleringar.log', level=logging.DEBUG, format='%(asctime)s - %(name)s - %(message)s')
 
@@ -104,23 +88,34 @@ app_log.setLevel(logging.DEBUG)
 app_log.debug('Byrja simuleringa med denne lista:')
 app_log.debug(f"{pickle_filer}")
 
+data_dir = Path("./data")
+
+if not data_dir.exists():
+    os.makedirs(data_dir)
+else:
+    assert data_dir.isdir()
+
+sim_dir = Path("./partikkelsimulasjonar")
+if not sim_dir.exists():
+    os.makedirs(sim_dir)
+else:
+    assert sim_dir.isdir()
 
 for namn in pickle_filer:
+    hdf5_fil = data_dir.joinpath(namn).with_suffix(".hdf5")
+
+    if not hdf5_fil.exists():
+        print("hdf5-fila låg ikkje inne, må lasta ned")
+        hdf5_fil_innhald = requests.get(f"http://folk.ntnu.no/havrevol/hdf5/{hdf5_fil.name}")
+        with open(hdf5_fil,'wb') as fp:
+            fp.write(hdf5_fil_innhald.content)
+        print("Ferdig å lasta ned, går vidare.")
+
     for skalering in [40,100,1000]:  
         if skalering == 1:
             pickle_namn = Path(namn).with_suffix(".pickle")
         else:
             pickle_namn = Path(namn+f"_scale{skalering}").with_suffix(".pickle")
-
-        hdf5_fil = Path("data").joinpath(namn).with_suffix(".hdf5")
-
-        # pickle_namn = "TONSTAD_FOUR_Q40_REPEAT.pickle"
-        # assert pickle_fil.exists()
-        # pickle_fil = finn_fil([Path("data").joinpath(Path(pickle_namn)), Path("~/hard/").joinpath(
-        #     Path(pickle_namn)).expanduser(), Path("/mnt/g/pickle/").joinpath(Path(pickle_namn))])
-
-        # assert pickle_fil.exists()
-        assert hdf5_fil.exists()
 
         talstart = datetime.datetime.now()
         f_span = (0,3598)
@@ -259,7 +254,7 @@ for namn in pickle_filer:
                 with open(partikkelfil, 'wb') as f:
                     pickle.dump(particle_list, f)
                 del tre
-            else:
+            elif laga_film:
                 app_log.info("Berekningane fanst frå før, hentar dei.")
                 with open(partikkelfil, 'rb') as f:
                     particle_list = pickle.load(f)
