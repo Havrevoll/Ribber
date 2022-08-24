@@ -172,7 +172,10 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
     
     # U_del = tre_samla.get_U(tx)
     # tri = tre_samla.get_tri(tx)
-    tri, U_del = tre_samla.get_tri_og_U(frame)
+    try:
+        tri, U_del = tre_samla.get_tri_og_U(frame)
+    except KeyError:
+        tri, U_del = tre_samla.get_max_tri_og_U()
 
     x = np.stack((tx,tx + np.asarray([[Δ],[0],[0]]), tx + np.asarray([[0],[Δ],[0]]), tx +np.asarray([[0],[0],[Δ]])))
         

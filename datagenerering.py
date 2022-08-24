@@ -235,6 +235,9 @@ class tre_objekt:
     def get_tri_og_U(self,t):
         return self.tre[int(t)]
     
+    def get_max_tri_og_U(self):
+        return self.tre[max(self.tre.keys())]
+    
     def get_kd_U(self, tx):
         while True:
                 try:
