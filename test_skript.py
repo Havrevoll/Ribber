@@ -36,7 +36,7 @@ SIM_TIMEOUT = 120
 pickle_filer = [
     # "rib25_Q20_1", 
     # "rib25_Q20_2", "rib25_Q20_3", 
-    # "rib25_Q40_1", 
+    "rib25_Q40_1", 
     # "rib25_Q40_2", 
     # "rib25_Q60_1", 
     # "rib25_Q60_2", 
@@ -44,7 +44,8 @@ pickle_filer = [
     # "rib25_Q80_2", 
     # "rib25_Q100_1", 
     # "rib25_Q100_2", 
-    # "rib75_Q20_1", "rib75_Q40_1", 
+    # "rib75_Q20_1", 
+    # "rib75_Q40_1", 
     # "rib75_Q40_2", "rib75_Q40_3", 
     # "rib75_Q60_1", "rib75_Q80_1", 
     # "rib75_Q80_2", "rib75_Q80_3", 
@@ -52,7 +53,7 @@ pickle_filer = [
     # "rib75_Q100_2", "rib75_Q100_3", "rib75_Q100_4", 
     # "rib50_Q20_1", 
     # "rib50_Q20_2", "rib50_Q20_3", 
-    "rib50_Q40_1", 
+    # "rib50_Q40_1", 
     # "rib50_Q60_1", "rib50_Q80_1", "rib50_Q100_1", "rib50_Q120_1", "rib50_Q140_1"
     ]
 
@@ -60,34 +61,26 @@ graderingar = [0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 
 7, 8, 9, 10,12]
 
-# logging.basicConfig(filename='simuleringar.log', level=logging.DEBUG, format='%(asctime)s - %(name)s - %(message)s')
-
+skaleringar = [1] # 40, 100, 1000]
 
 log_formatter = logging.Formatter(
     '%(asctime)s %(levelname)s %(name)s %(funcName)s(%(lineno)d) %(message)s')
-
 # File to log to
 logFile = 'simuleringar.log'
-
 # Setup File handler
 file_handler = logging.FileHandler(logFile)
 file_handler.setFormatter(log_formatter)
 file_handler.setLevel(logging.DEBUG)
-
 # Setup Stream Handler (i.e. console)
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(log_formatter)
 stream_handler.setLevel(logging.INFO)
-
 # Get our logger
 app_log = logging.getLogger()
-
 # Add both Handlers
 app_log.addHandler(file_handler)
 app_log.addHandler(stream_handler)
-
 app_log.setLevel(logging.DEBUG)
-
 app_log.debug('Byrja simuleringa med denne lista:')
 app_log.debug(f"{pickle_filer}")
 
@@ -114,7 +107,7 @@ for namn in pickle_filer:
             fp.write(hdf5_fil_innhald.content)
         print("Ferdig å lasta ned, går vidare.")
 
-    for skalering in [1, 40,100,1000]:  
+    for skalering in skaleringar:  
         if skalering == 1:
             pickle_namn = Path(namn).with_suffix(".pickle")
         else:
