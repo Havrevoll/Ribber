@@ -4,7 +4,7 @@ Created on Wed Jul  7 09:22:39 2021
 
 @author: havrevol
 """
-import datetime
+from datetime import datetime as dt
 import logging
 import os
 import pickle
@@ -16,6 +16,7 @@ import h5py
 import numpy as np
 import ray
 from ray.exceptions import GetTimeoutError
+from ray.experimental.state.api import list_tasks
 
 from datagenerering import lagra_tre
 from hjelpefunksjonar import create_bins, f2t, scale_bins
@@ -29,6 +30,8 @@ from rib import Rib
 tal = 200
 rnd_seed = 1
 tider = {}
+
+SIM_TIMEOUT = 120
 
 pickle_filer = [
     # "rib25_Q20_1", 
@@ -111,13 +114,13 @@ for namn in pickle_filer:
             fp.write(hdf5_fil_innhald.content)
         print("Ferdig å lasta ned, går vidare.")
 
-    for skalering in [40,100,1000]:  
+    for skalering in [1, 40,100,1000]:  
         if skalering == 1:
             pickle_namn = Path(namn).with_suffix(".pickle")
         else:
             pickle_namn = Path(namn+f"_scale{skalering}").with_suffix(".pickle")
 
-        talstart = datetime.datetime.now()
+        talstart = dt.now()
         f_span = (0,3598)
         t_span = (f2t(f_span[0],scale=skalering), f2t(f_span[0],scale=skalering))
 
@@ -139,7 +142,7 @@ for namn in pickle_filer:
         graderingsliste = create_bins(scale_bins(np.asarray(graderingar),skalering))
 
         for gradering in graderingsliste:
-            graderingstart = datetime.datetime.now()
+            graderingstart = dt.now()
             pickle_fil = Path("data").joinpath(Path(pickle_namn))
             app_log.info(f"Byrja med {namn}, gradering {gradering}")
 
@@ -165,7 +168,7 @@ for namn in pickle_filer:
 
                 random.seed(rnd_seed)
 
-                start = datetime.datetime.now()
+                start = dt.now()
                 ribs = [Rib(rib, µ=0.85 if rib_index < 2 else 1)
                         for rib_index, rib in enumerate(tre.ribs)]
 
@@ -189,32 +192,50 @@ for namn in pickle_filer:
                 del i,p
 
                 if multi:
-                    ray.init(local_mode=False)  # dashboard_port=8266,num_cpus=4)
+                    ray.init(local_mode=False,include_dashboard=True)  # dashboard_port=8266,num_cpus=4)
                     tre_plasma = ray.put(tre)
                     lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre_plasma, skalering=skalering, wrap_max=wrap_max,
                                             verbose=verbose, collision_correction=collision_correction)
 
-                    # jobs = {remote_lag_sti.remote(particle=pa, **lag_sti_args): pa for pa in particle_list}
-                    index_list = {pa.index:{'job':remote_lag_sti.remote(particle=pa, **lag_sti_args),'particle':pa} for pa in particle_list}
+                    index_list = {pa.index:{'job':remote_lag_sti.remote(particle=pa, **lag_sti_args),'particle':pa} for pa in particle_list} #index som key, job og particle i ein dict under der
+                    job_list_strings = {index_list[i]['job'].task_id().hex():i for i in index_list} # task-id som string som key, index som value
+                    task_liste = list_tasks(filters=[("scheduling_state", "!=", "SCHEDULED")]) # lista over dei som er running, som string
+                    running = {job_list_strings[p['task_id']]:dt.now() for p in list_tasks(filters=[("scheduling_state", "!=", "SCHEDULED")])} #index som key, tid for oppstart som value
+                    scheduled = [job_list_strings[p['task_id']] for p in list_tasks(filters=[("scheduling_state", "=", "SCHEDULED")])] # berre ei liste med index som er scheduled. Maks 100
 
-                    # not_ready = list(jobs.keys())
-                    #Kan eg lata vera å laga ei liste av jobs.keys() og heller berre bruka det som iterator?
                     cancelled = []
-                    for elem in index_list:
-                        try:
-                            app_log.info(f"Har kome til partikkel nr. {elem}")
-                            sti_dict = ray.get(index_list[elem]['job'], timeout=(1))
+                    
+                    while len(running) > 0:
+                        ready, _ = ray.wait([index_list[i]['job'] for i in running.keys()], timeout=0.5)
 
-                            assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {elem} er ufullstendig"
-                            index_list[elem]['particle'].sti_dict = sti_dict
+                        if len(ready) > 0:
+                            elem = job_list_strings[ready[0].task_id().hex()]
+                        else:
+                            elem = min(running,key=running.get)
+                        tid = running.pop(elem)
+                        app_log.info(f"skal sjekka partikkel {elem}, gått i {(dt.now()-tid).seconds} sekund")
+                        
 
-                        except (GetTimeoutError, AssertionError):
-                            ray.cancel(index_list[elem]['job'], force=True)
-                            app_log.info(f"Måtte kansellera nr. {elem}, vart visst aldri ferdig.")
-                            cancelled.append(elem)
-                            index_list[elem]['particle'].method = "RK23"
-                        index_list[elem].pop('job')
-                    del elem
+                        if (dt.now() - tid).seconds > SIM_TIMEOUT or len(ready) > 0:
+                            try:
+                                app_log.info(f"Har kome til partikkel nr. {elem}")
+                                sti_dict = ray.get(index_list[elem]['job'], timeout=(1))
+
+                                assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {elem} er ufullstendig"
+                                index_list[elem]['particle'].sti_dict = sti_dict
+
+                            except (GetTimeoutError, AssertionError):
+                                ray.cancel(index_list[elem]['job'], force=True)
+                                app_log.info(f"Måtte kansellera nr. {elem}, vart visst aldri ferdig.")
+                                cancelled.append(elem)
+                                index_list[elem]['particle'].method = "RK23"
+                        else:
+                            running[elem] = tid
+
+                        new_running = dict.fromkeys([job_list_strings[p['task_id']] for p in list_tasks(filters=[("scheduling_state", "!=", "SCHEDULED")]) if (job_list_strings[p['task_id']] not in running) and (job_list_strings[p['task_id']] not in cancelled)],(dt.now()))
+                        running.update(new_running)
+                        scheduled = [job_list_strings[p['task_id']] for p in list_tasks(filters=[("scheduling_state", "=", "SCHEDULED")])]
+                        app_log.info(f"Dei som no er att er {running.keys()}")
 
                     if len(cancelled) > 0:
                         app_log.info("Skal ta dei som ikkje klarte BDF")
@@ -258,8 +279,6 @@ for namn in pickle_filer:
                 app_log.info("Berekningane fanst frå før, hentar dei.")
                 with open(partikkelfil, 'rb') as f:
                     particle_list = pickle.load(f)
-                # with h5py.File(pickle_fil.with_name(f"{pickle_fil.stem}_ribs.hdf5"), 'r') as f:
-                #     ribs = [Rib(rib) for rib in np.asarray(f['ribs'])]
                 with open(pickle_fil, 'rb') as f:
                     ribs =  [Rib(rib) for rib in pickle.load(f).ribs]
             # caught = 0
@@ -274,26 +293,24 @@ for namn in pickle_filer:
             #         uncaught += 1
             #         uncaught_mass += pa.mass
 
-            app_log.info(f"Brukte  {datetime.datetime.now() - graderingstart} s på å simulera. Til saman er brukt {datetime.datetime.now()-talstart}.")
+            app_log.info(f"Brukte  {dt.now() - graderingstart} s på å simulera. Til saman er brukt {dt.now()-talstart}.")
             # app_log.info(f"Av {len(particle_list)} partiklar vart {caught} fanga, altså {100* caught/len(particle_list):.2f}%, og det er {1e6*caught_mass:.2f} mg")
             # app_log.info(f"Av {len(particle_list)} partiklar vart {uncaught} ikkje fanga, altså {100* uncaught/len(particle_list):.2f}%, og det er {1e6*uncaught_mass:.2f} mg")
 
-            start_film = datetime.datetime.now()
+            start_film = dt.now()
             if laga_film:
                 # Path(f"./filmar/sti_{pickle_fil.stem}_{sim_args['method']}_{len(particle_list)}_{sim_args['atol']:.0e}.mp4")
                 film_fil = partikkelfil.with_suffix(".mp4")
                 if not film_fil.exists():
                     sti_animasjon(particle_list, ribs, t_span=t_span, hdf5_fil=hdf5_fil, utfilnamn=film_fil, fps=60, skalering=skalering)
                     app_log.info("Brukte  {} s på å laga film".format(
-                        datetime.datetime.now() - start_film))
+                        dt.now() - start_film))
                 else:
                     app_log.info(
                         "Filmen finst jo frå før, hoppar over dette steget.")
 
-                # run(f"rsync {film_fil} havrevol@login.ansatt.ntnu.no:", shell=True)
-
-            tider[pickle_fil.stem] = dict(totalt=datetime.datetime.now() - talstart,
-                                        berre_film=datetime.datetime.now() - start_film, berre_sim=start_film-talstart)
+            tider[pickle_fil.stem] = dict(totalt=dt.now() - talstart,
+                                        berre_film=dt.now() - start_film, berre_sim=start_film-talstart)
             # break
 
         for t in tider:
