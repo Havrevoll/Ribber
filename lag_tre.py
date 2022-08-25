@@ -10,7 +10,7 @@ from datagenerering import generate_U_txy, generate_ribs, lagra_tre, tre_objekt
 import scipy.spatial.qhull as qhull
 from scipy.spatial import cKDTree
 
-def lag_tre_multi(f_span, filnamn_inn, filnamn_ut=None, skalering=1):
+def lag_tre_multi(f_span, filnamn_inn, filnamn_ut=None, skalering=1,linear = True):
     """Lagar eit objekt som kan brukast til interpolering av fartsdata.
 
     Args:
@@ -43,18 +43,19 @@ def lag_tre_multi(f_span, filnamn_inn, filnamn_ut=None, skalering=1):
     x_r = ray.put(x)
     y_r = ray.put(y)
     ribs_r = ray.put(ribs)
-
-    jobs = {lag_tre.remote((i,i+2), u_r,v_r,x_r,y_r,I,J,ribs_r, L,rib_width):i for i in range(f_span[0],f_span[1])}
-
     trees = {}
+    
+    if linear:
+        jobs = {lag_tre.remote((i,i+2), u_r,v_r,x_r,y_r,I,J,ribs_r, L,rib_width):i for i in range(f_span[0],f_span[1])}
 
-    not_ready = list(jobs.keys())
-    while True:
-        ready, not_ready = ray.wait(not_ready)
-        trees[jobs[ready[0]]] = ray.get(ready)[0]
 
-        if len(not_ready)==0:
-            break
+        not_ready = list(jobs.keys())
+        while True:
+            ready, not_ready = ray.wait(not_ready)
+            trees[jobs[ready[0]]] = ray.get(ready)[0]
+
+            if len(not_ready)==0:
+                break
 
     kdjob = lag_tre.remote(f_span, u_r,v_r,x_r,y_r,I,J,ribs_r, L, rib_width, nearest=True, kutt= False, inkluder_ribs=True)
     

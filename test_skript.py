@@ -22,6 +22,7 @@ from datagenerering import lagra_tre
 from hjelpefunksjonar import create_bins, f2t, scale_bins
 from kornfordeling import get_PSD_part
 from lag_sti import lag_sti, remote_lag_sti
+from lag_tre import lag_tre_multi
 from lag_video import sti_animasjon
 from particle import Particle
 from rib import Rib
@@ -45,7 +46,7 @@ pickle_filer = [
     # "rib25_Q100_1", 
     # "rib25_Q100_2", 
     # "rib75_Q20_1", 
-    # "rib75_Q40_1", 
+    "rib75_Q40_1", 
     # "rib75_Q40_2", "rib75_Q40_3", 
     # "rib75_Q60_1", "rib75_Q80_1", 
     # "rib75_Q80_2", "rib75_Q80_3", 
@@ -62,6 +63,16 @@ graderingar = [0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
 7, 8, 9, 10,12]
 
 skaleringar = [1] # 40, 100, 1000]
+linear = False
+lift = True
+addedmass = True
+wrap_max = 50
+method = 'BDF'
+# Denne tråden forklarer litt om korleis ein skal setja atol og rtol: https://stackoverflow.com/questions/67389644/floating-point-precision-of-scipy-solve-ivp
+verbose = False
+collision_correction = True
+laga_film = False
+multi = True
 
 log_formatter = logging.Formatter(
     '%(asctime)s %(levelname)s %(name)s %(funcName)s(%(lineno)d) %(message)s')
@@ -116,21 +127,11 @@ for namn in pickle_filer:
         talstart = dt.now()
         f_span = (0,3598)
         t_span = (f2t(f_span[0],scale=skalering), f2t(f_span[0],scale=skalering))
+        rtol = 1e-1
+        atol = 1e-1*skalering
 
         # sim_args = dict(fps = 20, t_span=t_span, linear = True, lift = True, addedmass = True, wrap_max = 50, method = 'BDF', atol = 1e-1, rtol = 1e-1, verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = multi)
         # fps = 20/sqrt(skalering)
-        linear = True
-        lift = True
-        addedmass = True
-        wrap_max = 50
-        method = 'BDF'
-        rtol = 1e-1
-        atol = 1e-1*skalering
-        # Denne tråden forklarer litt om korleis ein skal setja atol og rtol: https://stackoverflow.com/questions/67389644/floating-point-precision-of-scipy-solve-ivp
-        verbose = False
-        collision_correction = True
-        laga_film = False
-        multi = True
 
         graderingsliste = create_bins(scale_bins(np.asarray(graderingar),skalering))
 
@@ -141,24 +142,26 @@ for namn in pickle_filer:
 
             partikkelfil = Path( f"./partikkelsimulasjonar/particles_{pickle_fil.stem}_{method}_{tal}_{gradering}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}.pickle")
             if not partikkelfil.exists():
+                if linear:
+                    app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")
+                    if pickle_fil.exists():
+                        app_log.info(f"Ja, det finst, hentar det.")
+                        with open(pickle_fil, 'rb') as f:
+                            tre = pickle.load(f)
+                        app_log.info("Ferdig å henta tre.")
+                    else:
+                        app_log.info(f"Det finst ikkje, må laga det.")
+                        tre = lag_tre_multi((f_span[0],f_span[1]+1),filnamn_inn = hdf5_fil, skalering=skalering)
+                        app_log.info(f"Ferdig å laga, skal lagra det.")
 
-                app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")
-                if pickle_fil.exists():
-                    app_log.info(f"Ja, det finst, hentar det.")
-                    with open(pickle_fil, 'rb') as f:
-                        tre = pickle.load(f)
-                    app_log.info("Ferdig å henta tre.")
+                        lagra_tre(tre,pickle_fil)
+                        app_log.info(f"Ferdig å lagra det.")
+                    # ribs = [Rib(rib) for rib in tre.ribs]
+                    # particle_list = simulering(tal, tre, PSD=np.asarray([[gradering[0],0], [gradering[1],1]]), **sim_args)
                 else:
-                    app_log.info(f"Det finst ikkje, må laga det.")
-                    from lag_tre import lag_tre_multi
-                    tre = lag_tre_multi((f_span[0],f_span[1]+1),filnamn_inn = hdf5_fil, skalering=skalering)
-                    app_log.info(f"Ferdig å laga, skal lagra det.")
-
-                    lagra_tre(tre,pickle_fil)
-                    app_log.info(f"Ferdig å lagra det.")
-                # ribs = [Rib(rib) for rib in tre.ribs]
-                # particle_list = simulering(tal, tre, PSD=np.asarray([[gradering[0],0], [gradering[1],1]]), **sim_args)
-
+                    app_log.info(f"Skal berre laga kd-tre.")
+                    tre = lag_tre_multi((f_span[0],f_span[1]+1),filnamn_inn = hdf5_fil, skalering=skalering, linear=False)
+                    app_log.info(f"Ferdig å laga kd-tre.")
                 random.seed(rnd_seed)
 
                 start = dt.now()
