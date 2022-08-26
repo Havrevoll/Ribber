@@ -35,31 +35,31 @@ tider = {}
 SIM_TIMEOUT = 120
 
 pickle_filer = [
-    # "rib25_Q20_1", 
-    # "rib25_Q20_2", "rib25_Q20_3", 
-    "rib25_Q40_1", 
-    # "rib25_Q40_2", 
-    # "rib25_Q60_1", 
-    # "rib25_Q60_2", 
-    # "rib25_Q80_1", 
-    # "rib25_Q80_2", 
-    # "rib25_Q100_1", 
-    # "rib25_Q100_2", 
-    # "rib75_Q20_1", 
-    "rib75_Q40_1", 
-    # "rib75_Q40_2", "rib75_Q40_3", 
-    # "rib75_Q60_1", "rib75_Q80_1", 
-    # "rib75_Q80_2", "rib75_Q80_3", 
-    # "rib75_Q100_1", 
-    # "rib75_Q100_2", "rib75_Q100_3", "rib75_Q100_4", 
-    # "rib50_Q20_1", 
-    # "rib50_Q20_2", "rib50_Q20_3", 
-    # "rib50_Q40_1", 
+    # "rib25_Q20_1",
+    # "rib25_Q20_2", "rib25_Q20_3",
+    "rib25_Q40_1",
+    # "rib25_Q40_2",
+    # "rib25_Q60_1",
+    # "rib25_Q60_2",
+    # "rib25_Q80_1",
+    # "rib25_Q80_2",
+    # "rib25_Q100_1",
+    # "rib25_Q100_2",
+    # "rib75_Q20_1",
+    "rib75_Q40_1",
+    # "rib75_Q40_2", "rib75_Q40_3",
+    # "rib75_Q60_1", "rib75_Q80_1",
+    # "rib75_Q80_2", "rib75_Q80_3",
+    # "rib75_Q100_1",
+    # "rib75_Q100_2", "rib75_Q100_3", "rib75_Q100_4",
+    # "rib50_Q20_1",
+    # "rib50_Q20_2", "rib50_Q20_3",
+    # "rib50_Q40_1",
     # "rib50_Q60_1", "rib50_Q80_1", "rib50_Q100_1", "rib50_Q120_1", "rib50_Q140_1"
     ]
 
-graderingar = [0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3, 
-0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 
+graderingar = [0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
+0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6,
 7, 8, 9, 10,12]
 
 skaleringar = [1] # 40, 100, 1000]
@@ -112,13 +112,15 @@ for namn in pickle_filer:
     hdf5_fil = data_dir.joinpath(namn).with_suffix(".hdf5")
 
     if not hdf5_fil.exists():
-        print("hdf5-fila låg ikkje inne, må lasta ned")
+        app_log.info(f"hdf5-fila {hdf5_fil} låg ikkje inne, må lasta ned")
+        nedlast_tid= dt.now()
         hdf5_fil_innhald = requests.get(f"http://folk.ntnu.no/havrevol/hdf5/{hdf5_fil.name}")
         with open(hdf5_fil,'wb') as fp:
             fp.write(hdf5_fil_innhald.content)
-        print("Ferdig å lasta ned, går vidare.")
+        app_log.info(f"Ferdig å lasta ned, brukte {dt.now()-nedlast_tid}, går vidare.")
+        del nedlast_tid, fp
 
-    for skalering in skaleringar:  
+    for skalering in skaleringar:
         if skalering == 1:
             pickle_namn = Path(namn).with_suffix(".pickle")
         else:
@@ -129,6 +131,7 @@ for namn in pickle_filer:
         t_span = (f2t(f_span[0],scale=skalering), f2t(f_span[0],scale=skalering))
         rtol = 1e-1
         atol = 1e-1*skalering
+        tre = None
 
         # sim_args = dict(fps = 20, t_span=t_span, linear = True, lift = True, addedmass = True, wrap_max = 50, method = 'BDF', atol = 1e-1, rtol = 1e-1, verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = multi)
         # fps = 20/sqrt(skalering)
@@ -142,7 +145,7 @@ for namn in pickle_filer:
 
             partikkelfil = Path( f"./partikkelsimulasjonar/particles_{pickle_fil.stem}_{method}_{tal}_{gradering}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}.pickle")
             if not partikkelfil.exists():
-                if linear:
+                if linear and tre is None:
                     app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")
                     if pickle_fil.exists():
                         app_log.info(f"Ja, det finst, hentar det.")
@@ -158,7 +161,7 @@ for namn in pickle_filer:
                         app_log.info(f"Ferdig å lagra det.")
                     # ribs = [Rib(rib) for rib in tre.ribs]
                     # particle_list = simulering(tal, tre, PSD=np.asarray([[gradering[0],0], [gradering[1],1]]), **sim_args)
-                else:
+                elif tre is None:
                     app_log.info(f"Skal berre laga kd-tre.")
                     tre = lag_tre_multi((f_span[0],f_span[1]+1),filnamn_inn = hdf5_fil, skalering=skalering, linear=False)
                     app_log.info(f"Ferdig å laga kd-tre.")
@@ -188,7 +191,7 @@ for namn in pickle_filer:
                 del i,p
 
                 if multi:
-                    ray.init(local_mode=False,include_dashboard=True)  # dashboard_port=8266,num_cpus=4)
+                    ray.init(local_mode=False,include_dashboard=True,num_cpus=4)  # dashboard_port=8266,)
                     tre_plasma = ray.put(tre)
                     lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre_plasma, skalering=skalering, wrap_max=wrap_max,
                                             verbose=verbose, collision_correction=collision_correction)
@@ -200,7 +203,7 @@ for namn in pickle_filer:
                     scheduled = [job_list_strings[p['task_id']] for p in list_tasks(filters=[("scheduling_state", "=", "SCHEDULED")])] # berre ei liste med index som er scheduled. Maks 100
 
                     cancelled = []
-                    
+
                     while len(running) > 0:
                         ready, _ = ray.wait([index_list[i]['job'] for i in running.keys()], timeout=0.5)
 
@@ -209,8 +212,7 @@ for namn in pickle_filer:
                         else:
                             elem = min(running,key=running.get)
                         tid = running.pop(elem)
-                        app_log.info(f"skal sjekka partikkel {elem}, gått i {(dt.now()-tid).seconds} sekund")
-                        
+                        app_log.info(f"skal sjekka partikkel {elem}, gått i {(dt.now()-tid).seconds} sekund, dei som no er att er {[(k,(dt.now()-v).seconds) for k,v in running.items()]}")
 
                         if (dt.now() - tid).seconds > SIM_TIMEOUT or len(ready) > 0:
                             try:
@@ -231,7 +233,6 @@ for namn in pickle_filer:
                         new_running = dict.fromkeys([job_list_strings[p['task_id']] for p in list_tasks(filters=[("scheduling_state", "!=", "SCHEDULED")]) if (job_list_strings[p['task_id']] not in running) and (job_list_strings[p['task_id']] not in cancelled)],(dt.now()))
                         running.update(new_running)
                         scheduled = [job_list_strings[p['task_id']] for p in list_tasks(filters=[("scheduling_state", "=", "SCHEDULED")])]
-                        app_log.info(f"Dei som no er att er {running.keys()}")
 
                     if len(cancelled) > 0:
                         app_log.info("Skal ta dei som ikkje klarte BDF")
@@ -249,7 +250,7 @@ for namn in pickle_filer:
                             # ny_sti_dict = deepcopy_sti_dict(sti_dict)
 
                             assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {jobs[ready[0]]} er ufullstendig"
-                            
+
                             index_list[jobs[ready[0]]]['particle'].sti_dict = sti_dict
                             index_list[jobs.pop(ready[0])].pop('job')
 
@@ -267,6 +268,17 @@ for namn in pickle_filer:
                             assert all([i in pa.sti_dict for i in range(pa.sti_dict['init_time'], pa.sti_dict['final_time']+1)]), f"Partikkel nr. {pa.index} er ufullstendig"
 
                 for pa in particle_list:
+                    if not hasattr(pa,'sti_dict'):
+                        # try:
+                            app_log.info(f"Hadde ikkje fått sti_dict frå {pa.index}. Prøver å henta den no.")
+                            sti_dict = ray.get(index_list[pa.index]['job'], timeout=(5))
+
+                            assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {elem} er ufullstendig"
+                            pa.sti_dict = sti_dict
+                        # except (GetTimeoutError, AssertionError):
+                        #     ray.cancel(index_list[elem]['job'], force=True)
+                        #     app_log.info(f"Måtte kansellera nr. {elem}, vart visst aldri ferdig.")
+
                     assert hasattr(pa,'sti_dict'), f"problem i {pa.index}"
                 with open(partikkelfil, 'wb') as f:
                     pickle.dump(particle_list, f)
