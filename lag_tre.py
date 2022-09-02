@@ -7,8 +7,8 @@ import numpy as np
 import ray
 
 from datagenerering import generate_U_txy, generate_ribs, lagra_tre, tre_objekt
-import scipy.spatial.qhull as qhull
-from scipy.spatial import cKDTree
+from scipy.spatial import Delaunay
+from scipy.spatial import KDTree
 
 def lag_tre_multi(f_span, filnamn_inn, filnamn_ut=None, skalering=1,linear = True):
     """Lagar eit objekt som kan brukast til interpolering av fartsdata.
@@ -90,11 +90,11 @@ def lag_tre(f_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, nearest=False, kutt=True
     U, txy = generate_U_txy(f_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, kutt)
     
     if (nearest):
-        tree = cKDTree(txy)
+        tree = KDTree(txy)
     else:
         print(f"Byrjar på delaunay for ({f_span})")
         start = datetime.datetime.now()
-        tree = qhull.Delaunay(txy)
+        tree = Delaunay(txy)
         print(f"Ferdig med delaunay for ({f_span}, brukte {datetime.datetime.now()-start}")
         del start
     
@@ -129,7 +129,7 @@ if __name__ == "__main__":
     # Herifrå er det det som skjer i "lag_tre":
     U, txy = generate_U_txy(f_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, kutt)
 
-    tree = qhull.Delaunay(txy)
+    tree = Delaunay(txy)
     
     venstre_ribbe, hogre_ribbe, golv = generate_ribs(ribs, L, rib_width)
     

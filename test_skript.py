@@ -59,20 +59,20 @@ pickle_filer = [
     ]
 
 graderingar = [0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
-0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6,
-7, 8, 9, 10,12]
+0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,12]
 
 skaleringar = [1] # 40, 100, 1000]
-linear = False
+linear = True
 lift = True
 addedmass = True
 wrap_max = 50
 method = 'BDF'
+method_2nd = 'RK23'
 # Denne tråden forklarer litt om korleis ein skal setja atol og rtol: https://stackoverflow.com/questions/67389644/floating-point-precision-of-scipy-solve-ivp
 verbose = False
 collision_correction = True
 laga_film = False
-multi = True
+multi = False
 
 log_formatter = logging.Formatter(
     '%(asctime)s %(levelname)s %(name)s %(funcName)s(%(lineno)d) %(message)s')
@@ -102,11 +102,8 @@ if not data_dir.exists():
 else:
     assert data_dir.is_dir()
 
-sim_dir = Path("./partikkelsimulasjonar")
-if not sim_dir.exists():
-    os.makedirs(sim_dir)
-else:
-    assert sim_dir.is_dir()
+sim_dir = Path("./runs")
+
 
 for namn in pickle_filer:
     hdf5_fil = data_dir.joinpath(namn).with_suffix(".hdf5")
@@ -143,7 +140,11 @@ for namn in pickle_filer:
             pickle_fil = Path("data").joinpath(Path(pickle_namn))
             app_log.info(f"Byrja med {namn}, gradering {gradering}")
 
-            partikkelfil = Path( f"./partikkelsimulasjonar/particles_{pickle_fil.stem}_{method}_{tal}_{gradering}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}.pickle")
+            particle_dir = sim_dir.joinpath(Path(pickle_fil.stem))
+            if not particle_dir.exists():
+                os.makedirs(particle_dir)
+
+            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_test.pickle")
             if not partikkelfil.exists():
                 if linear and tre is None:
                     app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")
@@ -161,7 +162,7 @@ for namn in pickle_filer:
                         app_log.info(f"Ferdig å lagra det.")
                     # ribs = [Rib(rib) for rib in tre.ribs]
                     # particle_list = simulering(tal, tre, PSD=np.asarray([[gradering[0],0], [gradering[1],1]]), **sim_args)
-                elif tre is None:
+                elif not linear and tre is None:
                     app_log.info(f"Skal berre laga kd-tre.")
                     tre = lag_tre_multi((f_span[0],f_span[1]+1),filnamn_inn = hdf5_fil, skalering=skalering, linear=False)
                     app_log.info(f"Ferdig å laga kd-tre.")
@@ -188,13 +189,17 @@ for namn in pickle_filer:
                     p.index = i
                     p.resting_tolerance = 0.0001 if method == "BDF" else 0.01
                     p.scale = skalering
+                    p.wrap_max = wrap_max
                 del i,p
 
+                particle_list = particle_list[:4]
                 if multi:
-                    ray.init(local_mode=False,include_dashboard=True,num_cpus=4)  # dashboard_port=8266,)
+                    ray.init(local_mode=False,include_dashboard=True)  # dashboard_port=8266,),num_cpus=4
                     tre_plasma = ray.put(tre)
                     lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre_plasma, skalering=skalering, wrap_max=wrap_max,
                                             verbose=verbose, collision_correction=collision_correction)
+
+
 
                     index_list = {pa.index:{'job':remote_lag_sti.remote(particle=pa, **lag_sti_args),'particle':pa} for pa in particle_list} #index som key, job og particle i ein dict under der
                     job_list_strings = {index_list[i]['job'].task_id().hex():i for i in index_list} # task-id som string som key, index som value
@@ -226,7 +231,7 @@ for namn in pickle_filer:
                                 ray.cancel(index_list[elem]['job'], force=True)
                                 app_log.info(f"Måtte kansellera nr. {elem}, vart visst aldri ferdig.")
                                 cancelled.append(elem)
-                                index_list[elem]['particle'].method = "RK23"
+                                index_list[elem]['particle'].method = method_2nd
                         else:
                             running[elem] = tid
 
@@ -258,12 +263,11 @@ for namn in pickle_filer:
                             if len(not_ready) == 0:
                                 break
 
-                    ray.shutdown()
                 else:
                     lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre, skalering=skalering, wrap_max=wrap_max,
                                             verbose=verbose, collision_correction=collision_correction)
                     for pa in particle_list:
-                        if pa.index == 108:
+                        # if pa.index == 0:
                             pa.sti_dict = lag_sti(particle = pa, **lag_sti_args)
                             assert all([i in pa.sti_dict for i in range(pa.sti_dict['init_time'], pa.sti_dict['final_time']+1)]), f"Partikkel nr. {pa.index} er ufullstendig"
 
@@ -280,9 +284,10 @@ for namn in pickle_filer:
                         #     app_log.info(f"Måtte kansellera nr. {elem}, vart visst aldri ferdig.")
 
                     assert hasattr(pa,'sti_dict'), f"problem i {pa.index}"
+                ray.shutdown()
                 with open(partikkelfil, 'wb') as f:
                     pickle.dump(particle_list, f)
-                del tre
+                # del tre
             elif laga_film:
                 app_log.info("Berekningane fanst frå før, hentar dei.")
                 with open(partikkelfil, 'rb') as f:
