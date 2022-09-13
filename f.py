@@ -89,7 +89,15 @@ def f(t, x, particle, tri, ribs, skalering, separated = False):
     if np.all(dudt_material == 0.0 ):
         addedmass = False
 
-    lift_component = np.array([[0, -1],[1, 0]]) @ ( 3/4 * 0.5 / particle.diameter * rho_self_density * np.diff(np.square(U_top_bottom), axis=1).reshape(2,number_of_vectors) * norm(drag_component) )
+    # U_top_bottom = U_top_bottom[ :,np.flipud(np.argsort(np.squeeze(np.linalg.norm(U_top_bottom, axis=0)))) ]
+
+    # lift_component = np.array([[0, -1],[1, 0]]) @ (np.einsum('ij,ij->j', 3/4 * 0.2 / particle.diameter * rho_self_density * -np.diff(np.square(U_top_bottom- x[2:,None]), axis=1).reshape(2,number_of_vectors), norm(drag_component)) * norm(drag_component))
+    if np.all(U_top_bottom == 0.0):
+        lift_component = np.zeros((2,1))
+    else:
+        rotation_matrix_sign = np.sign(np.diff(np.linalg.norm(U_top_bottom- x[2:,None],axis=0),axis=0)).item(0) # Rotasjonsmatrisa skal vera [[0,-1],[1,0]] om U_top > U_bottom, og [[0,1],[-1,0]] om U_top < U_bottom. rotation_matrix_sign > 0 om U_top < U_bottom.
+
+        lift_component = np.linalg.norm( 3/4 * 0.2 / particle.diameter * rho_self_density * -np.diff(np.square(U_top_bottom- x[2:,None]), axis=1).reshape(2,number_of_vectors), axis=0) * (np.array([[0, rotation_matrix_sign],[-rotation_matrix_sign, 0]]) @ norm(drag_component) )
     
     divisor = 1 + 0.5 * rho_self_density * addedmass
     # divisoren trengst for akselerasjonen av partikkel kjem fram i added 
@@ -102,8 +110,9 @@ def f(t, x, particle, tri, ribs, skalering, separated = False):
     try:
         if (collision['is_resting_contact'] and particle.resting):# and np.dot(collision['rib_normal'],dudt) <= 0: #Kan ikkje sjekka om partikkelen skal ut frå flata midt i berekninga. Må ha ein event til alt slikt.
             #akselerasjonen, dudt
-            dudt_n = collision['rib_normal'] * np.dot(collision['rib_normal'][:,0],dudt) # projeksjon av dudt på normalvektoren
-            dxdt_n = collision['rib_normal'] * np.dot(collision['rib_normal'][:,0],dxdt)
+            normal = collision['rib_normal']
+            dudt_n = normal * np.dot(normal.T,dudt) # projeksjon av dudt på normalvektoren
+            dxdt_n = normal * np.dot(normal.T,dxdt)
             
             dudt_t = dudt - dudt_n
             dxdt_t = dxdt - dxdt_n
@@ -169,7 +178,7 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
     tx = np.concatenate((np.broadcast_to([frame],(1,number_of_vectors)), x_inn[:2]),axis=-2)
         
     # dt, dx, dy = 0.01, 0.1, 0.1
-    Δ = 0.01
+    Δ = 0.001
     
     # U_del = tre_samla.get_U(tx)
     # tri = tre_samla.get_tri(tx)
@@ -226,7 +235,7 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
     try:
         if (collision['is_resting_contact']):
             if U_f.shape == (2,number_of_vectors): # Skal sjekka om det er frå delaunay eller kd-tre. Er det frå kd-tre, er U_f.shape == (2,1) og er det lineær interpolasjon er U_f.shape == (2,4,1)
-                U_f = U_f - collision['rib_normal']* np.einsum('ij,in->n',collision['rib_normal'], U_f) # tangentialkomponenten er lik U_f - normalkomponenten. Normalkomponenten er lik n * dot(U_f,n), for dot(U_f,n) = |U_f|cos(α), som er lik projeksjonen av U_f på normalvektoren, der projeksjonen er hosliggjande katet og U_f er hypotenusen.
+                U_f = U_f - collision['rib_normal'] * np.einsum('ij,in->n',collision['rib_normal'], U_f) # tangentialkomponenten er lik U_f - normalkomponenten. Normalkomponenten er lik ň * dot(U_f,ň), for dot(U_f,ň) = |U_f|cos(α), som er lik projeksjonen av U_f på normalvektoren, der projeksjonen er hosliggjande katet og U_f er hypotenusen. ň er kollisjonsnormalen og |ň|=1.
             else:
                 U_f = U_f - collision['rib_normal'][:,None] * np.einsum('ij,ipn->pn',collision['rib_normal'], U_f) #
     except KeyError:
@@ -241,12 +250,13 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
         # DU/Dt = dU/dt + u * dU/dx + v*dU/dy
         
         dudt_material = dUdt + U_f[0,0] * dUdx + U_f[1,0] * dUdy
+        U_f = U_f[:,0]
     else:
         dudt_material = np.zeros((2,number_of_vectors))
 
     if (lift):
         # skal finna farten i passande punkt over og under partikkelen for lyftekraft
-        U_rel = U_f[:, 0] - x_inn[2:]
+        U_rel = U_f - x_inn[2:]
         
         # particle_top =    x_inn[0:2] + np.asarray([[0, -1],[1, 0]]) @ (particle.radius * norm(U_rel) )
         # particle_bottom = x_inn[0:2] + np.asarray([[0, 1],[-1, 0]]) @ (particle.radius * norm(U_rel) )
@@ -281,11 +291,10 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
                 break
                 
         U_top_bottom = np.einsum('vpnj,pjn->vpn', np.take(U_del, part_vertices, axis=1), part_wts)
+        
     else:
         U_top_bottom = np.zeros((2,2,number_of_vectors))
     
-    if (linear):
-        U_f = U_f[:,0]
 
     return (U_f, dudt_material, U_top_bottom)
 

@@ -37,7 +37,7 @@ SIM_TIMEOUT = 120
 pickle_filer = [
     # "rib25_Q20_1",
     # "rib25_Q20_2", "rib25_Q20_3",
-    "rib25_Q40_1",
+    # "rib25_Q40_1",
     # "rib25_Q40_2",
     # "rib25_Q60_1",
     # "rib25_Q60_2",
@@ -46,7 +46,7 @@ pickle_filer = [
     # "rib25_Q100_1",
     # "rib25_Q100_2",
     # "rib75_Q20_1",
-    "rib75_Q40_1",
+    # "rib75_Q40_1",
     # "rib75_Q40_2", "rib75_Q40_3",
     # "rib75_Q60_1", "rib75_Q80_1",
     # "rib75_Q80_2", "rib75_Q80_3",
@@ -54,7 +54,7 @@ pickle_filer = [
     # "rib75_Q100_2", "rib75_Q100_3", "rib75_Q100_4",
     # "rib50_Q20_1",
     # "rib50_Q20_2", "rib50_Q20_3",
-    # "rib50_Q40_1",
+    "rib50_Q40_1",
     # "rib50_Q60_1", "rib50_Q80_1", "rib50_Q100_1", "rib50_Q120_1", "rib50_Q140_1"
     ]
 
@@ -72,7 +72,7 @@ method_2nd = 'RK23'
 verbose = False
 collision_correction = True
 laga_film = False
-multi = False
+multi = True
 
 log_formatter = logging.Formatter(
     '%(asctime)s %(levelname)s %(name)s %(funcName)s(%(lineno)d) %(message)s')
@@ -144,7 +144,7 @@ for namn in pickle_filer:
             if not particle_dir.exists():
                 os.makedirs(particle_dir)
 
-            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_test.pickle")
+            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_test1.9.22.pickle")
             if not partikkelfil.exists():
                 if linear and tre is None:
                     app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")
