@@ -79,7 +79,7 @@ def f(t, x, particle, tri, ribs, skalering, separated = False):
     # print("Re = ", Re," cd= ", cd)
     rho_self_density = ρ / particle.density
     
-    drag_component =  3/4 * cd / particle.diameter * rho_self_density * abs(vel)*vel
+    drag_component =  3/4 * cd / particle.diameter * rho_self_density * np.linalg.norm(vel,axis=0)*vel
     gravity_component = (rho_self_density - 1) * g
 
     added_mass_component = 0.5 * rho_self_density * dudt_material 

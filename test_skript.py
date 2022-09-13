@@ -144,7 +144,7 @@ for namn in pickle_filer:
             if not particle_dir.exists():
                 os.makedirs(particle_dir)
 
-            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_test1.9.22.pickle")
+            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_test13.9.22.pickle")
             if not partikkelfil.exists():
                 if linear and tre is None:
                     app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")
@@ -192,7 +192,7 @@ for namn in pickle_filer:
                     p.wrap_max = wrap_max
                 del i,p
 
-                particle_list = particle_list[:4]
+                particle_list = particle_list[:100]
                 if multi:
                     ray.init(local_mode=False,include_dashboard=True)  # dashboard_port=8266,),num_cpus=4
                     tre_plasma = ray.put(tre)
