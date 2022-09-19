@@ -26,6 +26,7 @@ from lag_tre import lag_tre_multi
 from lag_video import sti_animasjon
 from particle import Particle
 from rib import Rib
+from get_u_delaunay import get_u
 
 
 tal = 200
@@ -35,36 +36,37 @@ tider = {}
 SIM_TIMEOUT = 120
 
 pickle_filer = [
-    # "rib25_Q20_1",
-    # "rib25_Q20_2", "rib25_Q20_3",
-    # "rib25_Q40_1",
-    # "rib25_Q40_2",
-    # "rib25_Q60_1",
-    # "rib25_Q60_2",
-    # "rib25_Q80_1",
-    # "rib25_Q80_2",
-    # "rib25_Q100_1",
-    # "rib25_Q100_2",
-    # "rib75_Q20_1",
-    # "rib75_Q40_1",
-    # "rib75_Q40_2", "rib75_Q40_3",
-    # "rib75_Q60_1", "rib75_Q80_1",
-    # "rib75_Q80_2", "rib75_Q80_3",
-    # "rib75_Q100_1",
-    # "rib75_Q100_2", "rib75_Q100_3", "rib75_Q100_4",
-    # "rib50_Q20_1",
-    # "rib50_Q20_2", "rib50_Q20_3",
+    "rib25_Q20_1",
+    "rib25_Q20_2", "rib25_Q20_3",
+    "rib25_Q40_1",
+    "rib25_Q40_2",
+    "rib25_Q60_1",
+    "rib25_Q60_2",
+    "rib25_Q80_1",
+    "rib25_Q80_2",
+    "rib25_Q100_1",
+    "rib25_Q100_2",
+    "rib75_Q20_1",
+    "rib75_Q40_1",
+    "rib75_Q40_2", "rib75_Q40_3",
+    "rib75_Q60_1", "rib75_Q80_1",
+    "rib75_Q80_2", "rib75_Q80_3",
+    "rib75_Q100_1",
+    "rib75_Q100_2", "rib75_Q100_3", "rib75_Q100_4",
+    "rib50_Q20_1",
+    "rib50_Q20_2", "rib50_Q20_3",
     "rib50_Q40_1",
-    # "rib50_Q60_1", "rib50_Q80_1", "rib50_Q100_1", "rib50_Q120_1", "rib50_Q140_1"
+    "rib50_Q60_1", "rib50_Q80_1", "rib50_Q100_1", "rib50_Q120_1", "rib50_Q140_1"
     ]
 
 graderingar = [0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
-0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,12]
+#0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,12
+]
 
 skaleringar = [1] # 40, 100, 1000]
-linear = True
-lift = True
-addedmass = True
+linear = False
+lift = False
+addedmass = False
 wrap_max = 50
 method = 'BDF'
 method_2nd = 'RK23'
@@ -144,7 +146,7 @@ for namn in pickle_filer:
             if not particle_dir.exists():
                 os.makedirs(particle_dir)
 
-            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_test13.9.22.pickle")
+            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_test16.9.22.pickle")
             if not partikkelfil.exists():
                 if linear and tre is None:
                     app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")
@@ -192,11 +194,11 @@ for namn in pickle_filer:
                     p.wrap_max = wrap_max
                 del i,p
 
-                particle_list = particle_list[:100]
+                # particle_list = particle_list[:100]
                 if multi:
-                    ray.init(local_mode=False,include_dashboard=True)  # dashboard_port=8266,),num_cpus=4
+                    ray.init(local_mode=False,include_dashboard=True, num_cpus=6)  # dashboard_port=8266,),num_cpus=4
                     tre_plasma = ray.put(tre)
-                    lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre_plasma, skalering=skalering, wrap_max=wrap_max,
+                    lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre_plasma, get_u=get_u, skalering=skalering, wrap_max=wrap_max,
                                             verbose=verbose, collision_correction=collision_correction)
 
 
@@ -264,7 +266,7 @@ for namn in pickle_filer:
                                 break
 
                 else:
-                    lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre, skalering=skalering, wrap_max=wrap_max,
+                    lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre, get_u=get_u, skalering=skalering, wrap_max=wrap_max,
                                             verbose=verbose, collision_correction=collision_correction)
                     for pa in particle_list:
                         # if pa.index == 0:
