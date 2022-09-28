@@ -115,7 +115,7 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
         dUdy = (U_f[:,3] - U_f[:,0]) / Δ # Fyrste verdien er dU/dy og andre er dV/dy
 
         # skal finna gradienten i t, u og v-retning for å bruka på added mass.
-        # DU/Dt = dU/dt + u * dU/dx + v*dU/dy
+        # DU/Dt = ∂U/∂t + u * ∂U/∂x + v*∂U/∂y
         
         dudt_material = dUdt + U_f[0,0] * dUdx + U_f[1,0] * dUdy
         U_f = U_f[:,0]

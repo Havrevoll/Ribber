@@ -20,7 +20,7 @@ g = np.array([[0], [g]]) # mm/s^2 = 9.81 m/s^2
 #         if obj is None: return
 #         self.delkrefter = getattr(obj, 'info', None)
 
-def f(t, x, particle, tri, ribs, skalering, get_u, separated = False):
+def f(t, x, particle, skalering, get_u, separated = False):
     """
     Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
     Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
@@ -56,9 +56,14 @@ def f(t, x, particle, tri, ribs, skalering, get_u, separated = False):
     
     dxdt = x[2:]
 
-    U_f, dudt_material, U_top_bottom = get_u(t, x, particle, tri, collision= collision, skalering=skalering)
-    
+    U_f, U_top_bottom, dudt_material = get_u(t, x, particle, collision= collision, skalering=skalering)
+
     vel = U_f - dxdt # relativ snøggleik
+    
+    
+    
+    
+    
     # vel_ang = atan2(vel[1], vel[0])
     assert len(vel) == 2
     Re = np.hypot(vel[0],vel[1]) * particle.diameter / ν

@@ -126,7 +126,7 @@ def term_vel(d, Δ=1.65, ν=1.5674, c1=20, c2=1.1, g=9810):
 def diff(d,u):
     return (term_vel(d) - u )
 
-def scale_bins(bins,factor):
+def scale_bins(bins,factor=1):
     u_m = term_vel(bins)
     u_p = u_m * factor**0.5
 

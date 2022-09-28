@@ -19,6 +19,7 @@ from check_collision import check_all_collisions
 from constants import ε
 from f import f
 from hjelpefunksjonar import f2t, status_colors, t2f
+from rib import Rib
 
 app_log = logging.getLogger(__name__)
 
@@ -26,12 +27,12 @@ from constants import collision_restitution
 
 
 @ray.remote(max_retries=0)
-def remote_lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):
-    return lag_sti(ribs, f_span, particle, tre, get_u, skalering=skalering, wrap_max = wrap_max, verbose=verbose, collision_correction=collision_correction)
+def remote_lag_sti(f_span, particle, get_u, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):
+    return lag_sti(f_span, particle, get_u, skalering=skalering, wrap_max = wrap_max, verbose=verbose, collision_correction=collision_correction)
 
-def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):
+def lag_sti(f_span, particle, get_u, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):
     # stien må innehalda posisjon, fart og tid.
-
+    ribs = [Rib(np.array([[-1000.,0],[1000.,0],[1000.,-100.],[-1000.,-100.]]))]
     # fps_inv = 1/fps
     # sti = []
     sti_dict = {}
@@ -40,7 +41,7 @@ def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, wrap_max = 0, verbo
     # print(type(tre))
     # tre = ray.get(tre)
     
-    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs, skalering, get_u), events = (event_check,wrap_check,still_check))
+    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, skalering, get_u), events = (event_check,wrap_check,still_check))
  
     step_old = np.concatenate(([particle.init_time], particle.init_position))
     # Step_old og step_new er ein array med [t, x, y, u, v]. 
@@ -58,7 +59,7 @@ def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, wrap_max = 0, verbo
     # dt = dt_main
     nfev = 0
     
-    left_edge = ribs[0].get_rib_middle()[0]
+    left_edge = -50
     
     starttid = datetime.datetime.now()
 
@@ -71,6 +72,7 @@ def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, wrap_max = 0, verbo
 
     while (frame < frame_max and not isclose(frame,frame_max)):
         # ray.util.pdb.set_trace() 
+        ribs = [Rib(np.array([[-1000.,0],[1000.,0.],[1000.,-100.],[-1000.,-100.]]))]
         particle.collision = check_all_collisions(particle, step_old[1:], ribs)
         if particle.collision['is_resting_contact']:
             particle.resting = True
