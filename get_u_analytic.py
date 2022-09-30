@@ -60,5 +60,5 @@ def get_u(t, x_inn, particle, collision, skalering):
 
 def kvervelfunksjon(x_inn, c1,c2):
     x_kvervel = x_inn[:2] - np.array([[0],[50]]) 
-    kvervel = c1*np.flipud(x_kvervel)*np.array([[1],[-1]])/(1+c2*((np.square(x_kvervel)).sum(axis=-2)))
+    kvervel = c1*np.flip(x_kvervel, axis=-2)*np.array([[1],[-1]])/(1+c2*((np.square(x_kvervel)).sum(axis=-2)))
     return x_kvervel, kvervel
