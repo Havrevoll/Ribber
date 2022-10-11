@@ -26,10 +26,10 @@ from constants import collision_restitution
 
 
 @ray.remote(max_retries=0)
-def remote_lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):
-    return lag_sti(ribs, f_span, particle, tre, skalering=skalering, wrap_max = wrap_max, verbose=verbose, collision_correction=collision_correction)
+def remote_lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):
+    return lag_sti(ribs, f_span, particle, tre, get_u, skalering=skalering, wrap_max = wrap_max, verbose=verbose, collision_correction=collision_correction)
 
-def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):
+def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):
     # stien må innehalda posisjon, fart og tid.
 
     # fps_inv = 1/fps
@@ -40,7 +40,7 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
     # print(type(tre))
     # tre = ray.get(tre)
     
-    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs, skalering), events = (event_check,wrap_check,still_check))
+    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs, skalering, get_u), events = (event_check,wrap_check,still_check))
  
     step_old = np.concatenate(([particle.init_time], particle.init_position))
     # Step_old og step_new er ein array med [t, x, y, u, v]. 
@@ -210,7 +210,7 @@ def eval_steps(t_span, skalering):
     #     t_min = ceil(t_span[0]*fps)/fps
     # return np.linspace( t_min, t_span[1], num = round((t_span[1]-t_min)*fps), endpoint = False )
 
-def event_check(t, x, particle, tre, ribs, skalering):
+def event_check(t, x, particle, tre, ribs, get_u, skalering):
     event_check.counter += 1
     
 
@@ -232,7 +232,7 @@ def event_check(t, x, particle, tre, ribs, skalering):
 event_check.counter = 0
 event_check.terminal = True
 
-def wrap_check(t, x, particle, tre, ribs, skalering):
+def wrap_check(t, x, particle, tre, ribs, get_u, skalering):
     right_edge = ribs[1].get_rib_middle()[0]
         #.strftime('%X.%f')
     if (x[0] > right_edge):
@@ -240,7 +240,7 @@ def wrap_check(t, x, particle, tre, ribs, skalering):
     return 1.0
 wrap_check.terminal = True
 
-def still_check(t,x, particle, tre,ribs, skalering):
+def still_check(t,x, particle, tre,ribs, get_u, skalering):
     if hypot(x[2],x[3]) < particle.resting_tolerance and hypot(x[2],x[3]) > 0 and particle.resting and not particle.still:
         return 0.0
     # Kvifor har eg denne her? Det er for å dempa farten om den er så bitteliten at han må leggjast til ro. Men det må jo skje berre dersom det er kontakt i tillegg. Så då må eg vel sjekka kollisjon uansett? 

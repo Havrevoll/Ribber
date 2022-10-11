@@ -26,6 +26,7 @@ from lag_tre import lag_tre_multi
 from lag_video import sti_animasjon
 from particle import Particle
 from rib import Rib
+from get_u_delaunay import get_u
 
 
 tal = 200
@@ -63,9 +64,9 @@ graderingar = [0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
 ]
 
 skaleringar = [1] # 40, 100, 1000]
-linear = True
-lift = True
-addedmass = True
+linear = False
+lift = False
+addedmass = False
 wrap_max = 50
 method = 'BDF'
 method_2nd = 'RK23'
@@ -195,9 +196,9 @@ for namn in pickle_filer:
 
                 # particle_list = particle_list[:100]
                 if multi:
-                    ray.init(local_mode=False,include_dashboard=True)  # dashboard_port=8266,),num_cpus=4
+                    ray.init(local_mode=False,include_dashboard=True, num_cpus=6)  # dashboard_port=8266,),num_cpus=4
                     tre_plasma = ray.put(tre)
-                    lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre_plasma, skalering=skalering, wrap_max=wrap_max,
+                    lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre_plasma, get_u=get_u, skalering=skalering, wrap_max=wrap_max,
                                             verbose=verbose, collision_correction=collision_correction)
 
 
@@ -265,7 +266,7 @@ for namn in pickle_filer:
                                 break
 
                 else:
-                    lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre, skalering=skalering, wrap_max=wrap_max,
+                    lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre, get_u=get_u, skalering=skalering, wrap_max=wrap_max,
                                             verbose=verbose, collision_correction=collision_correction)
                     for pa in particle_list:
                         # if pa.index == 0:
