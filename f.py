@@ -93,7 +93,7 @@ def f(t, x, particle, tri, ribs, skalering, separated = False):
 
     # lift_component = np.array([[0, -1],[1, 0]]) @ (np.einsum('ij,ij->j', 3/4 * 0.2 / particle.diameter * rho_self_density * -np.diff(np.square(U_top_bottom- x[2:,None]), axis=1).reshape(2,number_of_vectors), norm(drag_component)) * norm(drag_component))
     if np.all(U_top_bottom == 0.0):
-        lift_component = np.zeros((2,1))
+        lift_component = np.zeros((2,number_of_vectors))
     else:
         rotation_matrix_sign = np.sign(np.diff(np.linalg.norm(U_top_bottom- x[2:,None],axis=0),axis=0)).item(0) # Rotasjonsmatrisa skal vera [[0,-1],[1,0]] om U_top > U_bottom, og [[0,1],[-1,0]] om U_top < U_bottom. rotation_matrix_sign > 0 om U_top < U_bottom.
 
@@ -290,7 +290,7 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
             else:
                 break
                 
-        U_top_bottom = np.einsum('vpnj,pjn->vpn', np.take(U_del, part_vertices, axis=1), part_wts)
+        U_top_bottom = np.einsum('vpnj,pjn->vpn', np.take(U_del, part_vertices, axis=1), part_wts) # vpn tyder v: (u,v) p: (topp, botn), n: talet på vektorar
         
     else:
         U_top_bottom = np.zeros((2,2,number_of_vectors))
