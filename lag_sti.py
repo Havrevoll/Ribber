@@ -32,7 +32,7 @@ def remote_lag_sti(f_span, particle, get_u, skalering=1, wrap_max = 0, verbose=T
 
 def lag_sti(f_span, particle, get_u, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):
     # stien må innehalda posisjon, fart og tid.
-    ribs = [Rib(np.array([[-1000.,0],[1000.,0],[1000.,-100.],[-1000.,-100.]]))]
+    ribs = [Rib([[-101.,151.],[-99.,151.],[-99.,150.],[-101.,150.]]) , Rib([[1001.,151.],[999.,151.],[999.,150.],[1001.,150.]]) ,Rib(np.asarray([[-1000.,0],[1000.,0],[1000.,-100.],[-1000.,-100.]]))]
     # fps_inv = 1/fps
     # sti = []
     sti_dict = {}
@@ -41,7 +41,7 @@ def lag_sti(f_span, particle, get_u, skalering=1, wrap_max = 0, verbose=True, co
     # print(type(tre))
     # tre = ray.get(tre)
     
-    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, skalering, get_u), events = (event_check,wrap_check,still_check))
+    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, ribs, skalering, get_u), events = (event_check,wrap_check,still_check))
  
     step_old = np.concatenate(([particle.init_time], particle.init_position))
     # Step_old og step_new er ein array med [t, x, y, u, v]. 
@@ -59,7 +59,7 @@ def lag_sti(f_span, particle, get_u, skalering=1, wrap_max = 0, verbose=True, co
     # dt = dt_main
     nfev = 0
     
-    left_edge = -50
+    left_edge = -100
     
     starttid = datetime.datetime.now()
 
@@ -72,7 +72,6 @@ def lag_sti(f_span, particle, get_u, skalering=1, wrap_max = 0, verbose=True, co
 
     while (frame < frame_max and not isclose(frame,frame_max)):
         # ray.util.pdb.set_trace() 
-        ribs = [Rib(np.array([[-1000.,0],[1000.,0.],[1000.,-100.],[-1000.,-100.]]))]
         particle.collision = check_all_collisions(particle, step_old[1:], ribs)
         if particle.collision['is_resting_contact']:
             particle.resting = True
@@ -175,6 +174,7 @@ def lag_sti(f_span, particle, get_u, skalering=1, wrap_max = 0, verbose=True, co
     
     status_msg = f"Nr. {particle.index} brukte {datetime.datetime.now()-starttid} og kalla funksjonen {nfev} gonger."
     sti_dict['time_usage'] = datetime.datetime.now()-starttid
+    sti_dict['nfev'] = nfev
     print(f"\x1b[{status_col}m {status_msg} \x1b[0m")    
     # return np.array(sti), sti_dict
     return sti_dict
@@ -212,7 +212,7 @@ def eval_steps(t_span, skalering):
     #     t_min = ceil(t_span[0]*fps)/fps
     # return np.linspace( t_min, t_span[1], num = round((t_span[1]-t_min)*fps), endpoint = False )
 
-def event_check(t, x, particle, tre, ribs, get_u, skalering):
+def event_check(t, x, particle, ribs, skalering, get_u):
     event_check.counter += 1
     
 
@@ -234,7 +234,7 @@ def event_check(t, x, particle, tre, ribs, get_u, skalering):
 event_check.counter = 0
 event_check.terminal = True
 
-def wrap_check(t, x, particle, tre, ribs, get_u, skalering):
+def wrap_check(t, x, particle, ribs, skalering, get_u):
     right_edge = ribs[1].get_rib_middle()[0]
         #.strftime('%X.%f')
     if (x[0] > right_edge):
@@ -242,12 +242,12 @@ def wrap_check(t, x, particle, tre, ribs, get_u, skalering):
     return 1.0
 wrap_check.terminal = True
 
-def still_check(t,x, particle, tre,ribs, get_u, skalering):
-    if hypot(x[2],x[3]) < particle.resting_tolerance and hypot(x[2],x[3]) > 0 and particle.resting and not particle.still:
+def still_check(t,x, particle, ribs, skalering, get_u):
+    if np.linalg.norm(x[2:]) < particle.resting_tolerance and np.linalg.norm(x[2:]) > 0 and particle.resting and not particle.still:
         return 0.0
     # Kvifor har eg denne her? Det er for å dempa farten om den er så bitteliten at han må leggjast til ro. Men det må jo skje berre dersom det er kontakt i tillegg. Så då må eg vel sjekka kollisjon uansett? 
     # Brukte particle.rtol *1 eller particle.rtol * 10, men det verkar til å vera feil uansett. Prøver med 0.01. (OHH 13.12.2021)
-    if hypot(x[2],x[3]) > particle.resting_tolerance and particle.still:
+    if np.linalg.norm(x[2:]) > particle.resting_tolerance and particle.still:
         particle.still = False
     return 1.0
 still_check.terminal = True

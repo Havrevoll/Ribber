@@ -20,7 +20,7 @@ g = np.array([[0], [g]]) # mm/s^2 = 9.81 m/s^2
 #         if obj is None: return
 #         self.delkrefter = getattr(obj, 'info', None)
 
-def f(t, x, particle, skalering, get_u, separated = False):
+def f(t, x, particle, ribs, skalering, get_u, separated = False):
     """
     Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
     Så x er ein vektor med to element, nemleg x[0] = posisjon og x[1] = fart.
@@ -66,7 +66,7 @@ def f(t, x, particle, skalering, get_u, separated = False):
     
     # vel_ang = atan2(vel[1], vel[0])
     assert len(vel) == 2
-    Re = np.hypot(vel[0],vel[1]) * particle.diameter / ν
+    Re = np.linalg.norm(vel,axis=0) * particle.diameter / ν # tok vekk np.hypot(vel[0], vel[1]), for eg trur linalg.norm er raskare.
     
     # if (Re<1000):
     try:
@@ -99,9 +99,10 @@ def f(t, x, particle, skalering, get_u, separated = False):
     if np.all(U_top_bottom == 0.0):
         lift_component = np.zeros((2,1))
     else:
-        rotation_matrix_sign = np.sign(np.diff(np.linalg.norm(U_top_bottom- x[2:,None],axis=0),axis=0)).item(0) # Rotasjonsmatrisa skal vera [[0,-1],[1,0]] om U_top > U_bottom, og [[0,1],[-1,0]] om U_top < U_bottom. rotation_matrix_sign > 0 om U_top < U_bottom.
+        rotation_matrix_sign = np.sign(np.diff(np.linalg.norm(U_top_bottom- x[2:,None],axis=0),axis=0)).item(0) # Rotasjonsmatrisa skal vera [[0,-1],[1,0]] om U_top > U_bottom, og [[0,1],[-1,0]] om U_top < U_bottom. rotation_matrix_sign > 0 om U_top < U_bottom. 
+        # Det normale vil altså vera at rotation_matrix_sign < 0 for då er U_top > U_botn, som i eit vanleg fartsprofil.
 
-        lift_component = np.linalg.norm( 3/4 * 0.2 / particle.diameter * rho_self_density * -np.diff(np.square(U_top_bottom- x[2:,None]), axis=1).reshape(2,number_of_vectors), axis=0) * (np.array([[0, rotation_matrix_sign],[-rotation_matrix_sign, 0]]) @ norm(drag_component) )
+        lift_component =  3/4 * 0.2 / particle.diameter * rho_self_density * -np.diff(np.square(np.linalg.norm(U_top_bottom- x[2:,None],axis=0)), axis=0) * (np.array([[0, rotation_matrix_sign],[-rotation_matrix_sign, 0]]) @ norm(drag_component) )
     
     divisor = 1 + 0.5 * rho_self_density * addedmass
     # divisoren trengst for akselerasjonen av partikkel kjem fram i added 
@@ -139,3 +140,4 @@ def f(t, x, particle, skalering, get_u, separated = False):
         return np.concatenate((dxdt,dudt))
     else:
         return dict(drag = drag_component, gravity = gravity_component, added_mass = added_mass_component - 0.5 * rho_self_density * dudt, pressure = pressure_component, lift_component = lift_component, dudt = dudt, dxdt=dxdt)
+        # for testing: drag_component + gravity_component + added_mass_component   - 0.5 * rho_self_density * dudt +  pressure_component + lift_component

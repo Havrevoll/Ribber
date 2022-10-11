@@ -4,7 +4,7 @@ from constants import µ
 
 class Rib:
     def __init__(self, coords, µ=µ):
-        self.vertices = sortClockwise(np.array(coords))
+        self.vertices = sortClockwise(np.asarray(coords))
         
         self.normals = [norm(np.cross(self.vertices[1]-self.vertices[0],np.array([0,0,-1]))[:2,None]),
                         norm(np.cross(self.vertices[2]-self.vertices[1],np.array([0,0,-1]))[:2,None]), 

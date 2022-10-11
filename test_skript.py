@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Jul  7 09:22:39 2021
-
-@author: havrevol
-"""
 from datetime import datetime as dt
 import logging
 import os
@@ -28,21 +22,22 @@ from particle import Particle
 from rib import Rib
 from get_u_analytic import get_u
 
-
-tal = 1
+tal = 200
 rnd_seed = 1
 tider = {}
 
 SIM_TIMEOUT = 120
+RAY_NUM_CPUS = 8
+multi = True
 
-graderingar = [0.05, 0.06#, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
+graderingar = [0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
 #0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,12
 ]
 
 skaleringar = [1] # 40, 100, 1000]
-linear = False
-lift = False
-addedmass = False
+linear = True
+lift = True
+addedmass = True
 wrap_max = 50
 method = 'RK45'
 method_2nd = 'RK23'
@@ -50,7 +45,6 @@ method_2nd = 'RK23'
 verbose = False
 collision_correction = True
 laga_film = False
-multi = False
 
 log_formatter = logging.Formatter(
     '%(asctime)s %(levelname)s %(name)s %(funcName)s(%(lineno)d) %(message)s')
@@ -97,7 +91,7 @@ for gradering in graderingsliste:
     graderingstart = dt.now()
     app_log.info(f"Byrja med gradering {gradering}")
 
-    particle_dir = sim_dir.joinpath(Path("analytic"))
+    particle_dir = sim_dir.joinpath(Path("analytisk"))
     if not particle_dir.exists():
         os.makedirs(particle_dir)
 
@@ -110,11 +104,11 @@ for gradering in graderingsliste:
         # ribs = [Rib(rib, µ=0.85 if rib_index < 2 else 1)
         #         for rib_index, rib in enumerate(tre.ribs)]
 
-        max_y = 60
+        max_y = 200
 
         # Her blir partiklane laga:
         diameters = get_PSD_part(tal, PSD=np.asarray([[gradering[0], 0], [gradering[1], 1]]), rnd_seed=rnd_seed).tolist()
-        particle_list = [Particle(diameter=float(d), init_position=[-50, random.uniform(0, max_y), 0, 0], init_time = 0) for d in diameters]
+        particle_list = [Particle(diameter=float(d), init_position=[-100, random.uniform(0, max_y), 0, 0], init_time = 0) for d in diameters]
 
         for i, p in enumerate(particle_list):
             p.atol, p.rtol = atol, rtol
@@ -130,7 +124,7 @@ for gradering in graderingsliste:
 
         # particle_list = particle_list[:100]
         if multi:
-            ray.init(local_mode=False,include_dashboard=True, num_cpus=6)  # dashboard_port=8266,),num_cpus=4
+            ray.init(local_mode=False,include_dashboard=True, num_cpus=RAY_NUM_CPUS)  # dashboard_port=8266,),num_cpus=4
             lag_sti_args = dict(f_span=f_span, get_u=get_u, skalering=1, wrap_max=wrap_max,
                                     verbose=verbose, collision_correction=collision_correction)
 
@@ -145,7 +139,7 @@ for gradering in graderingsliste:
             cancelled = []
 
             while len(running) > 0:
-                ready, _ = ray.wait([index_list[i]['job'] for i in running.keys()], timeout=0.5)
+                ready, _ = ray.wait([index_list[i]['job'] for i in running.keys()], timeout=1.)
 
                 if len(ready) > 0:
                     elem = job_list_strings[ready[0].task_id().hex()]
@@ -161,6 +155,8 @@ for gradering in graderingsliste:
 
                         assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {elem} er ufullstendig"
                         index_list[elem]['particle'].sti_dict = sti_dict
+                        index_list[elem]['particle'].time_usage = (dt.now() - tid).seconds
+                        
 
                     except (GetTimeoutError, AssertionError):
                         ray.cancel(index_list[elem]['job'], force=True)
