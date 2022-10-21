@@ -12,7 +12,6 @@ import random
 from pathlib import Path
 import requests
 
-from pick import pick
 import h5py
 import numpy as np
 import ray
@@ -69,7 +68,7 @@ linear = True
 lift = True
 addedmass = True
 wrap_max = 50
-method = 'RK23'
+method = 'BDF'
 method_2nd = 'RK23'
 # Denne tråden forklarer litt om korleis ein skal setja atol og rtol: https://stackoverflow.com/questions/67389644/floating-point-precision-of-scipy-solve-ivp
 verbose = False
