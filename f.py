@@ -4,22 +4,6 @@ from constants import g, ρ, ν
 g = np.array([[0], [g]]) # mm/s^2 = 9.81 m/s^2
 # import ray
 
-# class RealisticInfoArray(np.ndarray):
-
-#     def __new__(cls, input_array, delkrefter=None):
-#         # Input array is an already formed ndarray instance
-#         # We first cast to be our class type
-#         obj = np.asarray(input_array).view(cls)
-#         # add the new attribute to the created instance
-#         obj.delkrefter = delkrefter
-#         # Finally, we must return the newly created object:
-#         return obj
-
-#     def __array_finalize__(self, obj):
-#         # see InfoArray.__array_finalize__ for comments
-#         if obj is None: return
-#         self.delkrefter = getattr(obj, 'info', None)
-
 def f(t, x, particle, tri, ribs, skalering, get_u, separated = False):
     """
     Sjølve differensiallikninga med t som x, og x som y (jf. Kreyszig)
@@ -56,7 +40,7 @@ def f(t, x, particle, tri, ribs, skalering, get_u, separated = False):
     
     dxdt = x[2:]
 
-    U_f, dudt_material, U_top_bottom = get_u(t, x, particle, tri, collision= collision, skalering=skalering)
+    U_f, dudt_material, U_top_bottom = get_u(t, x, particle, tri, ribs, collision= collision, skalering=skalering)
     
     vel = U_f - dxdt # relativ snøggleik
     # vel_ang = atan2(vel[1], vel[0])

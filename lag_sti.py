@@ -40,7 +40,8 @@ def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, wrap_max = 0, verbo
     # print(type(tre))
     # tre = ray.get(tre)
     
-    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs, skalering, get_u), events = (event_check,wrap_check,still_check))
+    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs, skalering, get_u), events = (event_check,#wrap_check,
+                                                                                                                                                    still_check))
  
     step_old = np.concatenate(([particle.init_time], particle.init_position))
     # Step_old og step_new er ein array med [t, x, y, u, v]. 

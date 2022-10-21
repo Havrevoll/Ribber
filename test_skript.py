@@ -12,6 +12,7 @@ import random
 from pathlib import Path
 import requests
 
+from pick import pick
 import h5py
 import numpy as np
 import ray
@@ -36,45 +37,55 @@ tider = {}
 SIM_TIMEOUT = 120
 
 pickle_filer = [
-    "rib25_Q20_1",
-    "rib25_Q20_2", "rib25_Q20_3",
-    "rib25_Q40_1",
-    "rib25_Q40_2",
-    "rib25_Q60_1",
-    "rib25_Q60_2",
-    "rib25_Q80_1",
-    "rib25_Q80_2",
-    "rib25_Q100_1",
-    "rib25_Q100_2",
-    "rib75_Q20_1",
-    "rib75_Q40_1",
-    "rib75_Q40_2", "rib75_Q40_3",
-    "rib75_Q60_1", "rib75_Q80_1",
-    "rib75_Q80_2", "rib75_Q80_3",
-    "rib75_Q100_1",
-    "rib75_Q100_2", "rib75_Q100_3", "rib75_Q100_4",
-    "rib50_Q20_1",
-    "rib50_Q20_2", "rib50_Q20_3",
+    # "rib25_Q20_1",
+    # "rib25_Q20_2", "rib25_Q20_3",
+    # "rib25_Q40_1",
+    # "rib25_Q40_2",
+    # "rib25_Q60_1",
+    # "rib25_Q60_2",
+    # "rib25_Q80_1",
+    # "rib25_Q80_2",
+    # "rib25_Q100_1",
+    # "rib25_Q100_2",
+    # "rib75_Q20_1",
+    # "rib75_Q40_1",
+    # "rib75_Q40_2", "rib75_Q40_3",
+    # "rib75_Q60_1", "rib75_Q80_1",
+    # "rib75_Q80_2", "rib75_Q80_3",
+    # "rib75_Q100_1",
+    # "rib75_Q100_2", "rib75_Q100_3", "rib75_Q100_4",
+    # "rib50_Q20_1",
+    # "rib50_Q20_2", "rib50_Q20_3",
     "rib50_Q40_1",
-    "rib50_Q60_1", "rib50_Q80_1", "rib50_Q100_1", "rib50_Q120_1", "rib50_Q140_1"
+    # "rib50_Q60_1", "rib50_Q80_1", "rib50_Q100_1", "rib50_Q120_1", "rib50_Q140_1"
     ]
 
-graderingar = [0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
-0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,12
+graderingar = [0.05, 0.06#, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
+# 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,12
 ]
 
 skaleringar = [1] # 40, 100, 1000]
-linear = False
-lift = False
-addedmass = False
+linear = True
+lift = True
+addedmass = True
 wrap_max = 50
-method = 'BDF'
+method = 'RK23'
 method_2nd = 'RK23'
 # Denne tråden forklarer litt om korleis ein skal setja atol og rtol: https://stackoverflow.com/questions/67389644/floating-point-precision-of-scipy-solve-ivp
 verbose = False
 collision_correction = True
 laga_film = False
-multi = False
+while True:
+    check_multi = input("Multi? [default: yes]").lower()
+    if check_multi in ['y', 'yes', 'ja', 'j'] or check_multi == '':
+        multi = True
+        break
+    elif check_multi in ['n','nei','no']:
+        multi = False
+        break
+    else:
+        print("Ikkje eit ekte svar, prøv på nytt")
+
 
 log_formatter = logging.Formatter(
     '%(asctime)s %(levelname)s %(name)s %(funcName)s(%(lineno)d) %(message)s')
@@ -146,7 +157,7 @@ for namn in pickle_filer:
             if not particle_dir.exists():
                 os.makedirs(particle_dir)
 
-            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_test16.9.22.pickle")
+            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_test21.10.22.pickle")
             if not partikkelfil.exists():
                 if linear and tre is None:
                     app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")
@@ -196,7 +207,7 @@ for namn in pickle_filer:
 
                 # particle_list = particle_list[:100]
                 if multi:
-                    ray.init(local_mode=False,include_dashboard=True, num_cpus=6)  # dashboard_port=8266,),num_cpus=4
+                    ray.init(local_mode=False,include_dashboard=True, num_cpus=8)  # dashboard_port=8266,),num_cpus=4
                     tre_plasma = ray.put(tre)
                     lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre_plasma, get_u=get_u, skalering=skalering, wrap_max=wrap_max,
                                             verbose=verbose, collision_correction=collision_correction)
@@ -212,7 +223,7 @@ for namn in pickle_filer:
                     cancelled = []
 
                     while len(running) > 0:
-                        ready, _ = ray.wait([index_list[i]['job'] for i in running.keys()], timeout=0.5)
+                        ready, _ = ray.wait([index_list[i]['job'] for i in running.keys()], timeout=1.)
 
                         if len(ready) > 0:
                             elem = job_list_strings[ready[0].task_id().hex()]
@@ -269,7 +280,7 @@ for namn in pickle_filer:
                     lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre, get_u=get_u, skalering=skalering, wrap_max=wrap_max,
                                             verbose=verbose, collision_correction=collision_correction)
                     for pa in particle_list:
-                        # if pa.index == 0:
+                        if pa.index == 4:
                             pa.sti_dict = lag_sti(particle = pa, **lag_sti_args)
                             assert all([i in pa.sti_dict for i in range(pa.sti_dict['init_time'], pa.sti_dict['final_time']+1)]), f"Partikkel nr. {pa.index} er ufullstendig"
 
@@ -289,6 +300,7 @@ for namn in pickle_filer:
                 ray.shutdown()
                 with open(partikkelfil, 'wb') as f:
                     pickle.dump(particle_list, f)
+                app_log.info(f"Lagra partiklane som {partikkelfil}")
                 # del tre
             elif laga_film:
                 app_log.info("Berekningane fanst frå før, hentar dei.")

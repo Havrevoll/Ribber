@@ -6,7 +6,7 @@ g = np.array([[0], [g]]) # mm/s^2 = 9.81 m/s^2
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
-def get_u(t, x_inn, particle, tre_samla, collision, skalering):
+def get_u(t, x_inn, particle, tre_samla, ribs, collision, skalering):
     '''
     get_u skal i praksis vera ein funksjon: [t,x,y]→ ( [u,v], [dudt_material,dvdt_material], [[u_top, u_bottom],[v_top, v_bottom]] ) Så når x_inn er ein vektor med fleire koordinatar: 
     tx = np.array([f₀, f₁, f₂, f₃],
@@ -42,11 +42,11 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
     lift, addedmass, linear = particle.lift, particle.addedmass, particle.linear
     frame = t2f(t,skalering)
     number_of_vectors = x_inn.shape[-1] #Dette er talet på vektorar pga vectorized i solve_ivp. Vanlegvis 1, men kan vera fleire, t.d. 4.
-
+    field_width = ribs[1].get_rib_middle()[0] - ribs[0].get_rib_middle()[0]
+    rib_width = ribs[1].get_rib_dimensions()[1]
     tx = np.concatenate((np.broadcast_to([frame],(1,number_of_vectors)), x_inn[:2]),axis=-2)
         
     # dt, dx, dy = 0.01, 0.1, 0.1
-    Δ = 0.001
     
     # U_del = tre_samla.get_U(tx)
     # tri = tre_samla.get_tri(tx)
@@ -60,8 +60,23 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
     else:
         innanfor = False
 
-    x = np.stack((tx,tx + np.asarray([[Δ],[0],[0]]), tx + np.asarray([[0],[Δ],[0]]), tx +np.asarray([[0],[0],[Δ]])))
+    # multiple = int(tx[1,0] / field_width)
+    tx_avstand = (tx[1] - particle.init_position[0]) % field_width
+    tx[1] = particle.init_position[0] + tx_avstand
+
+    orig_num_vec = number_of_vectors
+    if np.any(tx_avstand < (rib_width *.4)):  # or (real_tx[1] > (field_width - rib_width  *.4) ):
+        vekting_av_venstre = tx_avstand * 2 / rib_width
         
+        tx_bortanfor = np.copy(tx)
+        tx_bortanfor[1] = tx_bortanfor[1] + field_width
+        tx = np.hstack((tx,tx_bortanfor))
+        number_of_vectors += number_of_vectors
+
+    else:
+        vekting_av_venstre = 1
+    
+
     # kdtre = tre_samla.kdtre
     # U_kd = tre_samla.U_kd
 
@@ -85,7 +100,8 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
             temp = np.take(tri.transform, simplex, axis=0)
                     # https://en.wikipedia.org/wiki/Barycentric_coordinate_system#Barycentric_coordinates_on_tetrahedra
 
-            delta = x - temp[:,:,d,:].swapaxes(1,2)
+            Δ = 0.001
+            delta = np.stack((tx,tx + np.asarray([[Δ],[0],[0]]), tx + np.asarray([[0],[Δ],[0]]), tx +np.asarray([[0],[0],[Δ]]))) - temp[:,:,d,:].swapaxes(1,2)
             bary = np.einsum('pnjk,pkn->pjn', temp[:,:,:d,:], delta)
             wts = np.concatenate((bary, 1 - bary.sum(axis=1, keepdims=True)),axis=1)
             
@@ -163,8 +179,14 @@ def get_u(t, x_inn, particle, tre_samla, collision, skalering):
     else:
         U_top_bottom = np.zeros((2,2,number_of_vectors))
     
+    if np.any(vekting_av_venstre != 1):
+        
+        # U_f_ny = np.empty((2,orig_num_vec))
+        U_f[:,:orig_num_vec] = (U_f[:,:orig_num_vec]*vekting_av_venstre + U_f[:,orig_num_vec:] * (1- vekting_av_venstre) )
+        dudt_material[:,:orig_num_vec] = (dudt_material[:,:orig_num_vec]*vekting_av_venstre + dudt_material[:,orig_num_vec:] * (1- vekting_av_venstre) )
+        U_top_bottom[:,:,:orig_num_vec] = (U_top_bottom[:,:,:orig_num_vec]*vekting_av_venstre + U_top_bottom[:,:,orig_num_vec:] * (1- vekting_av_venstre) )
 
-    return (U_f, dudt_material, U_top_bottom)
+    return (U_f[:,:orig_num_vec], dudt_material[:,:orig_num_vec], U_top_bottom[:,:,:orig_num_vec])
 
   
 get_u.counter = 0
