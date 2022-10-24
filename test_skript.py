@@ -68,7 +68,16 @@ linear = True
 lift = True
 addedmass = True
 wrap_max = 50
-method = 'BDF'
+while True:
+    check_method = input("Method? [standard: BDF], vel mellom RK23, RK45, DOP853, Radau, BDF, LSODA: ").upper()
+    if check_method == '':
+        method = 'BDF'
+        break
+    elif check_method in ['RK23', 'RK45', 'DOP853', 'Radau', 'BDF', 'LSODA']:
+        method = check_method
+        break
+    else:
+        print("Skriv ein skikkeleg metode")
 method_2nd = 'RK23'
 # Denne tråden forklarer litt om korleis ein skal setja atol og rtol: https://stackoverflow.com/questions/67389644/floating-point-precision-of-scipy-solve-ivp
 verbose = False
@@ -156,7 +165,7 @@ for namn in pickle_filer:
             if not particle_dir.exists():
                 os.makedirs(particle_dir)
 
-            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_test21.10.22.pickle")
+            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_test23.10.22.pickle")
             if not partikkelfil.exists():
                 if linear and tre is None:
                     app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")
@@ -279,7 +288,7 @@ for namn in pickle_filer:
                     lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre, get_u=get_u, skalering=skalering, wrap_max=wrap_max,
                                             verbose=verbose, collision_correction=collision_correction)
                     for pa in particle_list:
-                        if pa.index == 4:
+                        if pa.index==57:
                             pa.sti_dict = lag_sti(particle = pa, **lag_sti_args)
                             assert all([i in pa.sti_dict for i in range(pa.sti_dict['init_time'], pa.sti_dict['final_time']+1)]), f"Partikkel nr. {pa.index} er ufullstendig"
 

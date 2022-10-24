@@ -108,7 +108,7 @@ def f(t, x, particle, tri, ribs, skalering, get_u, separated = False):
                     dudt = np.zeros_like(dudt_t)
                     # dxdt = np.zeros(2)
             else: # Tilfellet glidefriksjon:
-                dudt_friction = -norm(dxdt_t)*np.hypot(dudt_n[0],dudt_n[1]) * µ
+                dudt_friction = -norm(dxdt_t)* np.linalg.norm(dudt_n,axis=0) * µ #np.hypot(dudt_n[0],dudt_n[1])
                 dudt = dudt_t + dudt_friction
 
     except KeyError:

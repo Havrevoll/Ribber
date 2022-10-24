@@ -6,7 +6,7 @@ g = np.array([[0], [g]]) # mm/s^2 = 9.81 m/s^2
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
-def get_u(t, x_inn, particle, tre_samla, ribs, collision, skalering):
+def get_u(t, x, particle, tre_samla, ribs, collision, skalering):
     '''
     get_u skal i praksis vera ein funksjon: [t,x,y]→ ( [u,v], [dudt_material,dvdt_material], [[u_top, u_bottom],[v_top, v_bottom]] ) Så når x_inn er ein vektor med fleire koordinatar: 
     tx = np.array([f₀, f₁, f₂, f₃],
@@ -41,15 +41,14 @@ def get_u(t, x_inn, particle, tre_samla, ribs, collision, skalering):
   
     lift, addedmass, linear = particle.lift, particle.addedmass, particle.linear
     frame = t2f(t,skalering)
-    number_of_vectors = x_inn.shape[-1] #Dette er talet på vektorar pga vectorized i solve_ivp. Vanlegvis 1, men kan vera fleire, t.d. 4.
+    number_of_vectors = x.shape[-1] #Dette er talet på vektorar pga vectorized i solve_ivp. Vanlegvis 1, men kan vera fleire, t.d. 4.
     field_width = ribs[1].get_rib_middle()[0] - ribs[0].get_rib_middle()[0]
     rib_width = ribs[1].get_rib_dimensions()[1]
-    tx = np.concatenate((np.broadcast_to([frame],(1,number_of_vectors)), x_inn[:2]),axis=-2)
-        
+    tx = np.concatenate((np.broadcast_to([frame],(1,number_of_vectors)), x[:2]),axis=-2)
     # dt, dx, dy = 0.01, 0.1, 0.1
+    tx_avstand = (tx[1] - particle.init_position[0]) % field_width
+    tx[1] = particle.init_position[0] + tx_avstand
     
-    # U_del = tre_samla.get_U(tx)
-    # tri = tre_samla.get_tri(tx)
     if linear:
         try:
             tri, U_del = tre_samla.get_tri_og_U(frame)
@@ -60,10 +59,7 @@ def get_u(t, x_inn, particle, tre_samla, ribs, collision, skalering):
     else:
         innanfor = False
 
-    # multiple = int(tx[1,0] / field_width)
-    tx_avstand = (tx[1] - particle.init_position[0]) % field_width
-    tx[1] = particle.init_position[0] + tx_avstand
-
+    # assert not np.isnan(np.sum(tx))
     orig_num_vec = number_of_vectors
     if np.any(tx_avstand < (rib_width *.4)):  # or (real_tx[1] > (field_width - rib_width  *.4) ):
         vekting_av_venstre = tx_avstand * 2 / rib_width
@@ -127,7 +123,7 @@ def get_u(t, x_inn, particle, tre_samla, ribs, collision, skalering):
                 
     if (addedmass):
         dUdt = (U_f[:,1] - U_f[:,0]) / Δ # Fyrste verdien er dU/dt og andre er dV/dt
-        dUdx = (U_f[:,2] - U_f[:,0]) / Δ # Fyrste verdien er dU/dx og andre er dV/dy
+        dUdx = (U_f[:,2] - U_f[:,0]) / Δ # Fyrste verdien er dU/dx og andre er dV/dx
         dUdy = (U_f[:,3] - U_f[:,0]) / Δ # Fyrste verdien er dU/dy og andre er dV/dy
 
         # skal finna gradienten i t, u og v-retning for å bruka på added mass.
@@ -140,12 +136,12 @@ def get_u(t, x_inn, particle, tre_samla, ribs, collision, skalering):
 
     if (lift):
         # skal finna farten i passande punkt over og under partikkelen for lyftekraft
-        U_rel = U_f - x_inn[2:]
+        U_rel = U_f - x[2:]
         
         # particle_top =    x_inn[0:2] + np.asarray([[0, -1],[1, 0]]) @ (particle.radius * norm(U_rel) )
         # particle_bottom = x_inn[0:2] + np.asarray([[0, 1],[-1, 0]]) @ (particle.radius * norm(U_rel) )
         
-        particle_top_and_bottom = x_inn[0:2] + np.stack( (np.asarray([[0, -1],[1, 0]]) @ (particle.radius * norm(U_rel) ) ,  #Topp 
+        particle_top_and_bottom = tx[1:] + np.stack( (np.asarray([[0, -1],[1, 0]]) @ (particle.radius * norm(U_rel) ) ,  #Topp 
                                                             np.asarray([[0, 1],[-1, 0]]) @ (particle.radius * norm(U_rel) )) ) # botn
 
         part = np.concatenate((np.broadcast_to([frame],(2,1,number_of_vectors)), particle_top_and_bottom),axis=1)

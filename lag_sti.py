@@ -40,8 +40,8 @@ def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, wrap_max = 0, verbo
     # print(type(tre))
     # tre = ray.get(tre)
     
-    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs, skalering, get_u), events = (event_check,#wrap_check,
-                                                                                                                                                    still_check))
+    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs, skalering, get_u), events = (event_check,still_check))#wrap_check,
+                                                                                                                                                    
  
     step_old = np.concatenate(([particle.init_time], particle.init_position))
     # Step_old og step_new er ein array med [t, x, y, u, v]. 
@@ -147,17 +147,17 @@ def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, wrap_max = 0, verbo
             step_old[3:] = v_new
             step_old[1:3] = step_old[1:3] + collision_info['rib_normal'][:,0] * ε * 0.5
             
-        elif (event == "edge"):
-            if (particle.wrap_counter <= wrap_max):
-                step_old = np.copy(step_new)
-                step_old[1] = left_edge
-                edgecollision = check_all_collisions(particle, step_old[1:], ribs)
-                if edgecollision['is_collision'] or edgecollision['is_resting_contact'] or edgecollision['is_leaving']:
-                    step_old[1:3] = step_old[1:3] + edgecollision['rib_normal'][:,0]*edgecollision['collision_depth']
+        # elif (event == "edge"):
+        #     if (particle.wrap_counter <= wrap_max):
+        #         step_old = np.copy(step_new)
+        #         step_old[1] = left_edge
+        #         edgecollision = check_all_collisions(particle, step_old[1:], ribs)
+        #         if edgecollision['is_collision'] or edgecollision['is_resting_contact'] or edgecollision['is_leaving']:
+        #             step_old[1:3] = step_old[1:3] + edgecollision['rib_normal'][:,0]*edgecollision['collision_depth']
 
-                particle.wrap_counter += 1
-            else:
-                break
+        #         particle.wrap_counter += 1
+        #     else:
+        #         break
         elif event == "still":
             if hypot(step_new[3],step_new[4]) < particle.resting_tolerance:
                 step_old = np.copy(step_new)
@@ -192,9 +192,9 @@ def rk_3 (f, t, y0, solver_args, skalering):
         if resultat.t_events[0].size > 0:
             return np.concatenate((resultat.t_events[0], resultat.y_events[0][0])), np.column_stack((np.asarray(resultat.t), np.asarray(resultat.y).T)), "collision", resultat.nfev
         elif resultat.t_events[1].size > 0:
-            return np.concatenate((resultat.t_events[1], resultat.y_events[1][0])), np.column_stack((np.asarray(resultat.t), np.asarray(resultat.y).T)), "edge", resultat.nfev
-        elif resultat.t_events[2].size > 0:
-            return np.concatenate((resultat.t_events[2], resultat.y_events[2][0])), np.column_stack((np.asarray(resultat.t), np.asarray(resultat.y).T)), "still", resultat.nfev
+            return np.concatenate((resultat.t_events[1], resultat.y_events[1][0])), np.column_stack((np.asarray(resultat.t), np.asarray(resultat.y).T)), "still", resultat.nfev
+        # elif resultat.t_events[2].size > 0:
+        #     return np.concatenate((resultat.t_events[2], resultat.y_events[2][0])), np.column_stack((np.asarray(resultat.t), np.asarray(resultat.y).T)), "edge", resultat.nfev 
 
     else:
         return [], np.column_stack((resultat.t, np.asarray(resultat.y).T)), "finish", resultat.nfev #np.concatenate(([resultat.t[-1]], resultat.y[:,-1]))
@@ -233,20 +233,21 @@ def event_check(t, x, particle, tre, ribs, get_u, skalering):
 event_check.counter = 0
 event_check.terminal = True
 
-def wrap_check(t, x, particle, tre, ribs, get_u, skalering):
-    right_edge = ribs[1].get_rib_middle()[0]
-        #.strftime('%X.%f')
-    if (x[0] > right_edge):
-        return 0.0
-    return 1.0
-wrap_check.terminal = True
+# def wrap_check(t, x, particle, tre, ribs, get_u, skalering):
+#     right_edge = ribs[1].get_rib_middle()[0]
+#         #.strftime('%X.%f')
+#     if (x[0] > right_edge):
+#         return 0.0
+#     return 1.0
+# wrap_check.terminal = True
 
 def still_check(t,x, particle, tre,ribs, get_u, skalering):
-    if hypot(x[2],x[3]) < particle.resting_tolerance and hypot(x[2],x[3]) > 0 and particle.resting and not particle.still:
+    fart = np.hypot(x[2],x[3])
+    if fart < particle.resting_tolerance and fart > 0 and particle.resting and not particle.still:
         return 0.0
     # Kvifor har eg denne her? Det er for å dempa farten om den er så bitteliten at han må leggjast til ro. Men det må jo skje berre dersom det er kontakt i tillegg. Så då må eg vel sjekka kollisjon uansett? 
     # Brukte particle.rtol *1 eller particle.rtol * 10, men det verkar til å vera feil uansett. Prøver med 0.01. (OHH 13.12.2021)
-    if hypot(x[2],x[3]) > particle.resting_tolerance and particle.still:
+    if fart > particle.resting_tolerance and particle.still:
         particle.still = False
     return 1.0
 still_check.terminal = True
