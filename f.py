@@ -80,7 +80,7 @@ def f(t, x, particle, tri, ribs, skalering, get_u, separated = False):
     else:
         rotation_matrix_sign = np.sign(np.diff(np.linalg.norm(U_top_bottom- x[2:,None],axis=0),axis=0)).item(0) # Rotasjonsmatrisa skal vera [[0,-1],[1,0]] om U_top > U_bottom, og [[0,1],[-1,0]] om U_top < U_bottom. rotation_matrix_sign > 0 om U_top < U_bottom.
 
-        lift_component = np.linalg.norm( 3/4 * 0.2 / particle.diameter * rho_self_density * -np.diff(np.square(U_top_bottom- x[2:,None]), axis=1).reshape(2,number_of_vectors), axis=0) * (np.array([[0, rotation_matrix_sign],[-rotation_matrix_sign, 0]]) @ norm(drag_component) )
+        lift_component = 3/4 * 0.2 / particle.diameter * rho_self_density * -np.diff(np.square(U_top_bottom- x[2:,None]), axis=0) * (np.array([[0, rotation_matrix_sign],[-rotation_matrix_sign, 0]]) @ norm(drag_component) )
     
     divisor = 1 + 0.5 * rho_self_density * addedmass
     # divisoren trengst for akselerasjonen av partikkel kjem fram i added 
