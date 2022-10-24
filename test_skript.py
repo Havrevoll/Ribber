@@ -29,11 +29,11 @@ from rib import Rib
 from get_u_delaunay import get_u
 
 
+SIM_TIMEOUT = 120
 tal = 200
 rnd_seed = 1
 tider = {}
-
-SIM_TIMEOUT = 120
+einskildpartikkel = 6
 
 pickle_filer = [
     # "rib25_Q20_1",
@@ -187,7 +187,6 @@ for namn in pickle_filer:
                     app_log.info(f"Skal berre laga kd-tre.")
                     tre = lag_tre_multi((f_span[0],f_span[1]+1),filnamn_inn = hdf5_fil, skalering=skalering, linear=False)
                     app_log.info(f"Ferdig å laga kd-tre.")
-                random.seed(rnd_seed)
 
                 start = dt.now()
                 ribs = [Rib(rib, µ=0.85 if rib_index < 2 else 1)
@@ -198,6 +197,7 @@ for namn in pickle_filer:
                 del f
 
                 # Her blir partiklane laga:
+                random.seed(rnd_seed)
                 diameters = get_PSD_part(tal, PSD=np.asarray([[gradering[0], 0], [gradering[1], 1]]), rnd_seed=rnd_seed).tolist()
                 particle_list = [Particle(diameter=float(d), init_position=[ribs[0].get_rib_middle()[0], random.uniform(ribs[0].get_rib_middle()[1]+ribs[0].get_rib_dimensions()[0], max_y), 0, 0], init_time = random.randrange(0, 1000 )) for d in diameters]
 
@@ -213,7 +213,6 @@ for namn in pickle_filer:
                     p.wrap_max = wrap_max
                 del i,p
 
-                # particle_list = particle_list[:100]
                 if multi:
                     ray.init(local_mode=False,include_dashboard=True, num_cpus=8)  # dashboard_port=8266,),num_cpus=4
                     tre_plasma = ray.put(tre)
@@ -288,7 +287,7 @@ for namn in pickle_filer:
                     lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre, get_u=get_u, skalering=skalering, wrap_max=wrap_max,
                                             verbose=verbose, collision_correction=collision_correction)
                     for pa in particle_list:
-                        if pa.index==57:
+                        if pa.index==einskildpartikkel:
                             pa.sti_dict = lag_sti(particle = pa, **lag_sti_args)
                             assert all([i in pa.sti_dict for i in range(pa.sti_dict['init_time'], pa.sti_dict['final_time']+1)]), f"Partikkel nr. {pa.index} er ufullstendig"
 
