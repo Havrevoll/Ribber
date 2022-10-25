@@ -92,18 +92,25 @@ def get_u(t, x, particle, tre_samla, ribs, collision, skalering):
             U_f = tre_samla.get_kd_U(tx)
             # Gjer added mass og lyftekrafta lik null, sidan den ikkje er viktig her.
         else:  
-            vertices = np.take(tri.simplices, simplex, axis=0)
-            temp = np.take(tri.transform, simplex, axis=0)
-                    # https://en.wikipedia.org/wiki/Barycentric_coordinate_system#Barycentric_coordinates_on_tetrahedra
+            # https://en.wikipedia.org/wiki/Barycentric_coordinate_system#Barycentric_coordinates_on_tetrahedra
 
+            # kodane her må vera:
+            # p = dei ulike forskyvingane til bruk i material derivative/added mass 
+            # n = tal på vektorar
+            # v = u og v, horisontal og vertikal-komponentane
+            # j = vertices i kvar simplex
+            # k = tid, x og y (har eg meint komponentar?)
+
+            vertices = np.take(tri.simplices, simplex, axis=0) # (p,n,j)
+            temp = np.take(tri.transform, simplex, axis=0) # (p,n,j,k)
             Δ = 0.001
-            delta = np.stack((tx,tx + np.asarray([[Δ],[0],[0]]), tx + np.asarray([[0],[Δ],[0]]), tx +np.asarray([[0],[0],[Δ]]))) - temp[:,:,d,:].swapaxes(1,2)
-            bary = np.einsum('pnjk,pkn->pjn', temp[:,:,:d,:], delta)
-            wts = np.concatenate((bary, 1 - bary.sum(axis=1, keepdims=True)),axis=1)
+            delta = np.stack((tx,tx + np.asarray([[Δ],[0],[0]]), tx + np.asarray([[0],[Δ],[0]]), tx +np.asarray([[0],[0],[Δ]]))) - temp[:,:,d,:].swapaxes(1,2) # (p,k,n)
+            bary = np.einsum('pnjk,pkn->pjn', temp[:,:,:d,:], delta) # (p,j,n) men den siste rada manglar frå j, den blir lagt til i wts.
+            wts = np.concatenate((bary, 1 - bary.sum(axis=1, keepdims=True)),axis=1) # (p,j,n)
             
             # U_f = np.einsum('nij,ni->nj', np.take(np.column_stack(U_del),vertices,axis=0),wts)
             # U_f = np.einsum('ijn,ij->n', np.take(U_del, vertices, axis=0), wts)
-            U_f = np.einsum('vpnj,pjn->vpn', np.take(U_del,vertices,axis=1),wts)
+            U_f = np.einsum('vpnj,pjn->vpn', np.take(U_del,vertices,axis=1),wts) # (v,p,n)
     else:
         U_f = tre_samla.get_kd_U(tx) # U_f har shape (2,1) dersom tx.shape == (3,1)
         addedmass = False
@@ -130,7 +137,7 @@ def get_u(t, x, particle, tre_samla, ribs, collision, skalering):
         # DU/Dt = dU/dt + u * dU/dx + v*dU/dy
         
         dudt_material = dUdt + U_f[0,0] * dUdx + U_f[1,0] * dUdy
-        U_f = U_f[:,0]
+        U_f = U_f[:,0] # (v,n)
     else:
         dudt_material = np.zeros((2,number_of_vectors))
 

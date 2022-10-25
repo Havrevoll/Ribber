@@ -117,7 +117,7 @@ def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, verbose=True, colli
             elif (collision_info['is_resting_contact']):# and np.dot(collision_info['rib_normal'],collision_info['closest_rib_normal']) == 1.0 ):
                 if verbose:
                     print("kvilekontakt")
-                if collision_info['rib'].µ == 1:
+                if collision_info['rib'].µ == 1.5:
                     break
                 rest = 0
                 particle.resting = True
@@ -226,7 +226,8 @@ def event_check(t, x, particle, tre, ribs, get_u, skalering):
         return collision['collision_depth'] - ε #0.0
     elif collision['is_leaving']: # Forlet resting contact og kjem i fri flyt igjen.
         return 0.0
-
+    if collision['is_resting_contact'] and collision['rib'] == ribs[2]:
+        return 0.0
     if collision['is_resting_contact']:
         return -1.0
     return collision['collision_depth'] - ε #skulle kanskje vore berre sett til -1.0?

@@ -33,7 +33,7 @@ SIM_TIMEOUT = 1
 tal = 50
 rnd_seed = 1
 tider = {}
-einskildpartikkel = 4
+einskildpartikkel = 2
 linear = lift = addedmass = True
 length = 5000
 
@@ -68,9 +68,9 @@ graderingar = [0.05, 0.06#, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
 skaleringar = [1] # 40, 100, 1000]
 
 while True:
-    check_method = input("Method? [standard: BDF], vel mellom RK23, RK45, DOP853, Radau, BDF, LSODA: ").upper()
+    check_method = input("Method? [standard: RK45], vel mellom RK23, RK45, DOP853, Radau, BDF, LSODA: ").upper()
     if check_method == '':
-        method = 'BDF'
+        method = 'RK45'
         break
     elif check_method in ['RK23', 'RK45', 'DOP853', 'Radau', 'BDF', 'LSODA']:
         method = check_method
@@ -185,8 +185,7 @@ for namn in pickle_filer:
                     app_log.info(f"Ferdig å laga kd-tre.")
 
                 start = dt.now()
-                ribs = [Rib(rib, µ=0.85 if rib_index < 2 else 1)
-                        for rib_index, rib in enumerate(tre.ribs)]
+                ribs = [Rib(rib, µ=(0.85 if rib_index < 2 else 1.5)) for rib_index, rib in enumerate(tre.ribs)]
 
                 with h5py.File(hdf5_fil, 'r') as f:
                     max_y = np.max(np.asarray(f['y'])*skalering)
