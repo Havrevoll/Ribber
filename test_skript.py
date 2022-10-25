@@ -29,11 +29,13 @@ from rib import Rib
 from get_u_delaunay import get_u
 
 
-SIM_TIMEOUT = 120
-tal = 200
+SIM_TIMEOUT = 1
+tal = 50
 rnd_seed = 1
 tider = {}
-einskildpartikkel = 6
+einskildpartikkel = 4
+linear = lift = addedmass = True
+length = 5000
 
 pickle_filer = [
     # "rib25_Q20_1",
@@ -64,10 +66,7 @@ graderingar = [0.05, 0.06#, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
 ]
 
 skaleringar = [1] # 40, 100, 1000]
-linear = True
-lift = True
-addedmass = True
-wrap_max = 50
+
 while True:
     check_method = input("Method? [standard: BDF], vel mellom RK23, RK45, DOP853, Radau, BDF, LSODA: ").upper()
     if check_method == '':
@@ -78,7 +77,7 @@ while True:
         break
     else:
         print("Skriv ein skikkeleg metode")
-method_2nd = 'RK23'
+method_2nd = 'RK45'
 # Denne tråden forklarer litt om korleis ein skal setja atol og rtol: https://stackoverflow.com/questions/67389644/floating-point-precision-of-scipy-solve-ivp
 verbose = False
 collision_correction = True
@@ -147,12 +146,9 @@ for namn in pickle_filer:
         talstart = dt.now()
         f_span = (0,3598)
         t_span = (f2t(f_span[0],scale=skalering), f2t(f_span[0],scale=skalering))
-        rtol = 1e-1
-        atol = 1e-1*skalering
+        rtol = 1e-2
+        atol = 1e-2*skalering
         tre = None
-
-        # sim_args = dict(fps = 20, t_span=t_span, linear = True, lift = True, addedmass = True, wrap_max = 50, method = 'BDF', atol = 1e-1, rtol = 1e-1, verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = multi)
-        # fps = 20/sqrt(skalering)
 
         graderingsliste = create_bins(scale_bins(np.asarray(graderingar),skalering))
 
@@ -165,7 +161,7 @@ for namn in pickle_filer:
             if not particle_dir.exists():
                 os.makedirs(particle_dir)
 
-            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_test23.10.22.pickle")
+            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_test25.10.22.pickle")
             if not partikkelfil.exists():
                 if linear and tre is None:
                     app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")
@@ -210,13 +206,13 @@ for namn in pickle_filer:
                     p.index = i
                     p.resting_tolerance = 0.0001 if method == "BDF" else 0.01
                     p.scale = skalering
-                    p.wrap_max = wrap_max
+                    p.length = length
                 del i,p
 
                 if multi:
                     ray.init(local_mode=False,include_dashboard=True, num_cpus=8)  # dashboard_port=8266,),num_cpus=4
                     tre_plasma = ray.put(tre)
-                    lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre_plasma, get_u=get_u, skalering=skalering, wrap_max=wrap_max,
+                    lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre_plasma, get_u=get_u, skalering=skalering, 
                                             verbose=verbose, collision_correction=collision_correction)
 
 
@@ -230,7 +226,7 @@ for namn in pickle_filer:
                     cancelled = []
 
                     while len(running) > 0:
-                        ready, _ = ray.wait([index_list[i]['job'] for i in running.keys()], timeout=1.)
+                        ready, _ = ray.wait([index_list[i]['job'] for i in running.keys()], timeout=.1)
 
                         if len(ready) > 0:
                             elem = job_list_strings[ready[0].task_id().hex()]
@@ -284,7 +280,7 @@ for namn in pickle_filer:
                                 break
 
                 else:
-                    lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre, get_u=get_u, skalering=skalering, wrap_max=wrap_max,
+                    lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre, get_u=get_u, skalering=skalering,
                                             verbose=verbose, collision_correction=collision_correction)
                     for pa in particle_list:
                         if pa.index==einskildpartikkel:

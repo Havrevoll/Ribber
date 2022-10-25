@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 '''køyr funksjonar som plottingar(fil['vassføringar'])'''
 
+from operator import truediv
 import h5py
 import matplotlib
 
@@ -26,10 +27,10 @@ from constants import collision_restitution
 
 
 @ray.remote(max_retries=0)
-def remote_lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):
-    return lag_sti(ribs, f_span, particle, tre, get_u, skalering=skalering, wrap_max = wrap_max, verbose=verbose, collision_correction=collision_correction)
+def remote_lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, verbose=True, collision_correction=True):
+    return lag_sti(ribs, f_span, particle, tre, get_u, skalering=skalering, verbose=verbose, collision_correction=collision_correction)
 
-def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):
+def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, verbose=True, collision_correction=True):
     # stien må innehalda posisjon, fart og tid.
 
     # fps_inv = 1/fps
@@ -40,7 +41,7 @@ def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, wrap_max = 0, verbo
     # print(type(tre))
     # tre = ray.get(tre)
     
-    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs, skalering, get_u), events = (event_check,still_check))#wrap_check,
+    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs, skalering, get_u), events = (event_check,still_check,end_check))
                                                                                                                                                     
  
     step_old = np.concatenate(([particle.init_time], particle.init_position))
@@ -170,7 +171,7 @@ def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, wrap_max = 0, verbo
         frame = t2f(step_old[0],skalering)
 
     sti_dict['final_time'] = final_time
-    sti_dict['flow_length'] =  ribs[1].get_rib_middle()[0] - left_edge
+    # sti_dict['flow_length'] =  ribs[1].get_rib_middle()[0] - left_edge
     
     status_msg = f"Nr. {particle.index} brukte {datetime.datetime.now()-starttid} og kalla funksjonen {nfev} gonger."
     sti_dict['time_usage'] = datetime.datetime.now()-starttid
@@ -193,8 +194,8 @@ def rk_3 (f, t, y0, solver_args, skalering):
             return np.concatenate((resultat.t_events[0], resultat.y_events[0][0])), np.column_stack((np.asarray(resultat.t), np.asarray(resultat.y).T)), "collision", resultat.nfev
         elif resultat.t_events[1].size > 0:
             return np.concatenate((resultat.t_events[1], resultat.y_events[1][0])), np.column_stack((np.asarray(resultat.t), np.asarray(resultat.y).T)), "still", resultat.nfev
-        # elif resultat.t_events[2].size > 0:
-        #     return np.concatenate((resultat.t_events[2], resultat.y_events[2][0])), np.column_stack((np.asarray(resultat.t), np.asarray(resultat.y).T)), "edge", resultat.nfev 
+        elif resultat.t_events[2].size > 0:
+            return np.concatenate((resultat.t_events[2], resultat.y_events[2][0])), np.column_stack((np.asarray(resultat.t), np.asarray(resultat.y).T)), "finish", resultat.nfev 
 
     else:
         return [], np.column_stack((resultat.t, np.asarray(resultat.y).T)), "finish", resultat.nfev #np.concatenate(([resultat.t[-1]], resultat.y[:,-1]))
@@ -252,5 +253,6 @@ def still_check(t,x, particle, tre,ribs, get_u, skalering):
     return 1.0
 still_check.terminal = True
 
-
-
+def end_check(t,x, particle, tre,ribs, get_u, skalering):
+    return particle.length - x[0]
+end_check.terminal = True
