@@ -27,15 +27,15 @@ from constants import collision_restitution
 
 
 @ray.remote(max_retries=0)
-def remote_lag_sti(f_span, particle, get_u, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):
+def remote_lag_sti(f_span, particle, get_u, skalering=1, wrap_max = -1, verbose=True, collision_correction=True):
     return lag_sti(f_span, particle, get_u, skalering=skalering, wrap_max = wrap_max, verbose=verbose, collision_correction=collision_correction)
 
-def lag_sti(f_span, particle, get_u, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):
+def lag_sti(f_span, particle, get_u, skalering=1, wrap_max = -1, verbose=True, collision_correction=True):
     # stien må innehalda posisjon, fart og tid.
     ribs = [Rib([[-101.,151.],[-99.,151.],[-99.,150.],[-101.,150.]]) , Rib([[1001.,151.],[999.,151.],[999.,150.],[1001.,150.]]) ,Rib(np.asarray([[-1000.,0],[1000.,0],[1000.,-100.],[-1000.,-100.]]))]
     # fps_inv = 1/fps
     # sti = []
-    sti_dict = {}
+    sti_dict = []
 
     # sti_komplett = []
     # print(type(tre))
@@ -47,8 +47,8 @@ def lag_sti(f_span, particle, get_u, skalering=1, wrap_max = 0, verbose=True, co
     # Step_old og step_new er ein array med [t, x, y, u, v]. 
     
     # sti.append(step_old)
-    sti_dict[particle.init_time] = dict(position = particle.init_position, loops = 0, caught = False, time=particle.init_time)
-    sti_dict['init_time'] = particle.init_time
+    # sti_dict[particle.init_time] = dict(position = particle.init_position, loops = 0, caught = False, time=particle.init_time)
+    # sti_dict['init_time'] = particle.init_time
     
     final_time = particle.init_time
 
@@ -84,20 +84,13 @@ def lag_sti(f_span, particle, get_u, skalering=1, wrap_max = 0, verbose=True, co
         nfev += nfev_ny
         # sti = sti + backcatalog
 
+        sti_dict.append(backcatalog)
         for index, step in enumerate(backcatalog):
-            step[0] = t2f(step[0],skalering)
-            sti_dict[round(step[0])] = dict(position = step[1:], loops = particle.wrap_counter, caught = True if (step[2] < ribs[1].get_rib_middle()[1]) or (np.sqrt(np.square(step[2:]).sum()) < 0.1) else False, time=f2t(step[0],skalering))
-            final_time = round(step[0])
+            # step[0] = t2f(step[0],skalering)
+            # sti_dict[round(step[0])] = dict(position = step[1:], loops = particle.wrap_counter, caught = True if (step[2] < ribs[1].get_rib_middle()[1]) or (np.sqrt(np.square(step[2:]).sum()) < 0.1) else False, time=f2t(step[0],skalering))
+            # final_time = round(step[0])
             if np.all(index+1 < len(backcatalog) and backcatalog[index+1:,3:] == 0) and event == 'finish': 
                 break
-
-        if verbose:
-            if (event != "finish"):
-                backcatalog = backcatalog + [step_new]
-            for step in backcatalog:
-                status_msg = f"Nr {particle.index}, {particle.diameter:.2f} mm startpos. [{particle.init_position[0]:{des4}},{particle.init_position[1]:{des4}}] ferdig med t={step[0]:.4f}, pos=[{step[1]:{des4}},{step[2]:{des4}}] U=[{step[3]:{des4}},{step[4]:{des4}}]"
-                print(f"\x1b[{status_col}m {status_msg} \x1b[0m")
-
 
         if (event== "collision"):
             # collision_info = check_all_collisions(particle, step_new[1:], ribs)
@@ -169,12 +162,11 @@ def lag_sti(f_span, particle, get_u, skalering=1, wrap_max = 0, verbose=True, co
 
         frame = t2f(step_old[0],skalering)
 
-    sti_dict['final_time'] = final_time
-    sti_dict['flow_length'] =  ribs[1].get_rib_middle()[0] - left_edge
+    # sti_dict['final_time'] = final_time
     
     status_msg = f"Nr. {particle.index} brukte {datetime.datetime.now()-starttid} og kalla funksjonen {nfev} gonger."
-    sti_dict['time_usage'] = datetime.datetime.now()-starttid
-    sti_dict['nfev'] = nfev
+    # sti_dict['time_usage'] = datetime.datetime.now()-starttid
+    # sti_dict['nfev'] = nfev
     print(f"\x1b[{status_col}m {status_msg} \x1b[0m")    
     # return np.array(sti), sti_dict
     return sti_dict
@@ -183,7 +175,7 @@ def lag_sti(f_span, particle, get_u, skalering=1, wrap_max = 0, verbose=True, co
 def rk_3 (f, t, y0, solver_args, skalering):
     assert t[1] > t[0]
     
-    solver_args['t_eval'] = eval_steps(t, skalering)
+    #solver_args['t_eval'] = eval_steps(t, skalering)
     resultat = solve_ivp(f, (f2t(t[0], skalering), f2t(t[1],skalering)), y0, dense_output=True, vectorized=True, **solver_args)
     # t_eval = [t[1]],
     # har teke ut max_ste=0.02, for det vart aldri aktuelt, ser det ut til.  method=solver_args['method'], args=solver_args['args'],
@@ -235,11 +227,11 @@ event_check.counter = 0
 event_check.terminal = True
 
 def wrap_check(t, x, particle, ribs, skalering, get_u):
-    right_edge = ribs[1].get_rib_middle()[0]
+    return ribs[1].get_rib_middle()[0] - x[0] 
         #.strftime('%X.%f')
-    if (x[0] > right_edge):
-        return 0.0
-    return 1.0
+    # if (x[0] > right_edge):
+    #     return 0.0
+    # return 1.0
 wrap_check.terminal = True
 
 def still_check(t,x, particle, ribs, skalering, get_u):

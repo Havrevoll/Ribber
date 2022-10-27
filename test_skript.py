@@ -30,7 +30,7 @@ SIM_TIMEOUT = 120
 RAY_NUM_CPUS = 8
 multi = True
 
-graderingar = [0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
+graderingar = [0.05, 0.06#, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
 #0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,12
 ]
 
@@ -38,9 +38,9 @@ skaleringar = [1] # 40, 100, 1000]
 linear = True
 lift = True
 addedmass = True
-wrap_max = 50
+wrap_max = -1
 method = 'RK45'
-method_2nd = 'RK23'
+method_2nd = 'RK45'
 # Denne tråden forklarer litt om korleis ein skal setja atol og rtol: https://stackoverflow.com/questions/67389644/floating-point-precision-of-scipy-solve-ivp
 verbose = False
 collision_correction = True
@@ -78,8 +78,8 @@ sim_dir = Path("./runs")
 talstart = dt.now()
 f_span = (0,3598)
 t_span = (f2t(f_span[0]), f2t(f_span[0]))
-rtol = 1e-1
-atol = 1e-1
+rtol = 1e-2
+atol = 1e-2
 tre = None
 
 # sim_args = dict(fps = 20, t_span=t_span, linear = True, lift = True, addedmass = True, wrap_max = 50, method = 'BDF', atol = 1e-1, rtol = 1e-1, verbose = False, collision_correction = True, hdf5_fil=pickle_fil.with_suffix(".hdf5"),  multi = multi)
@@ -95,7 +95,7 @@ for gradering in graderingsliste:
     if not particle_dir.exists():
         os.makedirs(particle_dir)
 
-    partikkelfil = sim_dir.joinpath("analytisk").joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{atol:.0e}_{'linear' if linear else 'NN'}_test16.9.22.pickle")
+    partikkelfil = sim_dir.joinpath("analytisk").joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{atol:.0e}_{'linear' if linear else 'NN'}_test27.10.22_fri_t.pickle")
     if not partikkelfil.exists():
         
         random.seed(rnd_seed)
@@ -153,7 +153,7 @@ for gradering in graderingsliste:
                         app_log.info(f"Har kome til partikkel nr. {elem}")
                         sti_dict = ray.get(index_list[elem]['job'], timeout=(1))
 
-                        assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {elem} er ufullstendig"
+                        # assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {elem} er ufullstendig"
                         index_list[elem]['particle'].sti_dict = sti_dict
                         index_list[elem]['particle'].time_usage = (dt.now() - tid).seconds
                         
@@ -198,9 +198,9 @@ for gradering in graderingsliste:
             lag_sti_args = dict(f_span=f_span, get_u=get_u, skalering=1, wrap_max=wrap_max,
                                     verbose=verbose, collision_correction=collision_correction)
             for pa in particle_list:
-                # if pa.index == 0:
+                # if pa.index == 1:
                     pa.sti_dict = lag_sti(particle = pa, **lag_sti_args)
-                    assert all([i in pa.sti_dict for i in range(pa.sti_dict['init_time'], pa.sti_dict['final_time']+1)]), f"Partikkel nr. {pa.index} er ufullstendig"
+                    # assert all([i in pa.sti_dict for i in range(pa.sti_dict['init_time'], pa.sti_dict['final_time']+1)]), f"Partikkel nr. {pa.index} er ufullstendig"
 
         for pa in particle_list:
             if not hasattr(pa,'sti_dict'):
