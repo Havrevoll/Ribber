@@ -33,7 +33,7 @@ SIM_TIMEOUT = 1
 tal = 50
 rnd_seed = 1
 tider = {}
-einskildpartikkel = 2
+einskildpartikkel = 20
 linear = lift = addedmass = True
 length = 5000
 
@@ -161,7 +161,7 @@ for namn in pickle_filer:
             if not particle_dir.exists():
                 os.makedirs(particle_dir)
 
-            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_test25.10.22.pickle")
+            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_test27.10.22.pickle")
             if not partikkelfil.exists():
                 if linear and tre is None:
                     app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")

@@ -117,4 +117,4 @@ def f(t, x, particle, tri, ribs, skalering, get_u, separated = False):
     if not separated:
         return np.concatenate((dxdt,dudt))
     else:
-        return dict(drag = drag_component, gravity = gravity_component, added_mass = added_mass_component - 0.5 * rho_self_density * dudt, pressure = pressure_component, lift_component = lift_component, dudt = dudt, dxdt=dxdt)
+        return dict(drag = drag_component, gravity = gravity_component, added_mass = added_mass_component - 0.5 * rho_self_density * dudt, pressure = pressure_component, lift = lift_component, dudt = dudt, dxdt=dxdt)
