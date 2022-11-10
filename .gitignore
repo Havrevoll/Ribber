@@ -6,3 +6,6 @@ __pycache__
 *.pickle
 *.log
 *.hdf5
+*-checkpoint.*
+*.csv
+*DS_Store

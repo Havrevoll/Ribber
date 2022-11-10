@@ -1,5 +1,6 @@
 from math import pi
 from constants import ρ_p
+import numpy as np
 
 class Particle:
     #Lag ein tabell med tidspunkt og posisjon for kvar einskild partikkel.
@@ -24,6 +25,14 @@ class Particle:
         self.wrap_max = 50
         self.resting_tolerance = 0.01
 
+    def sti_list(self):
+        sti = self.sti_dict
+        init = int(sti['init_time'])
+        final = int(sti['final_time'])
+        plott_array = np.zeros((final+1-init,4))
+        for frame in range(init,final+1):
+            plott_array[frame-init,:] = np.asarray(sti[frame]['position'])#+np.asarray([sti[frame]['loops']*x_width,0,0,0])
+        return plott_array
 
 def particle_copy(pa):
     return Particle(pa.diameter, pa.init_position, pa.density)

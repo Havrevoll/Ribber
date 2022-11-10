@@ -4,6 +4,10 @@ from constants import vel_limit
 
 def check_all_collisions(particle, data, ribs):
     nearest_collision = None
+    data = data.copy()
+    field_width = ribs[1].get_rib_middle()[0] - ribs[0].get_rib_middle()[0]
+    data_avstand = (data[0] - particle.init_position[0]) % field_width
+    data[0] = particle.init_position[0] + data_avstand
     for rib in ribs:
         collision_info = check_collision(particle, data, rib)
         collision_info['rib'] = rib
@@ -38,7 +42,7 @@ def check_collision(particle, data, rib):
     inside = True
     bestDistance = -99999
     nearestEdge = 0
-    
+
     # collisionInfo = (-1,np.array([-1,-1]), np.array([-1,-1]), -1)
     # collisionInfo = {}
     

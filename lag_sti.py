@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 '''køyr funksjonar som plottingar(fil['vassføringar'])'''
 
+from operator import truediv
 import h5py
 import matplotlib
 
@@ -26,10 +27,10 @@ from constants import collision_restitution
 
 
 @ray.remote(max_retries=0)
-def remote_lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):
-    return lag_sti(ribs, f_span, particle, tre, skalering=skalering, wrap_max = wrap_max, verbose=verbose, collision_correction=collision_correction)
+def remote_lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, verbose=True, collision_correction=True):
+    return lag_sti(ribs, f_span, particle, tre, get_u, skalering=skalering, verbose=verbose, collision_correction=collision_correction)
 
-def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True, collision_correction=True):
+def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, verbose=True, collision_correction=True):
     # stien må innehalda posisjon, fart og tid.
 
     # fps_inv = 1/fps
@@ -40,7 +41,8 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
     # print(type(tre))
     # tre = ray.get(tre)
     
-    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs, skalering), events = (event_check,wrap_check,still_check))
+    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs, skalering, get_u), events = (event_check,still_check,end_check))
+                                                                                                                                                    
  
     step_old = np.concatenate(([particle.init_time], particle.init_position))
     # Step_old og step_new er ein array med [t, x, y, u, v]. 
@@ -115,7 +117,7 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
             elif (collision_info['is_resting_contact']):# and np.dot(collision_info['rib_normal'],collision_info['closest_rib_normal']) == 1.0 ):
                 if verbose:
                     print("kvilekontakt")
-                if collision_info['rib'].µ == 1:
+                if collision_info['rib'].µ == 1.5:
                     break
                 rest = 0
                 particle.resting = True
@@ -146,17 +148,17 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
             step_old[3:] = v_new
             step_old[1:3] = step_old[1:3] + collision_info['rib_normal'][:,0] * ε * 0.5
             
-        elif (event == "edge"):
-            if (particle.wrap_counter <= wrap_max):
-                step_old = np.copy(step_new)
-                step_old[1] = left_edge
-                edgecollision = check_all_collisions(particle, step_old[1:], ribs)
-                if edgecollision['is_collision'] or edgecollision['is_resting_contact'] or edgecollision['is_leaving']:
-                    step_old[1:3] = step_old[1:3] + edgecollision['rib_normal'][:,0]*edgecollision['collision_depth']
+        # elif (event == "edge"):
+        #     if (particle.wrap_counter <= wrap_max):
+        #         step_old = np.copy(step_new)
+        #         step_old[1] = left_edge
+        #         edgecollision = check_all_collisions(particle, step_old[1:], ribs)
+        #         if edgecollision['is_collision'] or edgecollision['is_resting_contact'] or edgecollision['is_leaving']:
+        #             step_old[1:3] = step_old[1:3] + edgecollision['rib_normal'][:,0]*edgecollision['collision_depth']
 
-                particle.wrap_counter += 1
-            else:
-                break
+        #         particle.wrap_counter += 1
+        #     else:
+        #         break
         elif event == "still":
             if hypot(step_new[3],step_new[4]) < particle.resting_tolerance:
                 step_old = np.copy(step_new)
@@ -169,9 +171,10 @@ def lag_sti(ribs, f_span, particle, tre, skalering=1, wrap_max = 0, verbose=True
         frame = t2f(step_old[0],skalering)
 
     sti_dict['final_time'] = final_time
-    sti_dict['flow_length'] =  ribs[1].get_rib_middle()[0] - left_edge
+    # sti_dict['flow_length'] =  ribs[1].get_rib_middle()[0] - left_edge
     
     status_msg = f"Nr. {particle.index} brukte {datetime.datetime.now()-starttid} og kalla funksjonen {nfev} gonger."
+    sti_dict['time_usage'] = datetime.datetime.now()-starttid
     print(f"\x1b[{status_col}m {status_msg} \x1b[0m")    
     # return np.array(sti), sti_dict
     return sti_dict
@@ -190,9 +193,9 @@ def rk_3 (f, t, y0, solver_args, skalering):
         if resultat.t_events[0].size > 0:
             return np.concatenate((resultat.t_events[0], resultat.y_events[0][0])), np.column_stack((np.asarray(resultat.t), np.asarray(resultat.y).T)), "collision", resultat.nfev
         elif resultat.t_events[1].size > 0:
-            return np.concatenate((resultat.t_events[1], resultat.y_events[1][0])), np.column_stack((np.asarray(resultat.t), np.asarray(resultat.y).T)), "edge", resultat.nfev
+            return np.concatenate((resultat.t_events[1], resultat.y_events[1][0])), np.column_stack((np.asarray(resultat.t), np.asarray(resultat.y).T)), "still", resultat.nfev
         elif resultat.t_events[2].size > 0:
-            return np.concatenate((resultat.t_events[2], resultat.y_events[2][0])), np.column_stack((np.asarray(resultat.t), np.asarray(resultat.y).T)), "still", resultat.nfev
+            return np.concatenate((resultat.t_events[2], resultat.y_events[2][0])), np.column_stack((np.asarray(resultat.t), np.asarray(resultat.y).T)), "finish", resultat.nfev 
 
     else:
         return [], np.column_stack((resultat.t, np.asarray(resultat.y).T)), "finish", resultat.nfev #np.concatenate(([resultat.t[-1]], resultat.y[:,-1]))
@@ -209,7 +212,7 @@ def eval_steps(t_span, skalering):
     #     t_min = ceil(t_span[0]*fps)/fps
     # return np.linspace( t_min, t_span[1], num = round((t_span[1]-t_min)*fps), endpoint = False )
 
-def event_check(t, x, particle, tre, ribs, skalering):
+def event_check(t, x, particle, tre, ribs, get_u, skalering):
     event_check.counter += 1
     
 
@@ -223,7 +226,8 @@ def event_check(t, x, particle, tre, ribs, skalering):
         return collision['collision_depth'] - ε #0.0
     elif collision['is_leaving']: # Forlet resting contact og kjem i fri flyt igjen.
         return 0.0
-
+    if collision['is_resting_contact'] and collision['rib'] == ribs[2]:
+        return 0.0
     if collision['is_resting_contact']:
         return -1.0
     return collision['collision_depth'] - ε #skulle kanskje vore berre sett til -1.0?
@@ -231,23 +235,25 @@ def event_check(t, x, particle, tre, ribs, skalering):
 event_check.counter = 0
 event_check.terminal = True
 
-def wrap_check(t, x, particle, tre, ribs, skalering):
-    right_edge = ribs[1].get_rib_middle()[0]
-        #.strftime('%X.%f')
-    if (x[0] > right_edge):
-        return 0.0
-    return 1.0
-wrap_check.terminal = True
+# def wrap_check(t, x, particle, tre, ribs, get_u, skalering):
+#     right_edge = ribs[1].get_rib_middle()[0]
+#         #.strftime('%X.%f')
+#     if (x[0] > right_edge):
+#         return 0.0
+#     return 1.0
+# wrap_check.terminal = True
 
-def still_check(t,x, particle, tre,ribs, skalering):
-    if hypot(x[2],x[3]) < particle.resting_tolerance and hypot(x[2],x[3]) > 0 and particle.resting and not particle.still:
+def still_check(t,x, particle, tre,ribs, get_u, skalering):
+    fart = np.hypot(x[2],x[3])
+    if fart < particle.resting_tolerance and fart > 0 and particle.resting and not particle.still:
         return 0.0
     # Kvifor har eg denne her? Det er for å dempa farten om den er så bitteliten at han må leggjast til ro. Men det må jo skje berre dersom det er kontakt i tillegg. Så då må eg vel sjekka kollisjon uansett? 
     # Brukte particle.rtol *1 eller particle.rtol * 10, men det verkar til å vera feil uansett. Prøver med 0.01. (OHH 13.12.2021)
-    if hypot(x[2],x[3]) > particle.resting_tolerance and particle.still:
+    if fart > particle.resting_tolerance and particle.still:
         particle.still = False
     return 1.0
 still_check.terminal = True
 
-
-
+def end_check(t,x, particle, tre,ribs, get_u, skalering):
+    return particle.length - x[0]
+end_check.terminal = True
