@@ -20,7 +20,7 @@ import numpy as np
 
 
 def generate_ribs(ribs, L, rib_width):
-    v_r, golv_nr, h_r, _, _, _, _, _, _, _, _, _ = get_essential_coordinates(L,rib_width)
+    v_r, golv_nr, h_r, _, _, _, _, _, _, _ = get_essential_coordinates(L,rib_width)
 
     venstre_ribbe = np.zeros((4,2))
     
@@ -59,46 +59,44 @@ def generate_U_txy(f_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, kutt=True):
     Umx_reshape = np.copy(Umx.reshape(len(Umx), J, I))
     Vmx_reshape = np.copy(Vmx.reshape(len(Vmx), J, I))
 
-    v_r, golv_nr, h_r, v_r_rad, v_r_kol, v_r_tjukk, golv_rad1, golv_rad2, golv_skifte, h_r_rad, h_r_kol, h_r_tjukk = get_essential_coordinates(L,rib_width)
+    v_r, golv_nr, h_r, v_r_rad, v_r_kol, v_r_tjukk, golv_rad1, h_r_rad, h_r_kol, h_r_tjukk = get_essential_coordinates(L,rib_width)
 
     # Venstre ribbe
-    x0 = ribs[v_r,0]  #-60.79
-    x1 = ribs[v_r+1,0]  #-10.84
+    x0 = ribs[v_r+1,0]  #-60.79
+    # x1 = ribs[v_r+1,0]  #-10.84
     y0 = ribs[v_r,1]  #-.8265
-    y1 = ribs[v_r+1,1]  #-1.1020
+    # y1 = ribs[v_r+1,1]  #-1.1020
     
     # y[64,18:55] = -.8265+ (x[0,18:55] + 60.79)* (-1.1020+0.8265)/(-10.84+60.79)
-    y[v_r_rad,0:v_r_kol] = y0 + (x[0,0:v_r_kol] - x0)* (y1 - y0)/(x1 - x0)
+    x[v_r_rad:v_r_rad+v_r_tjukk,v_r_kol] = x0
+    y[v_r_rad,0:v_r_kol] = y0 #+ (x[0,0:v_r_kol] - x0)* (y1 - y0)/(x1 - x0)
     
     # y[63,0:54]=-1.01
     Umx_reshape[:,v_r_rad:v_r_rad+v_r_tjukk,0:v_r_kol]=0
     Vmx_reshape[:,v_r_rad:v_r_rad+v_r_tjukk,0:v_r_kol]=0
     
+    # høgre ribbe:
     x0 = ribs[h_r,0]   #39.028
-    x1 = ribs[h_r+1,0]   #89.075
+    # x1 = ribs[h_r+1,0]   #89.075
     y0 = ribs[h_r,1]   #0.0918
-    y1 = ribs[h_r+1,1]   #0.0918
+    # y1 = ribs[h_r+1,1]   #0.0918
     
     x[h_r_rad:h_r_rad+h_r_tjukk,h_r_kol] = x0
-    y[h_r_rad,h_r_kol:] = y0  + (x[0,h_r_kol:] - x0)* (y1 - y0)/(x1 - x0)
+    y[h_r_rad,h_r_kol:] = y0  #+ (x[0,h_r_kol:] - x0)* (y1 - y0)/(x1 - x0)
     Umx_reshape[:,h_r_rad:h_r_rad+h_r_tjukk,h_r_kol:]=0
     Vmx_reshape[:,h_r_rad:h_r_rad+h_r_tjukk,h_r_kol:]=0
     
-    
+    # golvet:
     x0 = ribs[golv_nr,0]  #-93.2075
-    x1 = ribs[golv_nr+1,0]  #93.3
+    # x1 = ribs[golv_nr+1,0]  #93.3
     y0 = ribs[golv_nr,1]  #-72.6375
-    y1 = ribs[golv_nr+1,1]  #-74.8415
+    # y1 = ribs[golv_nr+1,1]  #-74.8415
     
-    y [golv_rad1,0:golv_skifte] = y0  + (x[0,0:golv_skifte] - x0)* (y1 - y0)/(x1 - x0)
-    y [golv_rad2,golv_skifte:] = y0  + (x[0,golv_skifte:] - x0)* (y1 - y0)/(x1 - x0)
-    Umx_reshape[:,golv_rad1,0:golv_skifte] = 0
-    Vmx_reshape[:,golv_rad1,0:golv_skifte] = 0
-    Umx_reshape[:,golv_rad2,golv_skifte:] = 0
-    Vmx_reshape[:,golv_rad2,golv_skifte:] = 0
+    y[golv_rad1,:] = y0
 
-    
-    
+    Umx_reshape[:,golv_rad1,:] = 0
+    Vmx_reshape[:,golv_rad1,:] = 0
+
     if kutt:
         # kutt_kor = [ribs[v_r+1,0]-rib_width/2, ribs[v_r+1,0]+(ribs[h_r,0] - ribs[v_r+1,0]) + rib_width/2, ribs[v_r+1,1]-rib_width/2, ribs[v_r+1,1] + 10 * rib_width * 0.02] 
         generated_ribs = generate_ribs(ribs,L,rib_width)
@@ -138,18 +136,18 @@ def get_essential_coordinates(L,rib_width):
     if (L == 50*skala):
         v_r = 1
         golv_nr = 8
-        h_r = 16
+        h_r = 13
 
         v_r_rad = 64
-        v_r_kol = 56
-        v_r_tjukk = 3
+        v_r_kol = 55
+        v_r_tjukk = 6
 
         golv_rad1 = 113
-        golv_rad2 = 114
-        golv_skifte = 55
+        # golv_rad2 = 113
+        # golv_skifte = 55
 
         h_r_rad = 63
-        h_r_kol = 88
+        h_r_kol = 89
         h_r_tjukk = 6
         
     else:
@@ -163,8 +161,8 @@ def get_essential_coordinates(L,rib_width):
             v_r_tjukk = 6
 
             golv_rad1 = 122
-            golv_rad2 = 122
-            golv_skifte = 50
+            # golv_rad2 = 122
+            # golv_skifte = 50
 
             h_r_rad = 69
             h_r_kol = 80
@@ -175,14 +173,14 @@ def get_essential_coordinates(L,rib_width):
             v_r_tjukk = 6
 
             golv_rad1 = 123
-            golv_rad2 = 122
-            golv_skifte = 46
+            # golv_rad2 = 122
+            # golv_skifte = 46
 
             h_r_rad = 65
             h_r_kol = 80
             h_r_tjukk = 6
 
-    return v_r, golv_nr, h_r, v_r_rad, v_r_kol, v_r_tjukk, golv_rad1, golv_rad2, golv_skifte, h_r_rad, h_r_kol, h_r_tjukk
+    return v_r, golv_nr, h_r, v_r_rad, v_r_kol, v_r_tjukk, golv_rad1, h_r_rad, h_r_kol, h_r_tjukk
 
 def lagra_tre(tre, fil):
     with open(fil, 'wb') as f:

@@ -110,8 +110,8 @@ if __name__ == "__main__":
     # Dette er det som skjer i "lag_tre_multi":
 
     filnamn_inn = "data/rib50_Q40_1.hdf5"
-    skalering = 40
-    f_span = (867,869)
+    skalering = 1
+    f_span = (0,2)
     kutt = True
     with h5py.File(filnamn_inn, 'r') as f:
         U = f.attrs['U']*skalering**0.5
