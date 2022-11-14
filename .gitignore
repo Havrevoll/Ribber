@@ -9,3 +9,4 @@ __pycache__
 *-checkpoint.*
 *.csv
 *DS_Store
+*.vec
