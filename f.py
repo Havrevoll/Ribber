@@ -18,7 +18,7 @@ def f(t, x, particle, tri, ribs, skalering, get_u, separated = False):
         Tidspunktet for funksjonen. Ikkje frame, men tid. Må vera slik sidan tida vert multiplisert med posisjonen ute i solve_ivp-funksjonen.
     x : tuple
         Ein tuple med koordinatane og farten, altså (x0, y0, u0, v0).
-    tri : spatial.qhull.Delaunay
+    tri : spatial.Delaunay
         Samling av triangulerte data.
     U : Tuple
         Ein tuple av dei to fartsvektor-arrayane.
