@@ -30,12 +30,12 @@ from get_u_delaunay import get_u
 
 
 SIM_TIMEOUT = 1
-tal = 50
-rnd_seed = 1
+tal = 1000
+rnd_seed = 2
 tider = {}
-einskildpartikkel = 20
+einskildpartikkel = 22
 linear = lift = addedmass = True
-length = 5000
+length = 8000
 
 pickle_filer = [
     # "rib25_Q20_1",
@@ -61,7 +61,7 @@ pickle_filer = [
     # "rib50_Q60_1", "rib50_Q80_1", "rib50_Q100_1", "rib50_Q120_1", "rib50_Q140_1"
     ]
 
-graderingar = [0.05, 0.06#, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
+graderingar = [0.05, 0.06, 0.07#, 0.08, 0.09, 0.1, 0.2, 0.3,
 # 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,12
 ]
 
@@ -154,14 +154,14 @@ for namn in pickle_filer:
 
         for gradering in graderingsliste:
             graderingstart = dt.now()
-            pickle_fil = Path("data").joinpath(Path(pickle_namn))
+            pickle_fil = data_dir.joinpath(Path(pickle_namn))
             app_log.info(f"Byrja med {namn}, gradering {gradering}")
 
             particle_dir = sim_dir.joinpath(Path(pickle_fil.stem))
             if not particle_dir.exists():
                 os.makedirs(particle_dir)
 
-            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_test27.10.22.pickle")
+            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_17.11.22.pickle")
             if not partikkelfil.exists():
                 if linear and tre is None:
                     app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")
@@ -174,7 +174,6 @@ for namn in pickle_filer:
                         app_log.info(f"Det finst ikkje, må laga det.")
                         tre = lag_tre_multi((f_span[0],f_span[1]+1),filnamn_inn = hdf5_fil, skalering=skalering)
                         app_log.info(f"Ferdig å laga, skal lagra det.")
-
                         lagra_tre(tre,pickle_fil)
                         app_log.info(f"Ferdig å lagra det.")
                     # ribs = [Rib(rib) for rib in tre.ribs]
@@ -184,6 +183,9 @@ for namn in pickle_filer:
                     tre = lag_tre_multi((f_span[0],f_span[1]+1),filnamn_inn = hdf5_fil, skalering=skalering, linear=False)
                     app_log.info(f"Ferdig å laga kd-tre.")
 
+
+                with h5py.File(data_dir.joinpath(namn+"_ribs").with_suffix(".hdf5"), 'w') as f:
+                    f.create_dataset("ribs", data=np.asarray(tre.ribs))
                 start = dt.now()
                 ribs = [Rib(rib, µ=(0.85 if rib_index < 2 else 1.5)) for rib_index, rib in enumerate(tre.ribs)]
 
@@ -209,74 +211,75 @@ for namn in pickle_filer:
                 del i,p
 
                 if multi:
-                    ray.init(local_mode=False,include_dashboard=True, num_cpus=8)  # dashboard_port=8266,),num_cpus=4
+                    ray.init(local_mode=False,include_dashboard=True, num_cpus=6)  # dashboard_port=8266,),num_cpus=4
                     tre_plasma = ray.put(tre)
                     lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre_plasma, get_u=get_u, skalering=skalering, 
                                             verbose=verbose, collision_correction=collision_correction)
 
 
 
-                    index_list = {pa.index:{'job':remote_lag_sti.remote(particle=pa, **lag_sti_args),'particle':pa} for pa in particle_list} #index som key, job og particle i ein dict under der
-                    job_list_strings = {index_list[i]['job'].task_id().hex():i for i in index_list} # task-id som string som key, index som value
-                    task_liste = list_tasks(filters=[("scheduling_state", "!=", "SCHEDULED")]) # lista over dei som er running, som string
-                    running = {job_list_strings[p['task_id']]:dt.now() for p in list_tasks(filters=[("scheduling_state", "!=", "SCHEDULED")])} #index som key, tid for oppstart som value
-                    scheduled = [job_list_strings[p['task_id']] for p in list_tasks(filters=[("scheduling_state", "=", "SCHEDULED")])] # berre ei liste med index som er scheduled. Maks 100
+                    # index_list = {pa.index:{'job':remote_lag_sti.remote(particle=pa, **lag_sti_args),'particle':pa} for pa in particle_list} #index som key, job og particle i ein dict under der
+                    # job_list_strings = {index_list[i]['job'].task_id().hex():i for i in index_list} # task-id som string som key, index som value
+                    # # task_liste = list_tasks(filters=[("scheduling_state", "!=", "SCHEDULED")]) # lista over dei som er running, som string
+                    # running = {job_list_strings[p['task_id']]:dt.now() for p in list_tasks(filters=[("scheduling_state", "!=", "SCHEDULED")])} #index som key, tid for oppstart som value
+                    # scheduled = [job_list_strings[p['task_id']] for p in list_tasks(filters=[("scheduling_state", "=", "SCHEDULED")])] # berre ei liste med index som er scheduled. Maks 100
 
-                    cancelled = []
+                    # cancelled = []
 
-                    while len(running) > 0:
-                        ready, _ = ray.wait([index_list[i]['job'] for i in running.keys()], timeout=.1)
+                    # while len(running) > 0:
+                    #     ready, _ = ray.wait([index_list[i]['job'] for i in running.keys()], timeout=.1)
 
-                        if len(ready) > 0:
-                            elem = job_list_strings[ready[0].task_id().hex()]
-                        else:
-                            elem = min(running,key=running.get)
-                        tid = running.pop(elem)
-                        app_log.info(f"skal sjekka partikkel {elem}, gått i {(dt.now()-tid).seconds} sekund, dei som no er att er {[(k,(dt.now()-v).seconds) for k,v in running.items()]}")
+                    #     if len(ready) > 0:
+                    #         elem = job_list_strings[ready[0].task_id().hex()]
+                    #     else:
+                    #         elem = min(running,key=running.get)
+                    #     tid = running.pop(elem)
+                    #     app_log.info(f"skal sjekka partikkel {elem}, gått i {(dt.now()-tid).seconds} sekund, dei som no er att er {[(k,(dt.now()-v).seconds) for k,v in running.items()]}")
 
-                        if (dt.now() - tid).seconds > SIM_TIMEOUT or len(ready) > 0:
-                            try:
-                                app_log.info(f"Har kome til partikkel nr. {elem}")
-                                sti_dict = ray.get(index_list[elem]['job'], timeout=(1))
+                    #     if (dt.now() - tid).seconds > SIM_TIMEOUT or len(ready) > 0:
+                    #         try:
+                    #             app_log.info(f"Har kome til partikkel nr. {elem}")
+                    #             sti_dict = ray.get(index_list[elem]['job'], timeout=(1))
 
-                                assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {elem} er ufullstendig"
-                                index_list[elem]['particle'].sti_dict = sti_dict
+                    #             assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {elem} er ufullstendig"
+                    #             index_list[elem]['particle'].sti_dict = sti_dict
 
-                            except (GetTimeoutError, AssertionError):
-                                ray.cancel(index_list[elem]['job'], force=True)
-                                app_log.info(f"Måtte kansellera nr. {elem}, vart visst aldri ferdig.")
-                                cancelled.append(elem)
-                                index_list[elem]['particle'].method = method_2nd
-                        else:
-                            running[elem] = tid
+                    #         except (GetTimeoutError, AssertionError):
+                    #             ray.cancel(index_list[elem]['job'], force=True)
+                    #             app_log.info(f"Måtte kansellera nr. {elem}, vart visst aldri ferdig.")
+                    #             cancelled.append(elem)
+                    #             index_list[elem]['particle'].method = method_2nd
+                    #     else:
+                    #         running[elem] = tid
 
-                        new_running = dict.fromkeys([job_list_strings[p['task_id']] for p in list_tasks(filters=[("scheduling_state", "!=", "SCHEDULED")]) if (job_list_strings[p['task_id']] not in running) and (job_list_strings[p['task_id']] not in cancelled)],(dt.now()))
-                        running.update(new_running)
-                        scheduled = [job_list_strings[p['task_id']] for p in list_tasks(filters=[("scheduling_state", "=", "SCHEDULED")])]
+                    #     new_running = dict.fromkeys([job_list_strings[p['task_id']] for p in list_tasks(filters=[("scheduling_state", "!=", "SCHEDULED")]) if (job_list_strings[p['task_id']] not in running) and (job_list_strings[p['task_id']] not in cancelled)],(dt.now()))
+                    #     running.update(new_running)
+                    #     scheduled = [job_list_strings[p['task_id']] for p in list_tasks(filters=[("scheduling_state", "=", "SCHEDULED")])]
 
-                    if len(cancelled) > 0:
-                        app_log.info("Skal ta dei som ikkje klarte BDF")
-                        not_ready = []
-                        jobs = {}
-                        for i in cancelled:
-                            index_list[i]['job'] = remote_lag_sti.remote(particle=index_list[i]['particle'], **lag_sti_args)
-                            not_ready.append(index_list[i]['job'])
-                            jobs[index_list[i]['job']] = i
-                        del i
-                        while True:
-                            ready, not_ready = ray.wait(not_ready)
-                            sti_dict = ray.get(ready[0])
-                            app_log.info(f"Fekk nr. {jobs[ready[0]]} som var klar.")
-                            # ny_sti_dict = deepcopy_sti_dict(sti_dict)
+                    # if len(cancelled) > 0:
+                    #     app_log.info("Skal ta dei som ikkje klarte BDF")
+                    index_list =  {pa.index:{'particle':pa} for pa in particle_list}
+                    not_ready = []
+                    jobs = {}
+                    for i in [p.index for p in particle_list]:
+                        index_list[i]['job'] = remote_lag_sti.remote(particle=index_list[i]['particle'], **lag_sti_args)
+                        not_ready.append(index_list[i]['job'])
+                        jobs[index_list[i]['job']] = i
+                    del i
+                    while True:
+                        ready, not_ready = ray.wait(not_ready)
+                        sti_dict = ray.get(ready[0])
+                        app_log.info(f"Fekk nr. {jobs[ready[0]]} som var klar.")
+                        # ny_sti_dict = deepcopy_sti_dict(sti_dict)
 
-                            assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {jobs[ready[0]]} er ufullstendig"
+                        assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {jobs[ready[0]]} er ufullstendig"
 
-                            index_list[jobs[ready[0]]]['particle'].sti_dict = sti_dict
-                            index_list[jobs.pop(ready[0])].pop('job')
+                        index_list[jobs[ready[0]]]['particle'].sti_dict = sti_dict
+                        index_list[jobs.pop(ready[0])].pop('job')
 
-                            app_log.info(f"Dei som står att no er {[index_list[jobs[p]]['particle'].index for p in not_ready] if len(not_ready)<100 else len(not_ready)}")
-                            if len(not_ready) == 0:
-                                break
+                        app_log.info(f"Dei som står att no er {[index_list[jobs[p]]['particle'].index for p in not_ready] if len(not_ready)<100 else len(not_ready)}")
+                        if len(not_ready) == 0:
+                            break
 
                 else:
                     lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre, get_u=get_u, skalering=skalering,
