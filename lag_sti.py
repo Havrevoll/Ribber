@@ -87,7 +87,7 @@ def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, verbose=True, colli
 
         for index, step in enumerate(backcatalog):
             step[0] = t2f(step[0],skalering)
-            sti_dict[round(step[0])] = dict(position = step[1:], loops = particle.wrap_counter, caught = True if (step[2] < ribs[1].get_rib_middle()[1]) or (np.sqrt(np.square(step[2:]).sum()) < 0.1) else False, time=f2t(step[0],skalering))
+            sti_dict[round(step[0])] = dict(position = step[1:], loops = particle.wrap_counter, caught = True if (step[2] < ribs[1].get_rib_middle()[1]) or (np.sqrt(np.square(step[3:]).sum()) < 0.1) else False, time=f2t(step[0],skalering))
             final_time = round(step[0])
             if np.all(index+1 < len(backcatalog) and backcatalog[index+1:,3:] == 0) and event == 'finish': 
                 break
