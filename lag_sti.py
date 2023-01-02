@@ -27,10 +27,10 @@ from constants import collision_restitution
 
 
 @ray.remote(max_retries=0)
-def remote_lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, verbose=True, collision_correction=True):
-    return lag_sti(ribs, f_span, particle, tre, get_u, skalering=skalering, verbose=verbose, collision_correction=collision_correction)
+def remote_lag_sti(ribs, f_span, particle, get_u, skalering=1, verbose=True, collision_correction=True):
+    return lag_sti(ribs, f_span, particle, get_u, skalering=skalering, verbose=verbose, collision_correction=collision_correction)
 
-def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, verbose=True, collision_correction=True):
+def lag_sti(ribs, f_span, particle, get_u, skalering=1, verbose=False, collision_correction=True):
     # stien må innehalda posisjon, fart og tid.
 
     # fps_inv = 1/fps
@@ -41,7 +41,7 @@ def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, verbose=True, colli
     # print(type(tre))
     # tre = ray.get(tre)
     
-    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs, skalering, get_u), events = (event_check,still_check,end_check))
+    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, ribs, skalering, get_u), events = (event_check,still_check,end_check))
                                                                                                                                                     
  
     step_old = np.concatenate(([particle.init_time], particle.init_position))
@@ -212,7 +212,7 @@ def eval_steps(t_span, skalering):
     #     t_min = ceil(t_span[0]*fps)/fps
     # return np.linspace( t_min, t_span[1], num = round((t_span[1]-t_min)*fps), endpoint = False )
 
-def event_check(t, x, particle, tre, ribs, get_u, skalering):
+def event_check(t, x, particle, ribs, get_u, skalering):
     event_check.counter += 1
     
 
@@ -243,7 +243,7 @@ event_check.terminal = True
 #     return 1.0
 # wrap_check.terminal = True
 
-def still_check(t,x, particle, tre,ribs, get_u, skalering):
+def still_check(t,x, particle, ribs, get_u, skalering):
     fart = np.hypot(x[2],x[3])
     if fart < particle.resting_tolerance and fart > 0 and particle.resting and not particle.still:
         return 0.0
@@ -254,6 +254,6 @@ def still_check(t,x, particle, tre,ribs, get_u, skalering):
     return 1.0
 still_check.terminal = True
 
-def end_check(t,x, particle, tre,ribs, get_u, skalering):
+def end_check(t,x, particle, ribs, get_u, skalering):
     return particle.length - x[0]
 end_check.terminal = True

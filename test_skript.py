@@ -4,21 +4,22 @@ Created on Wed Jul  7 09:22:39 2021
 
 @author: havrevol
 """
-from datetime import datetime as dt
+import builtins
 import logging
+import multiprocessing
 import os
 import pickle
 import random
+from datetime import datetime as dt
 from pathlib import Path
-import requests
 
 import h5py
 import numpy as np
 import ray
-# from ray.exceptions import GetTimeoutError
-# from ray.experimental.state.api import list_tasks
+import requests
 
 from datagenerering import lagra_tre
+from get_u_delaunay import get_u
 from hjelpefunksjonar import create_bins, f2t, scale_bins
 from kornfordeling import get_PSD_part
 from lag_sti import lag_sti, remote_lag_sti
@@ -26,7 +27,9 @@ from lag_tre import lag_tre_multi
 from lag_video import sti_animasjon
 from particle import Particle
 from rib import Rib
-from get_u_delaunay import get_u
+
+# from ray.exceptions import GetTimeoutError
+# from ray.experimental.state.api import list_tasks
 
 
 SIM_TIMEOUT = 1
@@ -38,22 +41,22 @@ linear = lift = addedmass = True
 length = 8000
 
 pickle_filer = [
-    "rib25_Q20_1",
-    #"rib25_Q20_2", "rib25_Q20_3",
-    "rib25_Q40_1",
-    # "rib25_Q40_2",
-    "rib25_Q60_1",
-    # "rib25_Q60_2",
-    "rib25_Q80_1",
-    # "rib25_Q80_2",
-    "rib25_Q100_1",
+    # "rib25_Q20_1",
+    # #"rib25_Q20_2", "rib25_Q20_3",
+    # "rib25_Q40_1",
+    # # "rib25_Q40_2",
+    # "rib25_Q60_1",
+    # # "rib25_Q60_2",
+    # "rib25_Q80_1",
+    # # "rib25_Q80_2",
+    # "rib25_Q100_1",
     # "rib25_Q100_2",
     "rib75_Q20_1",
     "rib75_Q40_1",
     # "rib75_Q40_2", "rib75_Q40_3",
     "rib75_Q60_1", "rib75_Q80_1",
     # "rib75_Q80_2", "rib75_Q80_3",
-    # "rib75_Q100_1",
+    "rib75_Q100_1",
     # # "rib75_Q100_2", "rib75_Q100_3", "rib75_Q100_4",
     # "rib50_Q20_1",
     # # "rib50_Q20_2", "rib50_Q20_3",
@@ -83,12 +86,15 @@ verbose = False
 collision_correction = True
 laga_film = False
 while True:
-    check_multi = input("Multi? [default: yes]").lower()
-    if check_multi in ['y', 'yes', 'ja', 'j'] or check_multi == '':
-        multi = True
+    check_multi = input("Multi? ['pool','ray','no'] [default: pool]").lower()
+    if check_multi in ['p', 'pool'] or check_multi == '':
+        multi = 'pool'
         break
     elif check_multi in ['n','nei','no']:
-        multi = False
+        multi = 'false'
+        break
+    elif check_multi in ['ray', 'r']:
+        multi = 'ray'
         break
     else:
         print("Ikkje eit ekte svar, prøv på nytt")
@@ -211,10 +217,13 @@ for namn in pickle_filer:
                     p.length = length
                 del i,p
 
-                if multi:
-                    ray.init(local_mode=False,include_dashboard=True, num_cpus=6)  # dashboard_port=8266,),num_cpus=4
-                    tre_plasma = ray.put(tre)
-                    lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre_plasma, get_u=get_u, skalering=skalering, 
+                builtins.tre = tre
+
+                if multi == 'ray': 
+                    ray.init(local_mode=False,include_dashboard=True, num_cpus=8)  # dashboard_port=8266,),num_cpus=4
+                    # tre_plasma = ray.put(tre)
+
+                    lag_sti_args = dict(ribs =ribs, f_span=f_span, get_u=get_u, skalering=skalering, 
                                             verbose=verbose, collision_correction=collision_correction)
 
 
@@ -282,11 +291,19 @@ for namn in pickle_filer:
                         if len(not_ready) == 0:
                             break
 
+                elif multi == 'pool':
+                    with multiprocessing.Pool(processes = 8) as p:
+                        stiar = p.starmap(lag_sti, [(ribs, f_span, particle, get_u) for particle in particle_list] )
+                        
+                    for sti,pa in zip(stiar,particle_list):
+                        pa.sti_dict = sti
+
                 else:
-                    lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre, get_u=get_u, skalering=skalering,
+                    lag_sti_args = dict(ribs =ribs, f_span=f_span, get_u=get_u, skalering=skalering,
                                             verbose=verbose, collision_correction=collision_correction)
+
                     for pa in particle_list:
-                        if pa.index==einskildpartikkel:
+                        # if pa.index==einskildpartikkel:
                             pa.sti_dict = lag_sti(particle = pa, **lag_sti_args)
                             assert all([i in pa.sti_dict for i in range(pa.sti_dict['init_time'], pa.sti_dict['final_time']+1)]), f"Partikkel nr. {pa.index} er ufullstendig"
 

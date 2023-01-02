@@ -6,7 +6,7 @@ g = np.array([[0], [g]]) # mm/s^2 = 9.81 m/s^2
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
-def get_u(t, x, particle, tre_samla, ribs, collision, skalering):
+def get_u(t, x, particle, ribs, collision, skalering):
     '''
     get_u skal i praksis vera ein funksjon: [t,x,y]→ ( [u,v], [dudt_material,dvdt_material], [[u_top, u_bottom],[v_top, v_bottom]] ) Så når x_inn er ein vektor med fleire koordinatar: 
     tx = np.array([f₀, f₁, f₂, f₃],
@@ -24,7 +24,7 @@ def get_u(t, x, particle, tre_samla, ribs, collision, skalering):
         heile arrayen med posisjon og fart: [x,y,u,v] presentert i ein vertikal vektor med ein eller fleire vektorar bortover.
     particle : Particle.particle
         Den gjeldande partikkelen.
-    tre_samla : datagenerering.tre_objekt
+    tre : datagenerering.tre_objekt
         Eit tre med ein dict med delaunay-trea (ein for kvart tidssteg) og tilhøyrande fartsdata, eit kd-tre og tilhøyrande fartsdata, samt ribber.
     collision : dict
         kollisjonsdata
@@ -51,9 +51,9 @@ def get_u(t, x, particle, tre_samla, ribs, collision, skalering):
     
     if linear:
         try:
-            tri, U_del = tre_samla.get_tri_og_U(frame)
+            tri, U_del = tre.get_tri_og_U(frame)
         except KeyError:
-            tri, U_del = tre_samla.get_max_tri_og_U()
+            tri, U_del = tre.get_max_tri_og_U()
 
         innanfor = np.all(tx >= tri.min_bound.reshape(3,1)) and np.all(tx <= tri.max_bound.reshape(3,1))
     else:
@@ -73,8 +73,8 @@ def get_u(t, x, particle, tre_samla, ribs, collision, skalering):
         vekting_av_venstre = 1
     
 
-    # kdtre = tre_samla.kdtre
-    # U_kd = tre_samla.U_kd
+    # kdtre = tre.kdtre
+    # U_kd = tre.U_kd
 
     if (linear and innanfor):
         d=3
@@ -89,7 +89,7 @@ def get_u(t, x, particle, tre_samla, ribs, collision, skalering):
             linear = False
             lift = False
                 
-            U_f = tre_samla.get_kd_U(tx)
+            U_f = tre.get_kd_U(tx)
             # Gjer added mass og lyftekrafta lik null, sidan den ikkje er viktig her.
         else:  
             # https://en.wikipedia.org/wiki/Barycentric_coordinate_system#Barycentric_coordinates_on_tetrahedra
@@ -112,7 +112,7 @@ def get_u(t, x, particle, tre_samla, ribs, collision, skalering):
             # U_f = np.einsum('ijn,ij->n', np.take(U_del, vertices, axis=0), wts)
             U_f = np.einsum('vpnj,pjn->vpn', np.take(U_del,vertices,axis=1),wts) # (v,p,n)
     else:
-        U_f = tre_samla.get_kd_U(tx) # U_f har shape (2,1) dersom tx.shape == (3,1)
+        U_f = tre.get_kd_U(tx) # U_f har shape (2,1) dersom tx.shape == (3,1)
         addedmass = False
         linear = False
         lift = False
