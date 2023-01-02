@@ -15,8 +15,8 @@ import requests
 import h5py
 import numpy as np
 import ray
-from ray.exceptions import GetTimeoutError
-from ray.experimental.state.api import list_tasks
+# from ray.exceptions import GetTimeoutError
+# from ray.experimental.state.api import list_tasks
 
 from datagenerering import lagra_tre
 from hjelpefunksjonar import create_bins, f2t, scale_bins
@@ -31,37 +31,37 @@ from get_u_delaunay import get_u
 
 SIM_TIMEOUT = 1
 tal = 1000
-rnd_seed = 2
+rnd_seed = 1
 tider = {}
 einskildpartikkel = 22
 linear = lift = addedmass = True
 length = 8000
 
 pickle_filer = [
-    # "rib25_Q20_1",
-    # "rib25_Q20_2", "rib25_Q20_3",
-    # "rib25_Q40_1",
+    "rib25_Q20_1",
+    #"rib25_Q20_2", "rib25_Q20_3",
+    "rib25_Q40_1",
     # "rib25_Q40_2",
-    # "rib25_Q60_1",
+    "rib25_Q60_1",
     # "rib25_Q60_2",
-    # "rib25_Q80_1",
+    "rib25_Q80_1",
     # "rib25_Q80_2",
-    # "rib25_Q100_1",
+    "rib25_Q100_1",
     # "rib25_Q100_2",
-    # "rib75_Q20_1",
-    # "rib75_Q40_1",
+    "rib75_Q20_1",
+    "rib75_Q40_1",
     # "rib75_Q40_2", "rib75_Q40_3",
-    # "rib75_Q60_1", "rib75_Q80_1",
+    "rib75_Q60_1", "rib75_Q80_1",
     # "rib75_Q80_2", "rib75_Q80_3",
     # "rib75_Q100_1",
-    # "rib75_Q100_2", "rib75_Q100_3", "rib75_Q100_4",
+    # # "rib75_Q100_2", "rib75_Q100_3", "rib75_Q100_4",
     # "rib50_Q20_1",
-    # "rib50_Q20_2", "rib50_Q20_3",
-    "rib50_Q40_1",
+    # # "rib50_Q20_2", "rib50_Q20_3",
+    # "rib50_Q40_1",
     # "rib50_Q60_1", "rib50_Q80_1", "rib50_Q100_1", "rib50_Q120_1", "rib50_Q140_1"
     ]
 
-graderingar = [0.05, 0.06, 0.07#, 0.08, 0.09, 0.1, 0.2, 0.3,
+graderingar = [0.05, 0.06#, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
 # 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,12
 ]
 
@@ -77,7 +77,7 @@ while True:
         break
     else:
         print("Skriv ein skikkeleg metode")
-method_2nd = 'RK45'
+# method_2nd = 'RK45'
 # Denne tråden forklarer litt om korleis ein skal setja atol og rtol: https://stackoverflow.com/questions/67389644/floating-point-precision-of-scipy-solve-ivp
 verbose = False
 collision_correction = True
@@ -138,6 +138,7 @@ for namn in pickle_filer:
         del nedlast_tid, fp
 
     for skalering in skaleringar:
+        length = length*skalering
         if skalering == 1:
             pickle_namn = Path(namn).with_suffix(".pickle")
         else:
@@ -161,7 +162,7 @@ for namn in pickle_filer:
             if not particle_dir.exists():
                 os.makedirs(particle_dir)
 
-            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{method_2nd}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_17.11.22.pickle")
+            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_23.11.22.pickle")
             if not partikkelfil.exists():
                 if linear and tre is None:
                     app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")
@@ -295,7 +296,7 @@ for namn in pickle_filer:
                             app_log.info(f"Hadde ikkje fått sti_dict frå {pa.index}. Prøver å henta den no.")
                             sti_dict = ray.get(index_list[pa.index]['job'], timeout=(5))
 
-                            assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {elem} er ufullstendig"
+                            assert all([i in sti_dict for i in range(sti_dict['init_time'], sti_dict['final_time']+1)]), f"Partikkel nr. {pa.index} er ufullstendig"
                             pa.sti_dict = sti_dict
                         # except (GetTimeoutError, AssertionError):
                         #     ray.cancel(index_list[elem]['job'], force=True)
