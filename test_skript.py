@@ -5,8 +5,9 @@ Created on Wed Jul  7 09:22:39 2021
 @author: havrevol
 """
 import builtins
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import logging
-import multiprocessing
+# import multiprocessing
 import os
 import pickle
 import random
@@ -41,9 +42,9 @@ linear = lift = addedmass = True
 length = 8000
 
 pickle_filer = [
-    # "rib25_Q20_1",
+    "rib25_Q20_1",
     # #"rib25_Q20_2", "rib25_Q20_3",
-    # "rib25_Q40_1",
+    "rib25_Q40_1",
     # # "rib25_Q40_2",
     # "rib25_Q60_1",
     # # "rib25_Q60_2",
@@ -64,7 +65,8 @@ pickle_filer = [
     # "rib50_Q60_1", "rib50_Q80_1", "rib50_Q100_1", "rib50_Q120_1", "rib50_Q140_1"
     ]
 
-graderingar = [0.05, 0.06#, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
+graderingar = [#0.05, 
+0.06, 0.07#, 0.08, 0.09, 0.1, 0.2, 0.3,
 # 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,12
 ]
 
@@ -292,11 +294,18 @@ for namn in pickle_filer:
                             break
 
                 elif multi == 'pool':
-                    with multiprocessing.Pool(processes = 8) as p:
-                        stiar = p.starmap(lag_sti, [(ribs, f_span, particle, get_u) for particle in particle_list] )
+                    # with multiprocessing.Pool(processes = 8) as p:
+                    #     stiar = p.starmap(lag_sti, [(ribs, f_span, particle, get_u) for particle in particle_list] )
                         
-                    for sti,pa in zip(stiar,particle_list):
-                        pa.sti_dict = sti
+                    # for sti,pa in zip(stiar,particle_list):
+                    #     pa.sti_dict = sti
+
+                    with ProcessPoolExecutor(max_workers=8) as executor:
+                        stiar = {executor.submit(lag_sti, ribs, f_span, particle, get_u):particle for particle in particle_list}
+
+                    for sti in as_completed(stiar):
+                        pa = stiar[sti]
+                        pa.sti_dict = sti.result()
 
                 else:
                     lag_sti_args = dict(ribs =ribs, f_span=f_span, get_u=get_u, skalering=skalering,

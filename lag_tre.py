@@ -92,11 +92,11 @@ def lag_tre(f_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, nearest=False, kutt=True
     if (nearest):
         tree = KDTree(txy)
     else:
-        print(f"Byrjar på delaunay for ({f_span})")
-        start = datetime.datetime.now()
+        # print(f"Byrjar på delaunay for ({f_span})")
+        # start = datetime.datetime.now()
         tree = Delaunay(txy)
-        print(f"Ferdig med delaunay for ({f_span}, brukte {datetime.datetime.now()-start}")
-        del start
+        # print(f"{f_span},{datetime.datetime.now()-start}", end="\r")
+        # del start
     
     if (inkluder_ribs):
         venstre_ribbe, hogre_ribbe, golv = generate_ribs(ribs, L, rib_width)
