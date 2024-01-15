@@ -27,10 +27,10 @@ from constants import collision_restitution
 
 
 @ray.remote(max_retries=0)
-def remote_lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, verbose=True, collision_correction=True):
-    return lag_sti(ribs, f_span, particle, tre, get_u, skalering=skalering, verbose=verbose, collision_correction=collision_correction)
+def remote_lag_sti(f_span, particle, tre, get_u, skalering=1, verbose=True, collision_correction=True):
+    return lag_sti(f_span, particle, tre, get_u, skalering=skalering, verbose=verbose, collision_correction=collision_correction)
 
-def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, verbose=True, collision_correction=True):
+def lag_sti(f_span, particle, tre, get_u, skalering=1, verbose=True, collision_correction=True):
     # stien må innehalda posisjon, fart og tid.
 
     # fps_inv = 1/fps
@@ -41,7 +41,7 @@ def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, verbose=True, colli
     # print(type(tre))
     # tre = ray.get(tre)
     
-    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, ribs, skalering, get_u), events = (event_check,still_check,end_check))
+    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, skalering, get_u), events = (event_check,still_check,end_check))
                                                                                                                                                     
  
     step_old = np.concatenate(([particle.init_time], particle.init_position))
@@ -60,7 +60,7 @@ def lag_sti(ribs, f_span, particle, tre, get_u, skalering=1, verbose=True, colli
     # dt = dt_main
     nfev = 0
     
-    left_edge = ribs[0].get_rib_middle()[0]
+    left_edge = 19.23734
     
     starttid = datetime.datetime.now()
 

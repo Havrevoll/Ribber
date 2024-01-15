@@ -71,7 +71,7 @@ def lag_tre_multi(f_span, filnamn_inn, filnamn_ut=None, skalering=1,linear = Tru
     else:
         lagra_tre(tre_obj, filnamn_ut)
 
-@ray.remote
+# @ray.remote
 def lag_tre(f_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, nearest=False, kutt=True, inkluder_ribs = False):
     """Lagar eit delaunay- eller kd-tre ut frå f_span og ei hdf5-fil.
 
@@ -87,7 +87,7 @@ def lag_tre(f_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, nearest=False, kutt=True
          tuple: Delaunay eller kd-tre, U pluss ev. ribber
     """
 
-    U, txy = generate_U_txy(f_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, kutt)
+    # U, txy = generate_U_txy(f_span, Umx,Vmx,x,y,I,J,ribs, L, rib_width, kutt)
     
     if (nearest):
         tree = KDTree(txy)
