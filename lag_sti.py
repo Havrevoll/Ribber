@@ -160,7 +160,7 @@ def lag_sti(ribs, f_span, particle, get_u, skalering=1, verbose=False, collision
         #     else:
         #         break
         elif event == "still":
-            if hypot(step_new[3],step_new[4]) < particle.resting_tolerance:
+            if hypot(step_new[3],step_new[4]) < particle.resting_tolerance*particle.resting_multiplier:
                 step_old = np.copy(step_new)
                 step_old[3:] = np.zeros(2)
                 particle.still = True
@@ -212,7 +212,7 @@ def eval_steps(t_span, skalering):
     #     t_min = ceil(t_span[0]*fps)/fps
     # return np.linspace( t_min, t_span[1], num = round((t_span[1]-t_min)*fps), endpoint = False )
 
-def event_check(t, x, particle, ribs, get_u, skalering):
+def event_check(t, x, particle, ribs, skalering, get_u):
     event_check.counter += 1
     
 
@@ -243,9 +243,17 @@ event_check.terminal = True
 #     return 1.0
 # wrap_check.terminal = True
 
-def still_check(t,x, particle, ribs, get_u, skalering):
+def still_check(t,x, particle, ribs, skalering, get_u):
+
+    U_f, _, _ = get_u(t, x.reshape((4,1)), particle, ribs, collision=particle.collision , skalering=skalering)
+    vassfart = np.hypot(U_f[0], U_f[1])
+    if vassfart < 0.01 and particle.resting and not particle.still and (abs(x[2]) > abs(x[3])):
+        particle.resting_multiplier = 100
+    else:
+        particle.resting_multiplier = 1
+
     fart = np.hypot(x[2],x[3])
-    if fart < particle.resting_tolerance and fart > 0 and particle.resting and not particle.still:
+    if fart < particle.resting_tolerance*particle.resting_multiplier and fart > 0 and particle.resting and not particle.still:
         return 0.0
     # Kvifor har eg denne her? Det er for å dempa farten om den er så bitteliten at han må leggjast til ro. Men det må jo skje berre dersom det er kontakt i tillegg. Så då må eg vel sjekka kollisjon uansett? 
     # Brukte particle.rtol *1 eller particle.rtol * 10, men det verkar til å vera feil uansett. Prøver med 0.01. (OHH 13.12.2021)
@@ -254,6 +262,6 @@ def still_check(t,x, particle, ribs, get_u, skalering):
     return 1.0
 still_check.terminal = True
 
-def end_check(t,x, particle, ribs, get_u, skalering):
+def end_check(t,x, particle, ribs, skalering, get_u):
     return particle.length - x[0]
 end_check.terminal = True

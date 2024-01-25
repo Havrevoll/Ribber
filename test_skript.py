@@ -34,17 +34,17 @@ from rib import Rib
 
 
 SIM_TIMEOUT = 1
-tal = 1000
-rnd_seed = 1
+tal = 200
+rnd_seed = 2
 tider = {}
-einskildpartikkel = 22
-linear = lift = addedmass = True
+einskildpartikkel = 139
+linear = lift = addedmass = False
 length = 8000
 
 pickle_filer = [
-    "rib25_Q20_1",
+    # "rib25_Q20_1",
     # #"rib25_Q20_2", "rib25_Q20_3",
-    "rib25_Q40_1",
+    # "rib25_Q40_1",
     # # "rib25_Q40_2",
     # "rib25_Q60_1",
     # # "rib25_Q60_2",
@@ -52,10 +52,10 @@ pickle_filer = [
     # # "rib25_Q80_2",
     # "rib25_Q100_1",
     # "rib25_Q100_2",
-    "rib75_Q20_1",
-    "rib75_Q40_1",
+    # "rib75_Q20_1",
+    # "rib75_Q40_1",
     # "rib75_Q40_2", "rib75_Q40_3",
-    "rib75_Q60_1", "rib75_Q80_1",
+    # "rib75_Q60_1", "rib75_Q80_1",
     # "rib75_Q80_2", "rib75_Q80_3",
     "rib75_Q100_1",
     # # "rib75_Q100_2", "rib75_Q100_3", "rib75_Q100_4",
@@ -65,11 +65,33 @@ pickle_filer = [
     # "rib50_Q60_1", "rib50_Q80_1", "rib50_Q100_1", "rib50_Q120_1", "rib50_Q140_1"
     ]
 
-graderingar = [#0.05, 
-0.06, 0.07#, 0.08, 0.09, 0.1, 0.2, 0.3,
+pickle_filer = [
+    # "rib25_Q20_1",
+    # "rib25_Q40_1",
+    # "rib25_Q60_1",
+    "rib25_Q80_1",
+    # "rib25_Q100_1",
+    # "rib75_Q20_1",
+    # "rib75_Q40_1",
+    # "rib75_Q60_1", 
+    "rib75_Q80_1",
+    # "rib75_Q100_1",
+    # "rib50_Q20_1",
+    # "rib50_Q40_1",
+    # "rib50_Q60_1", 
+    "rib50_Q80_1", 
+    # "rib50_Q100_1", 
+    # "rib50_Q120_1",
+    # "rib50_Q140_1"
+    ]
+graderingar = [#0.05, 0.06, 
+#0.12, 0.122#, 0.09, 0.1, 0.2, 0.3,
 # 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,12
 ]
-
+graderingar = [0.04,0.05, 0.06, 
+0.07, 0.08, 
+0.09, 0.1,0.12,0.14,0.16,0.18,.2, 0.3, 0.4, 0.5, #0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,12
+]
 skaleringar = [1] # 40, 100, 1000]
 
 while True:
@@ -170,7 +192,7 @@ for namn in pickle_filer:
             if not particle_dir.exists():
                 os.makedirs(particle_dir)
 
-            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_23.11.22.pickle")
+            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_17.03.23.pickle")
             if not partikkelfil.exists():
                 if linear and tre is None:
                     app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")
@@ -205,6 +227,7 @@ for namn in pickle_filer:
                 # Her blir partiklane laga:
                 random.seed(rnd_seed)
                 diameters = get_PSD_part(tal, PSD=np.asarray([[gradering[0], 0], [gradering[1], 1]]), rnd_seed=rnd_seed).tolist()
+                # diameters = [0.12] * tal # Lag ei liste med berre 0.12 mm diameter
                 particle_list = [Particle(diameter=float(d), init_position=[ribs[0].get_rib_middle()[0], random.uniform(ribs[0].get_rib_middle()[1]+ribs[0].get_rib_dimensions()[0], max_y), 0, 0], init_time = random.randrange(0, 1000 )) for d in diameters]
 
                 for i, p in enumerate(particle_list):
@@ -312,7 +335,7 @@ for namn in pickle_filer:
                                             verbose=verbose, collision_correction=collision_correction)
 
                     for pa in particle_list:
-                        # if pa.index==einskildpartikkel:
+                        if pa.index==einskildpartikkel:
                             pa.sti_dict = lag_sti(particle = pa, **lag_sti_args)
                             assert all([i in pa.sti_dict for i in range(pa.sti_dict['init_time'], pa.sti_dict['final_time']+1)]), f"Partikkel nr. {pa.index} er ufullstendig"
 
