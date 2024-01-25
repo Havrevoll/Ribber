@@ -17,12 +17,13 @@ import numpy as np
 import ray
 # from ray.exceptions import GetTimeoutError
 # from ray.experimental.state.api import list_tasks
+from scipy.spatial import KDTree
 
 from datagenerering import lagra_tre
-from hjelpefunksjonar import create_bins, f2t, scale_bins
+from hjelpefunksjonar import create_bins, f2t, scale_bins, t2f
 from kornfordeling import get_PSD_part
 from lag_sti import lag_sti, remote_lag_sti
-from lag_tre import lag_tre_multi
+# from lag_tre import lag_tre_multi
 from lag_video import sti_animasjon
 from particle import Particle
 from rib import Rib
@@ -33,19 +34,23 @@ SIM_TIMEOUT = 1
 tal = 1000
 rnd_seed = 1
 tider = {}
-einskildpartikkel = 22
-linear = lift = addedmass = True
-length = 8000
+einskildpartikkel = -9999
+linear = lift = addedmass = False
+length = 194980
 
-pickle_filer = ['richter.pickle']
+pickle_filer = ['richter']
 
-graderingar = [0.05, 0.06#, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
+graderingar = [0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
 # 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,12
 ]
 
 skaleringar = [1] # 40, 100, 1000]
 
 while True:
+    method='RK45'
+    break
+
+
     check_method = input("Method? [standard: RK45], vel mellom RK23, RK45, DOP853, Radau, BDF, LSODA: ").upper()
     if check_method == '':
         method = 'RK45'
@@ -58,9 +63,13 @@ while True:
 # method_2nd = 'RK45'
 # Denne tråden forklarer litt om korleis ein skal setja atol og rtol: https://stackoverflow.com/questions/67389644/floating-point-precision-of-scipy-solve-ivp
 verbose = False
-collision_correction = True
+collision_correction = False
 laga_film = False
 while True:
+    multi=True
+    break
+
+
     check_multi = input("Multi? [default: yes]").lower()
     if check_multi in ['y', 'yes', 'ja', 'j'] or check_multi == '':
         multi = True
@@ -106,15 +115,6 @@ sim_dir = Path("./runs")
 for namn in pickle_filer:
     hdf5_fil = data_dir.joinpath(namn).with_suffix(".hdf5")
 
-    if not hdf5_fil.exists():
-        app_log.info(f"hdf5-fila {hdf5_fil} låg ikkje inne, må lasta ned")
-        nedlast_tid= dt.now()
-        hdf5_fil_innhald = requests.get(f"http://folk.ntnu.no/havrevol/hdf5/{hdf5_fil.name}")
-        with open(hdf5_fil,'wb') as fp:
-            fp.write(hdf5_fil_innhald.content)
-        app_log.info(f"Ferdig å lasta ned, brukte {dt.now()-nedlast_tid}, går vidare.")
-        del nedlast_tid, fp
-
     for skalering in skaleringar:
         length = length*skalering
         if skalering == 1:
@@ -123,11 +123,13 @@ for namn in pickle_filer:
             pickle_namn = Path(namn+f"_scale{skalering}").with_suffix(".pickle")
 
         talstart = dt.now()
-        f_span = (0,3598)
-        t_span = (f2t(f_span[0],scale=skalering), f2t(f_span[0],scale=skalering))
+        t_span = (0,600)#(f2t(f_span[0],scale=skalering), f2t(f_span[0],scale=skalering))
+        f_span = (int(t2f(t_span[0])),int(t2f(t_span[1])))
         rtol = 1e-2
         atol = 1e-2*skalering
-        tre = None
+        with open("data/richter.pickle",'rb') as fila:
+            tre = pickle.load(fila)
+        del fila
 
         graderingsliste = create_bins(scale_bins(np.asarray(graderingar),skalering))
 
@@ -140,42 +142,48 @@ for namn in pickle_filer:
             if not particle_dir.exists():
                 os.makedirs(particle_dir)
 
-            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_23.11.22.pickle")
+            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_25.01.24.pickle")
             if not partikkelfil.exists():
-                if linear and tre is None:
-                    app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")
-                    if pickle_fil.exists():
-                        app_log.info(f"Ja, det finst, hentar det.")
-                        with open(pickle_fil, 'rb') as f:
-                            tre = pickle.load(f)
-                        app_log.info("Ferdig å henta tre.")
-                    else:
-                        app_log.info(f"Det finst ikkje, må laga det.")
-                        tre = lag_tre_multi((f_span[0],f_span[1]+1),filnamn_inn = hdf5_fil, skalering=skalering)
-                        app_log.info(f"Ferdig å laga, skal lagra det.")
-                        lagra_tre(tre,pickle_fil)
-                        app_log.info(f"Ferdig å lagra det.")
-                    # ribs = [Rib(rib) for rib in tre.ribs]
-                    # particle_list = simulering(tal, tre, PSD=np.asarray([[gradering[0],0], [gradering[1],1]]), **sim_args)
-                elif not linear and tre is None:
-                    app_log.info(f"Skal berre laga kd-tre.")
-                    tre = lag_tre_multi((f_span[0],f_span[1]+1),filnamn_inn = hdf5_fil, skalering=skalering, linear=False)
-                    app_log.info(f"Ferdig å laga kd-tre.")
+                # if linear and tre is None:
+                #     app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")
+                #     if pickle_fil.exists():
+                #         app_log.info(f"Ja, det finst, hentar det.")
+                #         with open(pickle_fil, 'rb') as f:
+                #             tre = pickle.load(f)
+                #         app_log.info("Ferdig å henta tre.")
+                #     else:
+                #         app_log.info(f"Det finst ikkje, må laga det.")
+                #         tre = lag_tre_multi((f_span[0],f_span[1]+1),filnamn_inn = hdf5_fil, skalering=skalering)
+                #         app_log.info(f"Ferdig å laga, skal lagra det.")
+                #         lagra_tre(tre,pickle_fil)
+                #         app_log.info(f"Ferdig å lagra det.")
+                #     # ribs = [Rib(rib) for rib in tre.ribs]
+                #     # particle_list = simulering(tal, tre, PSD=np.asarray([[gradering[0],0], [gradering[1],1]]), **sim_args)
+                # elif not linear and tre is None:
+                #     app_log.info(f"Skal berre laga kd-tre.")
+                #     tre = lag_tre_multi((f_span[0],f_span[1]+1),filnamn_inn = hdf5_fil, skalering=skalering, linear=False)
+                #     app_log.info(f"Ferdig å laga kd-tre.")
 
 
-                with h5py.File(data_dir.joinpath(namn+"_ribs").with_suffix(".hdf5"), 'w') as f:
-                    f.create_dataset("ribs", data=np.asarray(tre.ribs))
-                start = dt.now()
-                ribs = [Rib(rib, µ=(0.85 if rib_index < 2 else 1.5)) for rib_index, rib in enumerate(tre.ribs)]
+                # with h5py.File(data_dir.joinpath(namn+"_ribs").with_suffix(".hdf5"), 'w') as f:
+                #     f.create_dataset("ribs", data=np.asarray(tre.ribs))
+                # start = dt.now()
+                # ribs = [Rib(rib, µ=(0.85 if rib_index < 2 else 1.5)) for rib_index, rib in enumerate(tre.ribs)]
 
-                with h5py.File(hdf5_fil, 'r') as f:
-                    max_y = np.max(np.asarray(f['y'])*skalering)
-                del f
+                # with h5py.File(hdf5_fil, 'r') as f:
+                #     max_y = np.max(np.asarray(f['y'])*skalering)
+                # del f
 
+            
+                with h5py.File("walls.hdf5", 'r') as f:
+                    ribs = Rib(np.asarray(f['alle']) )
+                    
+                min_y = -4*1e3
+                max_y = 4.4*1000
                 # Her blir partiklane laga:
                 random.seed(rnd_seed)
                 diameters = get_PSD_part(tal, PSD=np.asarray([[gradering[0], 0], [gradering[1], 1]]), rnd_seed=rnd_seed).tolist()
-                particle_list = [Particle(diameter=float(d), init_position=[ribs[0].get_rib_middle()[0], random.uniform(ribs[0].get_rib_middle()[1]+ribs[0].get_rib_dimensions()[0], max_y), 0, 0], init_time = random.randrange(0, 1000 )) for d in diameters]
+                particle_list = [Particle(diameter=float(d), init_position=[19.24*1000, random.uniform(0, max_y), 0, 0], init_time = random.randrange(0,2500)) for d in diameters]
 
                 for i, p in enumerate(particle_list):
                     p.atol, p.rtol = atol, rtol
@@ -192,8 +200,8 @@ for namn in pickle_filer:
                 if multi:
                     ray.init(local_mode=False,include_dashboard=True, num_cpus=6)  # dashboard_port=8266,),num_cpus=4
                     tre_plasma = ray.put(tre)
-                    lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre_plasma, get_u=get_u, skalering=skalering, 
-                                            verbose=verbose, collision_correction=collision_correction)
+                    lag_sti_args = dict(f_span=f_span, tre=tre_plasma, get_u=get_u, skalering=skalering, 
+                                            verbose=verbose, collision_correction=collision_correction, ribs=ribs)
 
 
 
@@ -261,15 +269,19 @@ for namn in pickle_filer:
                             break
 
                 else:
-                    lag_sti_args = dict(ribs =ribs, f_span=f_span, tre=tre, get_u=get_u, skalering=skalering,
-                                            verbose=verbose, collision_correction=collision_correction)
+                    lag_sti_args = dict(f_span=f_span, tre=tre, get_u=get_u, skalering=skalering,
+                                            verbose=verbose, collision_correction=collision_correction, ribs=ribs)
                     for pa in particle_list:
-                        if pa.index==einskildpartikkel:
+                        if einskildpartikkel == -9999 or pa.index==einskildpartikkel:
                             pa.sti_dict = lag_sti(particle = pa, **lag_sti_args)
                             assert all([i in pa.sti_dict for i in range(pa.sti_dict['init_time'], pa.sti_dict['final_time']+1)]), f"Partikkel nr. {pa.index} er ufullstendig"
 
+
+                if einskildpartikkel != -9999:
+                    particle_list = [particle_list[einskildpartikkel]]
+
                 for pa in particle_list:
-                    if not hasattr(pa,'sti_dict'):
+                    if (not hasattr(pa,'sti_dict')) and multi:
                         # try:
                             app_log.info(f"Hadde ikkje fått sti_dict frå {pa.index}. Prøver å henta den no.")
                             sti_dict = ray.get(index_list[pa.index]['job'], timeout=(5))
@@ -281,7 +293,8 @@ for namn in pickle_filer:
                         #     app_log.info(f"Måtte kansellera nr. {elem}, vart visst aldri ferdig.")
 
                     assert hasattr(pa,'sti_dict'), f"problem i {pa.index}"
-                ray.shutdown()
+                if multi:
+                    ray.shutdown()
                 with open(partikkelfil, 'wb') as f:
                     pickle.dump(particle_list, f)
                 app_log.info(f"Lagra partiklane som {partikkelfil}")

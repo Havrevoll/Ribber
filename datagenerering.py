@@ -47,7 +47,7 @@ class tre_objekt:
         #         except IndexError:
         #             tx[np.abs(tx)>1e100] /= 1e10
                 
-        return self.U_kd[:,self.kdtre.query(np.swapaxes(tx, -2,-1))[1]] #, nullfart, np.zeros((2,2))
+        return self.U_kd[self.kdtre.query(np.swapaxes(tx, -2,-1))[1]].T #, nullfart, np.zeros((2,2))
     
 # def get_vel_snippets(t_span):
 #     t_min = t_span[0]

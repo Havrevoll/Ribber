@@ -6,7 +6,7 @@ g = np.array([[0], [g]]) # mm/s^2 = 9.81 m/s^2
 
 # Så dette er funksjonen som skal analyserast av runge-kutta-operasjonen. Må ha t som fyrste og y som andre parameter.
 # @jit(nopython=True) # Set "nopython" mode for best performance, equivalent to @njit
-def get_u(t, x, particle, tre_samla, collision, skalering):
+def get_u(t, x, particle, tre_samla,ribs, collision, skalering, ): # 
     '''
     get_u skal i praksis vera ein funksjon: [t,x,y]→ ( [u,v], [dudt_material,dvdt_material], [[u_top, u_bottom],[v_top, v_bottom]] ) Så når x_inn er ein vektor med fleire koordinatar: 
     tx = np.array([f₀, f₁, f₂, f₃],
@@ -40,11 +40,11 @@ def get_u(t, x, particle, tre_samla, collision, skalering):
     get_u.counter +=1
   
     lift, addedmass, linear = particle.lift, particle.addedmass, particle.linear
-    frame = t2f(t,skalering)
+#    frame = t2f(t,skalering)
     number_of_vectors = x.shape[-1] #Dette er talet på vektorar pga vectorized i solve_ivp. Vanlegvis 1, men kan vera fleire, t.d. 4.
     # field_width = ribs[1].get_rib_middle()[0] - ribs[0].get_rib_middle()[0]
     # rib_width = ribs[1].get_rib_dimensions()[1]
-    tx = np.concatenate((np.broadcast_to([frame],(1,number_of_vectors)), x[:2]),axis=-2)
+    tx = np.concatenate((np.broadcast_to([t],(1,number_of_vectors)), x[:2]),axis=-2) #gjorde om frame til t.
     # dt, dx, dy = 0.01, 0.1, 0.1
     # tx_avstand = (tx[1] - particle.init_position[0]) % field_width
     # tx[1] = particle.init_position[0] + tx_avstand
@@ -119,14 +119,14 @@ def get_u(t, x, particle, tre_samla, collision, skalering):
         # return np.einsum('j,j->', np.take(U_del[0], vertices), wts), np.einsum('j,j->', np.take(U_del[1], vertices), wts),  np.einsum('j,j->', np.take(U_del[2], vertices), wts),  np.einsum('j,j->', np.take(U_del[3], vertices), wts)
         # return U[0][kd_index], U[1][kd_index], U[2][kd_index], U[3][kd_index]
 
-    try:
-        if (collision['is_resting_contact']):
-            if U_f.shape == (2,number_of_vectors): # Skal sjekka om det er frå delaunay eller kd-tre. Er det frå kd-tre, er U_f.shape == (2,1) og er det lineær interpolasjon er U_f.shape == (2,4,1)
-                U_f = U_f - collision['rib_normal'] * np.einsum('ij,in->n',collision['rib_normal'], U_f) # tangentialkomponenten er lik U_f - normalkomponenten. Normalkomponenten er lik ň * dot(U_f,ň), for dot(U_f,ň) = |U_f|cos(α), som er lik projeksjonen av U_f på normalvektoren, der projeksjonen er hosliggjande katet og U_f er hypotenusen. ň er kollisjonsnormalen og |ň|=1.
-            else:
-                U_f = U_f - collision['rib_normal'][:,None] * np.einsum('ij,ipn->pn',collision['rib_normal'], U_f) #
-    except KeyError:
-        pass
+    # try:
+    #     if (collision['is_resting_contact']):
+    #         if U_f.shape == (2,number_of_vectors): # Skal sjekka om det er frå delaunay eller kd-tre. Er det frå kd-tre, er U_f.shape == (2,1) og er det lineær interpolasjon er U_f.shape == (2,4,1)
+    #             U_f = U_f - collision['rib_normal'] * np.einsum('ij,in->n',collision['rib_normal'], U_f) # tangentialkomponenten er lik U_f - normalkomponenten. Normalkomponenten er lik ň * dot(U_f,ň), for dot(U_f,ň) = |U_f|cos(α), som er lik projeksjonen av U_f på normalvektoren, der projeksjonen er hosliggjande katet og U_f er hypotenusen. ň er kollisjonsnormalen og |ň|=1.
+    #         else:
+    #             U_f = U_f - collision['rib_normal'][:,None] * np.einsum('ij,ipn->pn',collision['rib_normal'], U_f) #
+    # except KeyError:
+    #     pass
                 
     # if (addedmass):
     #     dUdt = (U_f[:,1] - U_f[:,0]) / Δ # Fyrste verdien er dU/dt og andre er dV/dt

@@ -151,7 +151,7 @@ def f2t(f,scale=1):
     Returns:
         float: tid som tilsvarer frame. Til dømes i skala 1: 1000 -> 50
     """    
-    return f*0.05*scale**0.5
+    return f*0.02*scale**0.5
 
 def t2f(t,scale=1):
     """Gjer om tid til frame
@@ -163,7 +163,7 @@ def t2f(t,scale=1):
     Returns:
         int: Datasett-nummer (0-3599)
     """
-    return t*20./scale**0.5
+    return t*50./scale**0.5
 
 def status_colors():
     while True:

@@ -27,10 +27,10 @@ from constants import collision_restitution
 
 
 @ray.remote(max_retries=0)
-def remote_lag_sti(f_span, particle, tre, get_u, skalering=1, verbose=True, collision_correction=True):
-    return lag_sti(f_span, particle, tre, get_u, skalering=skalering, verbose=verbose, collision_correction=collision_correction)
+def remote_lag_sti(f_span, particle, tre, get_u, ribs, skalering=1, verbose=True, collision_correction=True):
+    return lag_sti(f_span, particle, tre, get_u, ribs, skalering=skalering, verbose=verbose, collision_correction=collision_correction)
 
-def lag_sti(f_span, particle, tre, get_u, skalering=1, verbose=True, collision_correction=True):
+def lag_sti(f_span, particle, tre, get_u, ribs, skalering=1, verbose=True, collision_correction=True):
     # stien må innehalda posisjon, fart og tid.
 
     # fps_inv = 1/fps
@@ -41,7 +41,7 @@ def lag_sti(f_span, particle, tre, get_u, skalering=1, verbose=True, collision_c
     # print(type(tre))
     # tre = ray.get(tre)
     
-    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre, skalering, get_u), events = (event_check,still_check,end_check))
+    solver_args = dict(atol = particle.atol, rtol= particle.rtol, method=particle.method, args = (particle, tre,ribs, skalering, get_u), events = (event_check,still_check,end_check))
                                                                                                                                                     
  
     step_old = np.concatenate(([particle.init_time], particle.init_position))
@@ -60,7 +60,7 @@ def lag_sti(f_span, particle, tre, get_u, skalering=1, verbose=True, collision_c
     # dt = dt_main
     nfev = 0
     
-    left_edge = 19.23734
+    # left_edge = 19.23734
     
     starttid = datetime.datetime.now()
 
@@ -87,7 +87,7 @@ def lag_sti(f_span, particle, tre, get_u, skalering=1, verbose=True, collision_c
 
         for index, step in enumerate(backcatalog):
             step[0] = t2f(step[0],skalering)
-            sti_dict[round(step[0])] = dict(position = step[1:], loops = particle.wrap_counter, caught = True if (step[2] < ribs[1].get_rib_middle()[1]) or (np.sqrt(np.square(step[3:]).sum()) < 0.1) else False, time=f2t(step[0],skalering))
+            sti_dict[round(step[0])] = dict(position = step[1:], loops = particle.wrap_counter, caught = True if (np.sqrt(np.square(step[3:]).sum()) < 0.1) else False, time=f2t(step[0],skalering))
             final_time = round(step[0])
             if np.all(index+1 < len(backcatalog) and backcatalog[index+1:,3:] == 0) and event == 'finish': 
                 break
@@ -200,11 +200,11 @@ def rk_3 (f, t, y0, solver_args, skalering):
     else:
         return [], np.column_stack((resultat.t, np.asarray(resultat.y).T)), "finish", resultat.nfev #np.concatenate(([resultat.t[-1]], resultat.y[:,-1]))
 
-def eval_steps(t_span, skalering):
-    if isclose(t_span[0],round(t_span[0])):
-        return np.asarray([f2t(i,skalering) for i in range(ceil(t_span[0]),t_span[1])])[1:]
+def eval_steps(f_span, skalering):
+    if isclose(f_span[0],round(f_span[0])):
+        return np.asarray([f2t(i,skalering) for i in range(ceil(f_span[0]),f_span[1])])[1:]
     else:
-        return np.asarray([f2t(i,skalering) for i in range(ceil(t_span[0]),t_span[1])])
+        return np.asarray([f2t(i,skalering) for i in range(ceil(f_span[0]),f_span[1])])
 
     # if floor(t_span[0] * 1000000) % floor((1/fps) * 1000000) == 0:
     #     t_min = ceil(round(t_span[0]+1/fps,5)*fps)/fps
@@ -226,10 +226,10 @@ def event_check(t, x, particle, tre, ribs, get_u, skalering):
         return collision['collision_depth'] - ε #0.0
     elif collision['is_leaving']: # Forlet resting contact og kjem i fri flyt igjen.
         return 0.0
-    if collision['is_resting_contact'] and collision['rib'] == ribs[2]:
-        return 0.0
     if collision['is_resting_contact']:
-        return -1.0
+        return 0.0
+    # if collision['is_resting_contact']:
+    #     return -1.0
     return collision['collision_depth'] - ε #skulle kanskje vore berre sett til -1.0?
 
 event_check.counter = 0
