@@ -40,7 +40,7 @@ length = 194980
 
 pickle_filer = ['richter']
 
-graderingar = [0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.2, 0.3,
+graderingar = [0.05, 0.06, 0.07, 0.08, 0.09,# 0.1, 0.2, 0.3,
 # 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,12
 ]
 
@@ -142,7 +142,7 @@ for namn in pickle_filer:
             if not particle_dir.exists():
                 os.makedirs(particle_dir)
 
-            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_25.01.24.pickle")
+            partikkelfil = sim_dir.joinpath(pickle_fil.stem).joinpath( f"{method}_{tal}_{[round(i,3) for i in gradering]}_{skalering}_{atol:.0e}_{'linear' if linear else 'NN'}_27.01.24.pickle")
             if not partikkelfil.exists():
                 # if linear and tre is None:
                 #     app_log.info(f"Skal sjekka om treet finst som heiter {pickle_fil.name}.")
@@ -183,7 +183,7 @@ for namn in pickle_filer:
                 # Her blir partiklane laga:
                 random.seed(rnd_seed)
                 diameters = get_PSD_part(tal, PSD=np.asarray([[gradering[0], 0], [gradering[1], 1]]), rnd_seed=rnd_seed).tolist()
-                particle_list = [Particle(diameter=float(d), init_position=[19.24*1000, random.uniform(0, max_y), 0, 0], init_time = random.randrange(0,2500)) for d in diameters]
+                particle_list = [Particle(diameter=float(d), init_position=[19.24*1000, random.uniform(min_y, max_y), 0, 0], init_time = random.randrange(0,2500)) for d in diameters]
 
                 for i, p in enumerate(particle_list):
                     p.atol, p.rtol = atol, rtol
@@ -198,7 +198,7 @@ for namn in pickle_filer:
                 del i,p
 
                 if multi:
-                    ray.init(local_mode=False,include_dashboard=True, num_cpus=6)  # dashboard_port=8266,),num_cpus=4
+                    ray.init(local_mode=False,include_dashboard=True, num_cpus=7)  # dashboard_port=8266,),num_cpus=4
                     tre_plasma = ray.put(tre)
                     lag_sti_args = dict(f_span=f_span, tre=tre_plasma, get_u=get_u, skalering=skalering, 
                                             verbose=verbose, collision_correction=collision_correction, ribs=ribs)
