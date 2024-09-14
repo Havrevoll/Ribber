@@ -40,7 +40,7 @@ length = 194980
 
 pickle_filer = ['richter']
 
-graderingar = [0.05, 0.06, 0.07, 0.08, 0.09,# 0.1, 0.2, 0.3,
+graderingar = [0.05, 0.06, 0.07#, 0.08, 0.09, 0.1, 0.2, 0.3,
 # 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,12
 ]
 
@@ -198,7 +198,7 @@ for namn in pickle_filer:
                 del i,p
 
                 if multi:
-                    ray.init(local_mode=False,include_dashboard=True, num_cpus=7)  # dashboard_port=8266,),num_cpus=4
+                    ray.init(local_mode=False,include_dashboard=True, num_cpus=8)  # dashboard_port=8266,),num_cpus=4
                     tre_plasma = ray.put(tre)
                     lag_sti_args = dict(f_span=f_span, tre=tre_plasma, get_u=get_u, skalering=skalering, 
                                             verbose=verbose, collision_correction=collision_correction, ribs=ribs)
